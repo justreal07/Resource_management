@@ -1680,6 +1680,18 @@ a { color: var(--navy); }
     .user-dropdown-menu { right: auto; left: 0; }
 }
 
+/* Wide screens with larger text (the "Text size" buttons in the top bar make everything bigger):
+   the site title is never cut off. When the title and the menu don't fit on one line, the menu
+   drops to its own row, still lined up with the right edge of the top bar. At normal text size
+   everything still fits on one line, so nothing changes. */
+@media (min-width: 1181px) {
+    .nav-container { flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
+    .brand { flex: 0 0 auto; }
+    .brand-text strong,
+    .brand-text small { white-space: normal; overflow: visible; text-overflow: clip; }
+    .nav-menu { margin-left: auto; }
+}
+
 @media (max-width: 960px) {
     .steps-grid { grid-template-columns: repeat(2, 1fr); row-gap: 40px; }
     .steps-grid::before { display: none; }
