@@ -45,7 +45,7 @@ if(isset($_SESSION['applicant'])) {
     $stmt->execute([$applicant_id]);
     $recent_applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Notifications: received / approved / not approved / "you can apply again", with unread state
+    // ppNotifications: received / approved / not approved / "you can apply again", with unread state
     $notifications = get_user_notifications($pdo, (int)$applicant_id, $user['notifications_seen_at'] ?? null);
     $notification_count = count_unread($notifications);
 
