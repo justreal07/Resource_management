@@ -1,0 +1,221 @@
+/* ============================================
+   GOOGLE FONT (Matching the reference)
+============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600&display=swap');
+
+/* ============================================
+   RESET & BASE (Copying exact approach)
+============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+  font-family: 'Roboto'!important;
+}
+
+body {
+    font-family: 'Roboto' !important;
+    background: #F4F6FB;
+    background-image: url('../asset/walapa.png');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    color: #1A1A1A;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ============================================
+   LOGIN CONTAINER (Matching doc-container style)
+============================================ */
+.login-container {
+    max-width: 550px;
+    margin: 40px auto;
+    padding: 40px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 8px 25px rgba(10,36,114,0.1);
+    border-top: 5px solid #E63946;
+    width: 90%;
+}
+
+/* ============================================
+   LOGIN HEADER (Matching doc-header style)
+============================================ */
+.login-header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.login-header img {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    border: 3px solid #0A2472;
+    padding: 5px;
+    background: white;
+    box-shadow: 0 4px 15px rgba(10,36,114,0.2);
+    margin-bottom: 15px;
+}
+
+.login-header h2 {
+    color: #0A2472;
+    font-size: 2rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.login-sub {
+    color: #666;
+    font-size: 1rem;
+    margin-top: 5px;
+}
+
+/* ============================================
+   FORM GROUPS (Matching table approach)
+============================================ */
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #0A2472;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+input, select {
+    width: 100%;
+    padding: 14px;
+    font-size: 1rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    background: #f8fafc;
+    font-family: 'Roboto';
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: #0A2472;
+    box-shadow: 0 0 0 3px rgba(10,36,114,0.1);
+}
+
+/* REMOVED hover effect on inputs */
+/* input:hover, select:hover was removed */
+
+/* ============================================
+   ERROR BOX (Styled like table alerts)
+============================================ */
+.error-box {
+    background: #fef2f2;
+    border-left: 4px solid #E63946;
+    border-radius: 8px;
+    padding: 12px 18px;
+    margin-bottom: 20px;
+}
+
+.error-box p {
+    color: #E63946;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+/* ============================================
+   LOGIN BUTTON (NO HOVER EFFECTS)
+============================================ */
+button[type="submit"] {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    background: linear-gradient(135deg, #0A2472, #1a3d9e);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 25px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* COMPLETELY REMOVED the button:hover section */
+
+/* ============================================
+   REGISTER LINK (NO HOVER EFFECTS)
+============================================ */
+.register-link {
+    text-align: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+    font-size: 0.95rem;
+}
+
+.register-link a {
+    display: inline-block;
+    padding: 8px 16px;
+    background: linear-gradient(135deg, #0A2472, #1a3d9e);
+    color: white;
+    text-decoration: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin-left: 8px;
+    text-transform: uppercase;
+    font-weight: 500;
+}
+
+/* COMPLETELY REMOVED the register-link a:hover section */
+
+.register-link span {
+    color: #666;
+}
+
+/* ============================================
+   ROLE HINT (Subtle helper text)
+============================================ */
+.role-hint {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    display: flex;
+    gap: 10px;
+}
+
+/* ============================================
+   RESPONSIVE (EXACT same as reference)
+============================================ */
+@media (max-width: 768px) {
+    .login-container {
+        margin: 20px;
+        padding: 25px;
+        width: auto;
+    }
+    
+    .login-header h2 {
+        font-size: 1.5rem;
+    }
+    
+    .login-header img {
+        width: 70px;
+        height: 70px;
+    }
+    
+    input, select, button[type="submit"] {
+        padding: 12px;
+    }
+}

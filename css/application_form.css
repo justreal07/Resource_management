@@ -1,0 +1,514 @@
+    /* ============================================
+   APPLICATIONS MANAGEMENT PAGE CSS
+   Admin - Applications Styling
+   BLUE & RED COLOR PALETTE
+   ============================================ */
+
+/* RESET & BASE STYLES */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #0b1727;
+    padding: 30px;
+    color: #0b1727;
+}
+
+/* PAGE HEADER */
+h2 {
+    font-size: 2rem;
+    color: #ffffff;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 3px solid #c0392b; /* dark red */
+    display: inline-block;
+}
+
+/* ACTION BUTTONS CONTAINER */
+.action-buttons {
+    margin: 25px 0;
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+/* ADD BUTTON STYLES */
+.add-btn {
+    display: inline-block;
+    padding: 12px 24px;
+    background: linear-gradient(135deg, #1a3a6a 0%, #0f2a4d 100%); /* dark blue gradient */
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-size: 20px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      width: 250px;               /* fixed length */
+    max-width: 100%;
+}
+
+.add-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    background: linear-gradient(135deg, #0f2a4d 0%, #071a33 100%);
+}
+
+/* TABLE STYLES */
+table {
+    width: 100%;
+    background: white;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    border-collapse: separate;
+    border-spacing: 0;
+    border: 1px solid #9c9797;
+}
+
+thead tr {
+    background: linear-gradient(135deg, #1a3a6a 0%, #0f2a4d 100%); /* dark blue gradient */
+}
+
+th {
+    padding: 15px 12px;
+    text-align: left;
+    color: white;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    border: 1px solid #2a4a7a;
+}
+
+td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 0.9rem;
+    border: 1px solid #ddd;
+}
+
+tbody tr:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s;
+}
+
+/* STATUS COLORS - Blue & Red Theme */
+.status-Approved {
+    background: #d4e6f1; /* light blue */
+    color: #1a3a6a; /* dark blue */
+    padding: 6px 12px;
+    border-radius: 40px;
+    font-weight: 500;
+    font-size: 0.85rem;
+    display: inline-block;
+}
+
+.status-Pending {
+    color: #c0392b; /* dark red */
+    font-weight: bold;
+    background: #fadbd8; /* light red */
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.status-Rejected {
+    color: #922b21; /* deep red */
+    font-weight: bold;
+    background: #f2d7d5; /* soft red */
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+.status-passed {
+    color: #1a3a6a; /* dark blue */
+    font-weight: bold;
+    background: #d6eaf8; /* light blue */
+    display: inline-block;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+}
+
+/* ACTION BUTTONS IN TABLE */
+.action {
+    white-space: nowrap;
+}
+
+.action a, .action button {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 0 3px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    border: none;
+    cursor: pointer;
+}
+
+.view {
+    background-color: #1a3a6a; /* dark blue */
+    color: white;
+}
+
+.view:hover {
+    background-color: #0f2a4d;
+    transform: translateY(-1px);
+}
+
+.edit {
+    background-color: #2980b9; /* medium blue */
+    color: white;
+}
+
+.edit:hover {
+    background-color: #1f618d;
+    transform: translateY(-1px);
+}
+
+.delete {
+    background-color: #c0392b; /* dark red */
+    color: white;
+}
+
+.delete:hover {
+    background-color: #a93226;
+    transform: translateY(-1px);
+}
+
+.approve-btn {
+    background-color: #27ae60; /* green for approve - keeping for positive action */
+    color: white;
+    padding: 6px 12px;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.approve-btn:hover {
+    background-color: #1e8449;
+    transform: translateY(-1px);
+}
+
+.action form {
+    display: inline;
+}
+
+/* NO DATA ROW */
+td[colspan="7"] {
+    text-align: center;
+    padding: 40px;
+    color: #6c757d;
+    font-size: 1rem;
+}
+
+/* RESPONSIVE DESIGN */
+@media (max-width: 1024px) {
+    body {
+        padding: 20px;
+    }
+    
+    table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    th, td {
+        padding: 10px 8px;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 15px;
+    }
+    
+    h2 {
+        font-size: 1.5rem;
+    }
+    
+    .add-btn {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+    
+    th, td {
+        padding: 8px 6px;
+        font-size: 0.8rem;
+    }
+    
+    .action a, .action button {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+    
+    .status-Approved,
+    .status-Pending,
+    .status-Rejected,
+    .status-passed {
+        padding: 3px 8px;
+        font-size: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .action-buttons {
+        flex-direction: column;
+    }
+    
+    .add-btn {
+        text-align: center;
+        width: 100%;
+    }
+}
+
+/* PRINT STYLES */
+@media print {
+    body {
+        background: white;
+        padding: 0;
+    }
+    
+    .action-buttons,
+    .action,
+    .approve-btn {
+        display: none;
+    }
+    
+    table {
+        box-shadow: none;
+        border: 1px solid #ddd;
+    }
+    
+    th {
+        background: #f2f2f2;
+        color: black;
+    }
+}
+
+/* SCROLLBAR STYLING */
+::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #1a3a6a; /* dark blue */
+    border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #0f2a4d;
+}
+
+/* FOCUS STYLES FOR ACCESSIBILITY */
+a:focus, button:focus, .approve-btn:focus {
+    outline: 2px solid #c0392b; /* red focus outline */
+    outline-offset: 2px;
+}
+
+/* ANIMATIONS */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+table {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* CARD VIEW FOR MOBILE (Optional) */
+@media (max-width: 768px) {
+    table thead {
+        display: none;
+    }
+    
+    table, table tbody, table tr, table td {
+        display: block;
+        width: 100%;
+    }
+    
+    table tr {
+        margin-bottom: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background: white;
+        padding: 10px;
+    }
+    
+    table td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px;
+        border: none;
+        border-bottom: 1px solid #eee;
+    }
+    
+    table td:before {
+        content: attr(data-label);
+        font-weight: bold;
+        width: 40%;
+        color: #1a3a6a; /* dark blue */
+    }
+    
+    td[colspan="7"] {
+        display: table-cell;
+    }
+    
+    td[colspan="7"]:before {
+        display: none;
+    }
+}
+
+/* CARDS STYLES - Blue & Red Theme */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 25px;
+    margin-bottom: 40px;
+}
+
+.card {
+    background: white;
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s ease;
+    text-align: center;
+    border-left: 5px solid;
+    cursor: pointer;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.card:nth-child(1) { border-left-color: #1a3a6a; } /* dark blue */
+.card:nth-child(2) { border-left-color: #2980b9; } /* medium blue */
+.card:nth-child(3) { border-left-color: #c0392b; } /* dark red */
+.card:nth-child(4) { border-left-color: #e74c3c; } /* bright red */
+
+.card h3 {
+    font-size: 18px;
+    color: #666;
+    margin-bottom: 15px;
+    font-weight: 600;
+}
+
+.card h1 {
+    font-size: 48px;
+    margin: 0;
+    padding: 0;
+    border: none;
+    font-weight: 800;
+}
+
+.card a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.card a h1 {
+    transition: color 0.3s ease;
+}
+
+.card a:hover h1 {
+    opacity: 0.8;
+}
+
+/* SEARCH CONTAINER STYLES - Blue & Red Theme */
+.search-container {
+    background: #eff0f1;
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid #e0e0e0;
+      width: 600px;               /* fixed length */
+    max-width: 90%;
+}
+
+.search-container input {
+    flex: 0 0 280px;
+    max-width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: #fff;
+    transition: all 0.3s ease;
+}
+
+.search-container input:focus {
+    outline: none;
+    border-color: #1a3a6a; /* dark blue */
+    box-shadow: 0 0 0 2px rgba(26, 58, 106, 0.15);
+}
+
+.search-container input::placeholder {
+    color: #9ca3af;
+    font-style: italic;
+}
+
+.search-container button {
+    background: #1a3a6a; /* dark blue */
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.search-container button:hover {
+    background: #0f2a4d;
+    transform: translateY(-2px);
+}
+
+/* Additional red accent for delete/cancel actions */
+.cancel-btn, .reject-btn {
+    background-color: #c0392b; /* dark red */
+    color: white;
+}
+
+.cancel-btn:hover, .reject-btn:hover {
+    background-color: #a93226;
+}

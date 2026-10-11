@@ -1,0 +1,341 @@
+/* ============================================
+   ACCOUNT DASHBOARD - Tabler-style frame
+   my_account / my_documents / user_notifications / view_application
+   Layout and look follow the Tabler dashboard template (tabler.io, MIT):
+   white sidebar, slim top bar, plain page header, flat bordered cards,
+   soft-tinted icons. Loaded after css/apply.css and css/account.css and
+   restyles their classes, so the page scripts and the guided tour keep working.
+============================================ */
+
+.db-body {
+    --db-bg: #f5f7fb;
+    --db-border: #e3e7ee;
+    --db-text: #1d273b;
+    --db-muted: #667382;
+    --db-hover: #f3f5f9;
+    --db-active: #eef2fb;
+    --db-radius: 8px;
+    --db-radius-sm: 6px;
+    --db-shadow: 0 1px 2px rgba(29, 39, 59, 0.04);
+    --db-sidebar-w: 252px;
+
+    --tint-navy: #e8eefb;
+    --tint-amber: #fff4d6;
+    --tint-green: #e3f6ec;
+    --tint-red: #fde8e8;
+
+    display: block;
+    background: var(--db-bg);
+    color: #3b4659;
+    font-size: 1rem;
+}
+.db-body h1, .db-body h2, .db-body h3, .db-body h4 {
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: var(--db-text);
+    letter-spacing: -0.01em;
+}
+.db-body :focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+
+/* ---------- Frame ---------- */
+.db-shell { display: flex; min-height: 100vh; }
+.db-page { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.db-body .ap-container { max-width: 1240px; padding: 0 28px; }
+
+/* ---------- Sidebar ---------- */
+.db-sidebar {
+    flex: none;
+    width: var(--db-sidebar-w);
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border-right: 1px solid var(--db-border);
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+.db-sidebar::before {   /* LGU colors, thin */
+    content: "";
+    flex: none;
+    height: 3px;
+    background: linear-gradient(90deg, var(--navy) 0 33%, var(--red) 33% 66%, var(--gold) 66% 100%);
+}
+.db-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--db-border);
+    text-decoration: none;
+}
+.db-brand .ap-brand-logos img { width: 36px; height: 36px; }
+.db-brand-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
+.db-brand-text strong { color: var(--navy); font-size: 0.95rem; font-weight: 700; }
+.db-brand-text small { color: var(--db-muted); font-size: 0.72rem; }
+
+.db-menu { flex: 1; padding: 8px 12px 16px; display: flex; flex-direction: column; }
+.db-menu-label {
+    display: block;
+    padding: 18px 12px 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: #9aa3b2;
+}
+.db-menu-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--db-radius-sm);
+    color: #49566b;
+    font-size: 0.92rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+.db-menu-link > i { width: 18px; text-align: center; color: #8a94a6; font-size: 0.95rem; }
+.db-menu-link:hover { background: var(--db-hover); color: var(--db-text); }
+.db-menu-link.is-active { background: var(--db-active); color: var(--navy); font-weight: 600; }
+.db-menu-link.is-active > i { color: var(--navy); }
+.db-menu-link > i.db-tone-red { color: #c62828; }
+.db-menu-link > i.db-tone-blue { color: var(--navy); }
+.db-menu-link > i.db-tone-green { color: var(--green); }
+.db-menu-badge {
+    margin-left: auto;
+    min-width: 20px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--red);
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-align: center;
+}
+.db-menu-badge[hidden] { display: none; }
+.db-sidebar-foot { padding: 10px 12px 16px; border-top: 1px solid var(--db-border); display: grid; gap: 2px; }
+.db-logout, .db-logout > i { color: var(--danger) !important; }
+
+.db-backdrop { display: none; }
+
+/* ---------- Top bar ---------- */
+.db-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.96);
+    border-bottom: 1px solid var(--db-border);
+}
+.db-topbar::before { display: none; }
+.db-topbar-inner { height: 60px; padding: 0 28px; gap: 12px; }
+.db-topbar-date { margin-right: auto; color: var(--db-muted); font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px; }
+.db-menu-toggle, .db-topbar-brand { display: none; }
+.db-topbar-brand .ap-brand-logos img { width: 34px; height: 34px; }
+
+.db-body .acc-icon-btn {
+    width: 40px; height: 40px; border-radius: var(--db-radius-sm);
+    border: 1px solid transparent; background: transparent; color: #49566b;
+}
+.db-body .acc-icon-btn:hover, .db-body .acc-icon-btn.is-active { background: var(--db-hover); border-color: var(--db-border); }
+.db-body .acc-badge { top: 2px; right: 2px; min-width: 18px; height: 18px; font-size: 0.65rem; }
+.db-body .ap-user {
+    border: 1px solid transparent; background: transparent; border-radius: var(--db-radius-sm);
+    padding: 4px 10px 4px 4px; box-shadow: none; color: var(--db-text); font-weight: 600;
+}
+.db-body .ap-user:hover { background: var(--db-hover); border-color: var(--db-border); box-shadow: none; }
+.db-body .acc-avatar-sm { width: 32px; height: 32px; border: 0; box-shadow: 0 0 0 1px var(--db-border); }
+
+/* Dropdowns */
+.db-body .acc-dd-panel { border-radius: var(--db-radius); border-color: var(--db-border); box-shadow: 0 12px 32px rgba(29, 39, 59, 0.12); top: calc(100% + 8px); }
+.db-body .acc-user-head { background: #fff; color: var(--db-text); border-bottom: 1px solid var(--db-border); }
+.db-body .acc-user-head img { border: 0; box-shadow: 0 0 0 1px var(--db-border); }
+.db-body .acc-user-head span { color: var(--db-muted); opacity: 1; }
+.db-body .acc-user-panel > a { font-size: 0.92rem; padding: 10px 18px; }
+.db-body .acc-user-panel > a i { color: #8a94a6; }
+.db-body .acc-user-panel > a:hover { background: var(--db-hover); }
+.db-body .acc-dd-foot { background: #fff; font-size: 0.9rem; }
+
+/* ---------- Page header ---------- */
+.db-page-header { padding: 28px 0 6px; }
+.db-page-header-inner { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.db-pretitle { display: block; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--db-muted); margin-bottom: 2px; }
+.db-title { font-size: 1.55rem; font-weight: 700; margin: 0; }
+.db-subtitle { margin: 4px 0 0; color: var(--db-muted); font-size: 0.95rem; }
+.db-body .acc-hero-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.db-main { margin-top: 0; padding: 18px 0 48px; }
+
+/* ---------- Buttons ---------- */
+.db-body .ap-btn {
+    min-height: 40px; padding: 8px 16px; border-radius: var(--db-radius-sm);
+    font-size: 0.9rem; font-weight: 600; box-shadow: none; gap: 8px;
+}
+.db-body .ap-btn:hover { transform: none; }
+.db-body .ap-btn-primary, .db-body .acc-btn-gold { background: var(--navy); color: #fff; border-color: var(--navy); box-shadow: none; }
+.db-body .ap-btn-primary:hover, .db-body .acc-btn-gold:hover { background: var(--navy-700, #0d2d8a); }
+.db-body .ap-btn-success { box-shadow: none; }
+.db-body .ap-btn-ghost, .db-body .acc-btn-glass { background: #fff; color: var(--db-text); border: 1px solid var(--db-border); }
+.db-body .ap-btn-ghost:hover, .db-body .acc-btn-glass:hover { background: var(--db-hover); border-color: #cfd5df; color: var(--db-text); }
+.db-body .acc-btn-sm { min-height: 34px; padding: 6px 12px; font-size: 0.85rem; }
+
+/* ---------- Cards ---------- */
+.db-body .ap-card {
+    background: #fff;
+    border: 1px solid var(--db-border);
+    border-radius: var(--db-radius);
+    box-shadow: var(--db-shadow);
+}
+.db-body .acc-card { padding: 20px; }
+.db-body .acc-h3 { font-size: 1rem; font-weight: 600; gap: 8px; }
+.db-body .acc-h3 i { color: #8a94a6; font-size: 0.95rem; }
+.db-body .ap-notice { border-radius: var(--db-radius); }
+
+/* ---------- Profile summary ---------- */
+.db-body .acc-summary { padding: 20px 24px; margin-bottom: 20px; }
+.db-body .acc-summary-user h2 { font-size: 1.15rem; font-weight: 700; }
+.db-body .acc-avatar-lg { width: 64px; height: 64px; border: 0; box-shadow: 0 0 0 1px var(--db-border); }
+.db-body .acc-completion-top { font-size: 0.85rem; color: var(--db-muted); }
+.db-body .acc-completion-top strong { color: var(--db-text); }
+.db-body .ap-progress-bar { height: 6px; background: #edf0f5; }
+.db-body .ap-progress-bar span { background: var(--navy); }
+.db-body .acc-chip { border-radius: 4px; font-weight: 600; }
+
+/* ---------- Tabs (underline, like Tabler's card tabs) ---------- */
+.db-body .acc-tabs {
+    gap: 2px; padding: 0 4px; margin-bottom: 20px;
+    background: transparent; border: 0; border-bottom: 1px solid var(--db-border);
+    border-radius: 0; box-shadow: none;
+}
+.db-body .acc-tab {
+    flex: 0 0 auto; padding: 12px 14px; border-radius: 0; margin-bottom: -1px;
+    border-bottom: 2px solid transparent; color: var(--db-muted); font-weight: 500; font-size: 0.93rem;
+}
+.db-body .acc-tab:hover { background: transparent; color: var(--db-text); }
+.db-body .acc-tab.is-active { background: transparent; color: var(--navy); border-bottom-color: var(--navy); box-shadow: none; font-weight: 600; }
+.db-body .acc-tab-count { background: #edf0f5; color: var(--db-muted); }
+.db-body .acc-tab.is-active .acc-tab-count { background: var(--tint-navy); color: var(--navy); }
+.db-body .acc-panel { animation: none; }
+
+/* ---------- Stats ---------- */
+.db-body .acc-stats { gap: 16px; margin-bottom: 24px; }
+.db-body .acc-stat {
+    gap: 14px; padding: 16px 18px; border: 1px solid var(--db-border); border-radius: var(--db-radius);
+    box-shadow: var(--db-shadow); transition: border-color 0.15s, box-shadow 0.15s;
+}
+.db-body .acc-stat:hover { transform: none; border-color: #cfd5df; }
+.db-body .acc-stat.is-active { border-color: var(--navy); box-shadow: inset 0 -2px 0 var(--navy); }
+.db-body .acc-stat-icon { width: 40px; height: 40px; border-radius: var(--db-radius-sm); font-size: 1rem; }
+.db-body .acc-stat strong { font-family: inherit; font-size: 1.45rem; font-weight: 700; color: var(--db-text); }
+.db-body .acc-stat small { color: var(--db-muted); font-weight: 500; font-size: 0.85rem; }
+.db-body .acc-stat.tone-navy .acc-stat-icon { background: var(--tint-navy); color: var(--navy); }
+.db-body .acc-stat.tone-amber .acc-stat-icon { background: var(--tint-amber); color: #a86a00; }
+.db-body .acc-stat.tone-green .acc-stat-icon { background: var(--tint-green); color: var(--green); }
+.db-body .acc-stat.tone-red .acc-stat-icon { background: var(--tint-red); color: var(--danger); }
+
+/* ---------- Program icons, application icons ---------- */
+.db-body .acc-app-icon, .db-body .acc-program-icon { border-radius: var(--db-radius-sm); }
+.db-body .acc-app-icon.tone-red, .db-body .acc-program-icon.tone-red { background: var(--tint-red); color: #c62828; }
+.db-body .acc-app-icon.tone-blue, .db-body .acc-program-icon.tone-blue { background: var(--tint-navy); color: var(--navy); }
+.db-body .acc-app-icon.tone-green, .db-body .acc-program-icon.tone-green { background: var(--tint-green); color: var(--green); }
+
+.db-body .acc-programs { gap: 16px; margin-bottom: 24px; }
+.db-body .acc-program { padding: 16px; transition: border-color 0.15s; }
+.db-body .acc-program:hover { border-color: #cfd5df; }
+.db-body .acc-program-icon { width: 42px; height: 42px; font-size: 1.05rem; }
+.db-body .acc-program-body h4 { font-size: 0.95rem; font-weight: 600; }
+.db-body .acc-state { font-weight: 600; font-size: 0.82rem; }
+
+/* ---------- Application list (card with a header, rows like a list group) ---------- */
+.db-body .acc-list-card { padding: 0; overflow: hidden; }
+.db-body .acc-list-head { padding: 14px 20px; margin: 0; border-bottom: 1px solid var(--db-border); }
+.db-body .acc-chips { padding: 12px 20px; margin: 0; border-bottom: 1px solid var(--db-border); background: #fbfcfd; }
+.db-body .acc-search input, .db-body .acc-toolbar select {
+    min-height: 38px; border: 1px solid var(--db-border); border-radius: var(--db-radius-sm);
+    background: #fff; font-size: 0.9rem;
+}
+.db-body .acc-search input:focus, .db-body .acc-toolbar select:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(10, 36, 114, 0.1); }
+.db-body .acc-chip-btn { border: 1px solid var(--db-border); border-radius: var(--db-radius-sm); padding: 5px 12px; font-size: 0.85rem; font-weight: 500; }
+.db-body .acc-chip-btn span { background: #edf0f5; }
+.db-body .acc-chip-btn.is-active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.db-body .acc-chip-btn.is-active span { background: rgba(255, 255, 255, 0.2); }
+
+.db-body .acc-apps { gap: 0; }
+.db-body .acc-app {
+    gap: 14px; padding: 14px 20px; border: 0; border-radius: 0; background: #fff;
+    border-bottom: 1px solid var(--db-border); transition: background 0.15s;
+}
+.db-body .acc-app:last-child { border-bottom: 0; }
+.db-body .acc-app:hover { background: #f8fafc; transform: none; }
+.db-body .acc-app-main strong { font-weight: 600; font-size: 0.95rem; }
+.db-body .acc-app-meta { font-size: 0.83rem; }
+
+/* Status badges with a dot */
+.db-body .acc-status { gap: 6px; padding: 3px 10px; border-radius: 4px; font-size: 0.78rem; font-weight: 600; }
+.db-body .acc-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.db-body .acc-empty > i { color: #c5ccd8; }
+.db-body .acc-empty h4 { font-weight: 600; font-size: 1.05rem; }
+
+/* ---------- Forms on the account pages ---------- */
+.db-body .field input[type="text"], .db-body .field input[type="email"], .db-body .field input[type="tel"],
+.db-body .field input[type="password"], .db-body .field input[type="number"], .db-body .field input[type="date"],
+.db-body .field select, .db-body .field textarea {
+    border-width: 1px; border-radius: var(--db-radius-sm); min-height: 42px; padding: 9px 12px; font-size: 0.95rem; background: #fff;
+}
+.db-body .acc-avatar-xl { border: 0; box-shadow: 0 0 0 1px var(--db-border); }
+.db-body .acc-switch-row, .db-body .acc-size-picker button { border-radius: var(--db-radius); border-width: 1px; }
+
+/* ---------- Notifications page ---------- */
+.db-body .acc-notif { border-radius: var(--db-radius); border-color: var(--db-border); }
+.db-body .acc-notif.is-unread { background: #f7f9fe; border-color: #d5def3; box-shadow: inset 3px 0 0 var(--navy); }
+.db-body .acc-n-icon { border-radius: var(--db-radius-sm); }
+
+/* ---------- Application details ---------- */
+.db-body .acc-status-card { border-top-width: 3px; }
+.db-body .acc-status-head h2 { font-size: 1.35rem; font-weight: 700; }
+.db-body .acc-status-icon { width: 56px; height: 56px; border-radius: var(--db-radius); font-size: 1.4rem; background: var(--tint-amber); color: #a86a00; }
+.db-body .s-approved .acc-status-icon { background: var(--tint-green); color: var(--green); }
+.db-body .s-disapproved .acc-status-icon { background: var(--tint-red); color: var(--danger); }
+.db-body .acc-amount-box { border-radius: var(--db-radius); }
+.db-body .acc-amount-box strong { font-family: inherit; }
+.db-body .acc-shot { border-radius: var(--db-radius-sm); }
+
+/* ---------- Footer ---------- */
+.db-footer { background: transparent; border-top: 1px solid var(--db-border); color: var(--db-muted); font-size: 0.85rem; padding: 16px 0; margin-top: auto; }
+.db-footer i { color: #8a94a6; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 991px) {
+    .db-sidebar {
+        position: fixed; left: 0; top: 0; z-index: 130;
+        transform: translateX(-100%); transition: transform 0.25s ease;
+    }
+    body.db-sidebar-open .db-sidebar { transform: none; box-shadow: 0 0 40px rgba(29, 39, 59, 0.25); }
+    .db-backdrop { display: block; position: fixed; inset: 0; z-index: 120; background: rgba(15, 23, 42, 0.4); }
+    .db-backdrop[hidden] { display: none; }
+    .db-menu-toggle { display: inline-flex; }
+    .db-topbar-brand { display: flex; }
+    .db-topbar-date { display: none; }
+    .db-topbar-inner { padding: 0 16px; }
+    .db-topbar-inner .acc-nav { margin-left: auto; }
+    .db-body .ap-container { padding: 0 16px; }
+}
+@media (max-width: 640px) {
+    .db-page-header { padding-top: 20px; }
+    .db-title { font-size: 1.3rem; }
+    .db-body .acc-hero-actions { width: 100%; }
+    .db-body .acc-hero-actions .ap-btn { flex: 1; }
+    .db-body .acc-summary { padding: 16px; }
+    .db-body .acc-list-head, .db-body .acc-chips { padding-left: 14px; padding-right: 14px; }
+    .db-body .acc-app { padding: 12px 14px; }
+    .db-body .acc-stat { padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .db-sidebar { transition: none; }
+}
+@media print {
+    .db-sidebar, .db-topbar, .db-backdrop, .db-footer { display: none !important; }
+    .db-body { background: #fff; }
+}

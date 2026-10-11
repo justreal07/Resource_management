@@ -1,0 +1,400 @@
+/* ============================================
+   APPLICANT PAGES - SHARED ADDITIONS
+   Loaded on every applicant page after its own stylesheet (see user/portal_ui.php),
+   so it reuses that page's colour tokens (--navy, --gold, --ink, --line ...).
+   - Bottom menu on phones
+   - Dialogs and toasts (SweetAlert2), photo viewer (Viewer.js), guided tour (Driver.js)
+   - Form helpers: finished sections, dates in words, password strength, Caps Lock
+============================================ */
+
+.pui-sr {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ============================================
+   BOTTOM MENU (phones, signed in)
+============================================ */
+.pui-bottom-nav { display: none; }
+
+@media (max-width: 768px) {
+    .pui-bottom-nav {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 45;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        align-items: end;
+        padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+        background: rgba(255, 255, 255, 0.96);
+        -webkit-backdrop-filter: saturate(160%) blur(14px);
+        backdrop-filter: saturate(160%) blur(14px);
+        border-top: 1px solid var(--line, #e4e8f2);
+        box-shadow: 0 -8px 24px rgba(10, 36, 114, 0.08);
+    }
+    .pui-bn-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+        min-width: 0;
+        min-height: 54px;
+        padding: 4px 2px 2px;
+        border-radius: 14px;
+        color: var(--muted, #6b7390);
+        font-size: 0.72rem;
+        font-weight: 600;
+        line-height: 1.2;
+        text-decoration: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .pui-bn-item:focus-visible { outline: 3px solid var(--gold, #F4B400); outline-offset: 0; }
+    .pui-bn-icon {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 56px;
+        max-width: 100%;
+        height: 30px;
+        border-radius: 999px;
+        font-size: 1.1rem;
+        transition: background 0.2s, color 0.2s;
+    }
+    .pui-bn-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pui-bn-item.is-active { color: var(--navy, #0A2472); font-weight: 700; }
+    .pui-bn-item.is-active .pui-bn-icon { background: #e3eaff; }
+    .pui-bn-item:active .pui-bn-icon { background: #eef2fb; }
+
+    /* Apply: the main action, a raised gold button in the middle */
+    .pui-bn-apply { color: var(--ink, #14213D); }
+    .pui-bn-apply .pui-bn-icon {
+        width: 54px;
+        height: 54px;
+        margin-top: -26px;
+        border-radius: 50%;
+        border: 4px solid #fff;
+        background: var(--gold, #F4B400);
+        color: var(--ink, #14213D);
+        font-size: 1.3rem;
+        box-shadow: 0 8px 18px rgba(244, 180, 0, 0.45);
+    }
+    .pui-bn-apply:active .pui-bn-icon { background: #e0a600; }
+
+    .pui-bn-badge {
+        position: absolute;
+        top: -5px;
+        left: 50%;
+        margin-left: 3px;
+        min-width: 19px;
+        height: 19px;
+        padding: 0 5px;
+        border-radius: 999px;
+        border: 2px solid #fff;
+        background: var(--red, #E63946);
+        color: #fff;
+        font-size: 0.66rem;
+        font-weight: 700;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .pui-bn-badge[hidden] { display: none; }
+
+    /* Room under the footer, so its last line isn't hidden behind the bar */
+    body.has-bottom-nav .footer-bottom { padding-bottom: calc(92px + env(safe-area-inset-bottom, 0px)); }
+    body.has-bottom-nav .ap-footer { padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+
+    /* Home page buttons that float in the corners sit above the bar */
+    body.has-bottom-nav #chat-toggle,
+    body.has-bottom-nav .back-to-top { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+    body.has-bottom-nav #chat-container {
+        bottom: calc(150px + env(safe-area-inset-bottom, 0px));
+        height: min(600px, calc(100vh - 190px - env(safe-area-inset-bottom, 0px)));
+    }
+
+    /* The bar replaces the header's page links on the account pages (the bell and account menu stay) */
+    body.has-bottom-nav .acc-nav .ap-nav-link { display: none; }
+
+    /* Toasts at the bottom of the screen sit above the bar */
+    body.has-bottom-nav .swal2-container.swal2-bottom-start,
+    body.has-bottom-nav .swal2-container.swal2-bottom,
+    body.has-bottom-nav .swal2-container.swal2-bottom-end { padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media print {
+    .pui-bottom-nav, .pui-copy, .swal2-container { display: none !important; }
+}
+
+/* ============================================
+   DIALOGS AND TOASTS (SweetAlert2)
+   Its own CSS uses :where(), so these win.
+============================================ */
+body:not(.swal2-toast-shown) .swal2-container.swal2-backdrop-show,
+body:not(.swal2-toast-shown) .swal2-container.swal2-noanimation { background: rgba(6, 22, 80, 0.55); }
+
+.swal2-popup.pui-swal {
+    width: min(460px, calc(100vw - 32px));
+    padding: 28px 26px 24px;
+    border-radius: 22px;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: var(--body, #3d4660);
+    box-shadow: 0 24px 60px rgba(6, 22, 80, 0.25);
+}
+.swal2-popup.pui-swal .swal2-icon { margin: 0 auto 6px; font-size: 0.72rem; }   /* the icon is sized in em */
+.swal2-popup.pui-swal .swal2-icon.swal2-warning { border-color: #f0c36a; color: #b7791f; }
+.swal2-popup.pui-swal .swal2-icon.swal2-question,
+.swal2-popup.pui-swal .swal2-icon.swal2-info { border-color: #b8c8f5; color: var(--navy, #0A2472); }
+.swal2-popup.pui-swal .swal2-title {
+    padding: 6px 0 0;
+    font-family: 'Poppins', 'Inter', sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--ink, #14213D);
+}
+.swal2-popup.pui-swal .swal2-html-container {
+    margin: 10px 0 0;
+    padding: 0;
+    font-size: 1rem;
+    line-height: 1.6;
+    color: var(--body, #3d4660);
+}
+.swal2-popup.pui-swal .swal2-html-container p { margin: 0 0 8px; }
+.swal2-popup.pui-swal .swal2-html-container p:last-child { margin-bottom: 0; }
+.swal2-popup.pui-swal .swal2-actions { width: 100%; margin: 22px 0 0; gap: 10px; }
+.swal2-popup.pui-swal .swal2-actions .pui-btn { flex: 1 1 0; margin: 0; }
+.swal2-popup.pui-swal .swal2-close:focus-visible { outline: 3px solid var(--gold, #F4B400); box-shadow: none; }
+
+/* Summary box inside a dialog (e.g. before submitting an application) */
+.pui-dialog-summary {
+    display: grid;
+    gap: 6px;
+    margin: 4px 0 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line, #e4e8f2);
+    border-radius: 14px;
+    background: #f7f9fd;
+    text-align: left;
+    font-size: 0.95rem;
+}
+.pui-dialog-summary div { display: flex; justify-content: space-between; gap: 12px; }
+.pui-dialog-summary span { color: var(--muted, #6b7390); }
+.pui-dialog-summary strong { color: var(--ink, #14213D); text-align: right; }
+
+.pui-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 12px 20px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    font: 700 0.98rem/1.2 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    text-decoration: none;
+    cursor: pointer;
+    transition: transform 0.15s, background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.pui-btn:hover { transform: translateY(-1px); }
+.pui-btn:focus-visible { outline: 3px solid var(--gold, #F4B400); outline-offset: 2px; }
+.pui-btn-primary { background: var(--navy, #0A2472); color: #fff; box-shadow: 0 8px 20px rgba(10, 36, 114, 0.25); }
+.pui-btn-primary:hover { background: var(--navy-700, #0d2d8a); }
+.pui-btn-danger { background: #c53030; color: #fff; box-shadow: 0 8px 20px rgba(197, 48, 48, 0.25); }
+.pui-btn-danger:hover { background: #a82828; }
+.pui-btn-ghost { background: #fff; color: var(--ink, #14213D); border-color: var(--line, #e4e8f2); }
+.pui-btn-ghost:hover { border-color: #c3cbe0; }
+
+@media (max-width: 420px) {
+    .swal2-popup.pui-swal { padding: 24px 18px 20px; }
+    .swal2-popup.pui-swal .swal2-actions { flex-direction: column-reverse; }   /* the action on top, Cancel under it */
+    .swal2-popup.pui-swal .swal2-actions .pui-btn { width: 100%; flex: none; }
+}
+
+/* Toasts */
+.swal2-popup.pui-toast {
+    padding: 12px 14px;
+    border: 1px solid var(--line, #e4e8f2);
+    border-radius: 16px;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    color: var(--ink, #14213D);
+    box-shadow: 0 14px 36px rgba(6, 22, 80, 0.18);
+}
+.swal2-popup.pui-toast .swal2-title { margin: 0 6px; font-size: 0.95rem; font-weight: 700; line-height: 1.4; color: var(--ink, #14213D); }
+.swal2-popup.pui-toast .swal2-html-container { margin: 2px 6px 0; padding: 0; font-size: 0.88rem; line-height: 1.45; color: var(--body, #3d4660); }
+.swal2-popup.pui-toast .swal2-close { color: var(--muted, #6b7390); }
+.swal2-popup.pui-toast .swal2-close:focus-visible { outline: 3px solid var(--gold, #F4B400); box-shadow: none; }
+.swal2-popup.pui-toast .swal2-icon.swal2-success { border-color: #9fdcbb; color: var(--green, #1e9e5a); }
+.swal2-popup.pui-toast .swal2-icon.swal2-success [class^="swal2-success-line"] { background-color: var(--green, #1e9e5a); }
+.swal2-popup.pui-toast .swal2-icon.swal2-success .swal2-success-ring { border-color: #9fdcbb; }
+.swal2-popup.pui-toast .swal2-icon.swal2-info { border-color: #b8c8f5; color: var(--navy, #0A2472); }
+.swal2-popup.pui-toast .swal2-timer-progress-bar { background: var(--green, #1e9e5a); }
+.swal2-popup.pui-toast .swal2-actions { justify-content: flex-start; gap: 8px; margin: 10px 6px 2px; }
+.swal2-popup.pui-toast .swal2-actions .pui-btn { min-height: 40px; margin: 0; padding: 8px 16px; font-size: 0.9rem; }
+
+/* "New here? Take a quick tour" (home page, first visit) */
+body.swal2-toast-shown .swal2-container:has(.pui-toast-offer) { width: min(440px, 100%); }
+.swal2-popup.pui-toast-offer { padding: 16px 16px 14px; border-left: 5px solid var(--gold, #F4B400); }
+.swal2-popup.pui-toast-offer .swal2-icon {
+    align-self: start;
+    width: 2.6em;
+    min-width: 2.6em;
+    height: 2.6em;
+    margin: 2px 0.6em 0 0;
+    border: 0;
+    background: #e8efff;
+    color: var(--navy, #0A2472);
+}
+.swal2-popup.pui-toast-offer .swal2-icon .swal2-icon-content { font-size: 1.15em; }
+.swal2-popup.pui-toast-offer .swal2-title { font-size: 1.02rem; }
+
+/* ============================================
+   PHOTO VIEWER (Viewer.js)
+============================================ */
+.viewer-container.pui-viewer.viewer-backdrop { background-color: rgba(6, 12, 40, 0.94); }
+.pui-viewer .viewer-title {
+    margin: 0 16px 10px;
+    opacity: 1;
+    color: #fff;
+    font: 600 0.95rem/1.4 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+.pui-viewer .viewer-toolbar > ul > li:focus-visible,
+.pui-viewer .viewer-button:focus-visible { outline: 3px solid var(--gold, #F4B400); outline-offset: 2px; }
+.pui-viewer .viewer-navbar { background-color: rgba(0, 0, 0, 0.35); }
+
+/* ============================================
+   GUIDED TOUR (Driver.js)
+============================================ */
+.driver-popover.pui-tour {
+    min-width: 260px;
+    max-width: min(340px, calc(100vw - 32px));
+    padding: 20px 20px 16px;
+    border-radius: 18px;
+    background: #fff;
+    color: var(--body, #3d4660);
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    box-shadow: 0 24px 60px rgba(6, 22, 80, 0.3);
+}
+.driver-popover.pui-tour .driver-popover-title {
+    padding-right: 30px;
+    font: 700 1.1rem/1.35 'Poppins', 'Inter', sans-serif;
+    color: var(--ink, #14213D);
+}
+.driver-popover.pui-tour .driver-popover-description { font-size: 0.95rem; line-height: 1.55; color: var(--body, #3d4660); }
+.driver-popover.pui-tour .driver-popover-close-btn {
+    top: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    color: var(--muted, #6b7390);
+    font-size: 22px;
+    line-height: 36px;
+}
+.driver-popover.pui-tour .driver-popover-close-btn:hover { background: #f1f4fb; color: var(--ink, #14213D); }
+.driver-popover.pui-tour .driver-popover-footer { gap: 10px; margin-top: 16px; }
+.driver-popover.pui-tour .driver-popover-progress-text { font-size: 0.82rem; font-weight: 600; color: var(--muted, #6b7390); }
+.driver-popover.pui-tour .driver-popover-navigation-btns { gap: 8px; }
+.driver-popover.pui-tour .driver-popover-navigation-btns button + button { margin-left: 0; }
+.driver-popover.pui-tour .driver-popover-footer-btn {
+    padding: 9px 16px;
+    border: 1.5px solid var(--line, #e4e8f2);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--ink, #14213D);
+    font: 700 0.9rem/1.2 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    text-shadow: none;
+}
+.driver-popover.pui-tour .driver-popover-footer-btn:hover { background: #f4f6fc; }
+.driver-popover.pui-tour .driver-popover-next-btn { border-color: var(--navy, #0A2472); background: var(--navy, #0A2472); color: #fff; }
+.driver-popover.pui-tour .driver-popover-next-btn:hover { background: var(--navy-700, #0d2d8a); }
+.driver-popover.pui-tour .driver-popover-btn-disabled { display: none !important; }   /* no "Back" on the first step (Driver.js sets display inline) */
+.driver-popover.pui-tour button:focus-visible { outline: 3px solid var(--gold, #F4B400); outline-offset: 2px; }
+
+/* "Take a tour" button in the home page help card */
+.help-card .btn + .btn { margin-top: 10px; }
+
+/* ============================================
+   APPLICATION FORMS
+============================================ */
+/* A section's number turns into a green check once its required fields are filled in */
+.ap-section-num { position: relative; transition: background 0.25s; }
+.ap-section.is-complete .ap-section-num { background: var(--green, #1e9e5a); color: transparent; }
+.ap-section.is-complete .ap-section-num::after {
+    content: "\f00c";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 0.8rem;
+    animation: puiPop 0.3s ease;
+}
+@keyframes puiPop { from { transform: scale(0.3); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* The picked date in words: "Friday, October 16, 2026 · in 6 days" */
+.field-help.pui-date-echo { display: flex; align-items: baseline; gap: 6px; color: #1c3274; font-weight: 600; }
+.field-help.pui-date-echo[hidden] { display: none; }
+.pui-date-echo i { color: var(--muted, #6b7390); font-size: 0.8rem; }
+
+/* ============================================
+   PASSWORDS (sign up, change password)
+============================================ */
+.pui-strength { margin-top: 8px; }
+.auth-form .pui-strength { margin-top: -6px; }   /* sign-up form: right under the two password boxes */
+.pui-strength-bar { height: 6px; margin-bottom: 4px; border-radius: 999px; background: #e8ecf5; overflow: hidden; }
+.pui-strength-bar span { display: block; width: 0; height: 100%; border-radius: inherit; transition: width 0.3s, background 0.3s; }
+.pui-strength small { color: var(--muted, #6b7390); font-size: 0.82rem; }
+.pui-match { display: block; margin-top: 6px; font-size: 0.82rem; font-weight: 600; }
+.pui-match:empty { display: none; }
+
+.pui-caps {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 6px 0 0;
+    color: #8a5a00;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.pui-caps[hidden] { display: none; }
+
+/* ============================================
+   COPY BUTTON (application number)
+============================================ */
+.pui-copy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    margin-left: 8px;
+    border: 1px solid var(--line, #e4e8f2);
+    border-radius: 10px;
+    background: #fff;
+    color: var(--navy, #0A2472);
+    font-size: 0.95rem;
+    vertical-align: middle;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+.pui-copy:hover { background: #eef2fb; }
+.pui-copy.is-copied { border-color: #9fdcbb; background: var(--green-soft, #e3f6ec); color: var(--green, #1e9e5a); }
+
+@media (prefers-reduced-motion: reduce) {
+    .ap-section.is-complete .ap-section-num::after { animation: none; }
+    .pui-btn:hover { transform: none; }
+}

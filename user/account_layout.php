@@ -1,0 +1,242 @@
+<?php
+/**
+ * Layout for the logged-in account pages:
+ * my_account.php, user_notifications.php, view_application.php, my_documents.php
+ */
+require_once __DIR__ . '/account_helpers.php';
+require_once __DIR__ . '/apply_layout.php';   // e() and other small helpers
+
+/**
+ * Prints the page head and the dashboard frame: sidebar (menu), top bar
+ * (notifications + account menu) and the page header.
+ * The look follows the Tabler dashboard template (tabler.io, MIT) - styles in css/dashboard.css.
+ *
+ * @param string $active  'account' | 'documents' | 'notifications'
+ * @param array  $hero    page header: ['eyebrow', 'title', 'subtitle', 'icon', 'actions' => raw HTML]
+ * @param string $tour    guided tour of this page (a name from TOURS in js/portal-ui.js), '' for none
+ */
+function account_page_start(array $ctx, string $title, string $active, array $hero, string $tour = ''): void {
+    global $ASSISTANCE_PROGRAMS;
+    $user = $ctx['user'];
+    $avatar = avatar_url($user);
+    $unread = $ctx['unread'];
+    $latest = array_slice($ctx['notifications'], 0, 5);
+
+    // Sidebar menu. 'tab' = a section of my_account.php (js/account.js marks the open one).
+    $menu = [
+        'Overview' => [
+            ['my_account.php#applications', 'fa-gauge-high', 'Dashboard', $active === 'account', 'applications'],
+            ['my_documents.php', 'fa-folder-open', 'My Documents', $active === 'documents', null],
+            ['user_notifications.php', 'fa-bell', 'Notifications', $active === 'notifications', null],
+        ],
+        'Account' => [
+            ['my_account.php#profile', 'fa-user-pen', 'Profile', false, 'profile'],
+            ['my_account.php#security', 'fa-shield-halved', 'Password & Security', false, 'security'],
+            ['my_account.php#preferences', 'fa-sliders', 'Preferences', false, 'preferences'],
+        ],
+    ];
+    ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?= csrf_token() ?>">
+    <title><?= e($title) ?> | LGU Assistance Portal</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="<?= e(portal_asset('../css/apply.css')) ?>">
+    <link rel="stylesheet" href="<?= e(portal_asset('../css/account.css')) ?>">
+    <link rel="stylesheet" href="<?= e(portal_asset('../css/dashboard.css')) ?>">
+    <?php portal_head(); ?>
+</head>
+<body class="acc-body db-body has-bottom-nav"<?= $tour !== '' ? ' data-tour="' . e($tour) . '"' : '' ?>>
+
+<div class="db-shell">
+
+<!-- SIDEBAR -->
+<aside class="db-sidebar" id="dbSidebar" aria-label="Main menu">
+    <a href="landingpage.php" class="db-brand">
+        <span class="ap-brand-logos">
+            <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
+            <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
+        </span>
+        <span class="db-brand-text">
+            <strong>Assistance Portal</strong>
+            <small>LGU General Mariano Alvarez</small>
+        </span>
+    </a>
+
+    <nav class="db-menu">
+        <?php foreach ($menu as $group => $links): ?>
+            <span class="db-menu-label"><?= e($group) ?></span>
+            <?php foreach ($links as [$href, $icon, $label, $on, $tab]): ?>
+                <a href="<?= e($href) ?>" class="db-menu-link<?= $on ? ' is-active' : '' ?>"<?= $on ? ' aria-current="page"' : '' ?><?= $tab ? ' data-side-tab="' . e($tab) . '"' : '' ?>>
+                    <i class="fas <?= $icon ?>" aria-hidden="true"></i><span><?= e($label) ?></span>
+                    <?php if ($label === 'Notifications'): ?><span class="db-menu-badge" data-unread-badge<?= $unread ? '' : ' hidden' ?>><?= $unread > 9 ? '9+' : $unread ?></span><?php endif; ?>
+                </a>
+            <?php endforeach; ?>
+            <?php if ($group === 'Overview'): ?>
+                <span class="db-menu-label">Apply for assistance</span>
+                <?php foreach ($ASSISTANCE_PROGRAMS as $p): ?>
+                    <a href="<?= e(str_replace(' ', '%20', $p['form_page'])) ?>" class="db-menu-link">
+                        <i class="fas <?= e($p['icon']) ?> db-tone-<?= e($p['tone']) ?>" aria-hidden="true"></i><span><?= e($p['name']) ?></span>
+                    </a>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        <?php endforeach; ?>
+    </nav>
+
+    <div class="db-sidebar-foot">
+        <a href="landingpage.php" class="db-menu-link"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to website</span></a>
+        <a href="applicant_logout.php" class="db-menu-link db-logout"><i class="fas fa-right-from-bracket" aria-hidden="true"></i><span>Log out</span></a>
+    </div>
+</aside>
+<div class="db-backdrop" data-sidebar-close hidden></div>
+
+<div class="db-page">
+
+<!-- TOP BAR -->
+<header class="ap-header db-topbar">
+    <div class="ap-header-inner db-topbar-inner">
+        <button type="button" class="acc-icon-btn db-menu-toggle" data-sidebar-toggle aria-controls="dbSidebar" aria-expanded="false" aria-label="Open menu">
+            <i class="fas fa-bars"></i>
+        </button>
+        <a href="landingpage.php" class="ap-brand db-topbar-brand">
+            <span class="ap-brand-logos">
+                <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
+                <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
+            </span>
+        </a>
+        <span class="db-topbar-date"><i class="far fa-calendar"></i> <?= e(date('l, F j, Y')) ?></span>
+
+        <nav class="acc-nav" aria-label="Account">
+
+            <!-- Notifications -->
+            <div class="acc-dd" data-dropdown>
+                <button type="button" class="acc-icon-btn<?= $active === 'notifications' ? ' is-active' : '' ?>" data-dropdown-toggle aria-haspopup="true" aria-expanded="false" aria-label="Notifications<?= $unread ? " ($unread unread)" : '' ?>">
+                    <i class="fas fa-bell"></i>
+                    <span class="acc-badge" data-unread-badge<?= $unread ? '' : ' hidden' ?>><?= $unread > 9 ? '9+' : $unread ?></span>
+                </button>
+                <div class="acc-dd-panel acc-notif-panel" data-dropdown-panel>
+                    <div class="acc-dd-head">
+                        <strong>Notifications</strong>
+                        <button type="button" class="ap-link-btn" data-mark-all-read<?= $unread ? '' : ' hidden' ?>><i class="fas fa-check-double"></i> Mark all read</button>
+                    </div>
+                    <?php if ($latest): ?>
+                        <ul class="acc-notif-mini">
+                            <?php foreach ($latest as $n): ?>
+                            <li class="<?= $n['unread'] ? 'is-unread' : '' ?>">
+                                <a href="<?= e($n['link']) ?>">
+                                    <span class="acc-n-icon tone-<?= $n['tone'] ?>"><i class="fas <?= $n['icon'] ?>"></i></span>
+                                    <span class="acc-n-text"><strong><?= e($n['title']) ?></strong><span><?= e($n['message']) ?></span><small><?= e(time_ago($n['time'])) ?></small></span>
+                                </a>
+                            </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php else: ?>
+                        <div class="acc-empty-mini"><i class="far fa-bell-slash"></i><p>No notifications yet</p></div>
+                    <?php endif; ?>
+                    <a href="user_notifications.php" class="acc-dd-foot">See all notifications <i class="fas fa-arrow-right"></i></a>
+                </div>
+            </div>
+
+            <!-- Account menu -->
+            <div class="acc-dd" data-dropdown>
+                <button type="button" class="ap-user" data-dropdown-toggle aria-haspopup="true" aria-expanded="false" aria-label="Account menu">
+                    <img src="<?= e($avatar) ?>" alt="" class="acc-avatar-sm">
+                    <span class="ap-user-name"><?= e($user['firstname']) ?></span>
+                    <i class="fas fa-chevron-down acc-caret"></i>
+                </button>
+                <div class="acc-dd-panel acc-user-panel" data-dropdown-panel>
+                    <div class="acc-user-head">
+                        <img src="<?= e($avatar) ?>" alt="">
+                        <div><strong><?= e($user['firstname'] . ' ' . $user['lastname']) ?></strong><span>@<?= e($user['username']) ?></span></div>
+                    </div>
+                    <a href="my_account.php#applications"><i class="fas fa-list"></i> My Applications</a>
+                    <a href="my_documents.php"><i class="fas fa-folder-open"></i> My Documents</a>
+                    <a href="user_notifications.php"><i class="fas fa-bell"></i> Notifications</a>
+                    <a href="my_account.php#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
+                    <a href="my_account.php#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
+                    <a href="my_account.php#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
+                    <a href="#tour" role="button" data-tour-start><i class="fas fa-route"></i> Take a tour of this page</a>
+                    <a href="applicant_logout.php" class="acc-logout"><i class="fas fa-sign-out-alt"></i> Log out</a>
+                </div>
+            </div>
+        </nav>
+    </div>
+</header>
+
+<?php portal_bottom_nav($active, $unread); ?>
+
+<!-- PAGE HEADER -->
+<div class="db-page-header">
+    <div class="ap-container db-page-header-inner">
+        <div>
+            <?php if (!empty($hero['eyebrow'])): ?><span class="db-pretitle"><?= e($hero['eyebrow']) ?></span><?php endif; ?>
+            <h1 class="db-title"><?= e($hero['title']) ?></h1>
+            <?php if (!empty($hero['subtitle'])): ?><p class="db-subtitle"><?= e($hero['subtitle']) ?></p><?php endif; ?>
+        </div>
+        <?php if (!empty($hero['actions'])): ?><div class="acc-hero-actions"><?= $hero['actions'] ?></div><?php endif; ?>
+    </div>
+</div>
+
+<main class="ap-main db-main">
+    <div class="ap-container">
+        <?php foreach (take_flashes() as $f): ?>
+            <?php /* data-toast: js/portal-ui.js shows a success message as a toast; errors stay on the page */ ?>
+            <div class="ap-notice ap-notice-<?= $f['type'] === 'success' ? 'success' : 'error' ?> acc-flash" role="status"<?= $f['type'] === 'success' ? ' data-toast' : '' ?>>
+                <i class="fas <?= $f['type'] === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle' ?>"></i>
+                <div><?= e($f['message']) ?></div>
+                <button type="button" class="ap-link-btn" data-dismiss aria-label="Dismiss"><i class="fas fa-times"></i></button>
+            </div>
+        <?php endforeach; ?>
+    <?php
+}
+
+/** Closes the page opened by account_page_start(): footer, scripts, and the dashboard frame. */
+function account_page_end(array $scripts = []): void {
+    $scripts = array_merge(['../js/account.js'], $scripts);
+    ?>
+    </div>
+</main>
+
+<footer class="ap-footer db-footer">
+    <div class="ap-container">
+        <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez</span>
+        <span><i class="fas fa-phone"></i> Need help? Call (046) 123-4567 · Mon–Fri, 8 AM–5 PM</span>
+    </div>
+</footer>
+
+</div><!-- /.db-page -->
+</div><!-- /.db-shell -->
+
+<?php portal_scripts(); ?>
+<?php foreach ($scripts as $src): ?>
+<script src="<?= e(portal_asset($src)) ?>"></script>
+<?php endforeach; ?>
+</body>
+</html>
+    <?php
+}
+
+/**
+ * Loads everything the account header needs. Redirects to login when signed out.
+ */
+function account_context(PDO $pdo): array {
+    if (!isset($_SESSION['applicant'])) {
+        header('Location: applicant_login.php');
+        exit;
+    }
+    $user = get_current_user_row($pdo);
+    if (!$user) {
+        session_destroy();
+        header('Location: applicant_login.php');
+        exit;
+    }
+    $notifications = get_user_notifications($pdo, (int)$user['id'], $user['notifications_seen_at']);
+    return [
+        'user' => $user,
+        'notifications' => $notifications,
+        'unread' => count_unread($notifications),
+    ];
+}

@@ -1,0 +1,340 @@
+/* ============================================
+   GOOGLE FONT
+============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600&display=swap');
+
+/* ============================================
+   RESET & BASE
+============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+*,
+*::before,
+*::after {
+    font-family: 'Roboto'!important;
+}
+
+input,
+button,
+textarea,
+select {
+    font-family: 'Roboto'!important;
+}
+
+body {
+    font-family: 'Roboto'!important;
+    background: #F4F6FB;
+    color: #1A1A1A;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+}
+
+/* ============================================
+   NAVBAR
+============================================ */
+.navbar {
+    background: linear-gradient(135deg, #0A2472, #8B0000);
+    padding: 18px 40px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo-area img {
+    width: 60px;
+    background: white;
+    border-radius: 50%;
+    padding: 0px;
+}
+
+.logo-area span {
+    font-size: 1.6rem;
+    color: white;
+    font-weight: 600;
+}
+
+.nav-links {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    padding: 10px 20px;
+    border-radius: 0px;
+    font-size: 1.1rem;
+    transition: 0.3s;
+}
+
+.nav-links a:hover {
+    background: #5939e6;
+    transform: translateY(-2px);
+}
+
+.welcome-text {
+    color: #E0E7FF;
+    font-size: 1.1rem;
+}
+
+/* ============================================
+   LOGIN CONTAINER
+============================================ */
+.login-container {
+    max-width: 450px;
+    margin: 60px auto;
+    padding: 40px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 8px 25px rgba(10,36,114,0.1);
+    border-top: 5px solid #E63946;
+}
+
+.login-container h2 {
+    text-align: center;
+    color: #0A2472;
+    margin-bottom: 30px;
+    font-size: 2rem;
+}
+
+/* ============================================
+   REGISTER CONTAINER
+============================================ */
+.register-container {
+    max-width: 450px;
+    margin: 60px auto;
+    padding: 40px;
+    background: white;
+    border-radius: 18px;
+    box-shadow: 0 8px 25px rgba(10,36,114,0.1);
+    border-top: 5px solid #E63946;
+}
+
+.register-container h2 {
+    text-align: center;
+    color: #0A2472;
+    margin-bottom: 30px;
+    font-size: 2rem;
+}
+
+/* ============================================
+   FORM ELEMENTS
+============================================ */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: #0A2472;
+    font-weight: 500;
+    font-size: 1rem;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px 15px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    box-sizing: border-box;
+    transition: 0.3s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #0A2472;
+    box-shadow: 0 0 8px rgba(10,36,114,0.3);
+}
+
+/* ============================================
+   BUTTONS
+============================================ */
+.login-btn,
+.register-btn {
+    width: 100%;
+    padding: 14px;
+    background: linear-gradient(135deg, #0A2472, #1a3d9e);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    font-weight: 600;
+    transition: 0.3s;
+}
+
+.login-btn:hover,
+.register-btn:hover {
+    background: linear-gradient(135deg, #E63946, #8B0000);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(230,57,70,0.3);
+}
+
+/* ============================================
+   MESSAGES
+============================================ */
+.error-box {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #f5c6cb;
+    text-align: center;
+}
+
+.error-box p {
+    margin: 5px 0;
+}
+
+.success-box {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    border: 1px solid #c3e6cb;
+    text-align: center;
+}
+
+.success-box a {
+    color: #155724;
+    font-weight: 600;
+}
+
+/* ============================================
+   LINKS
+============================================ */
+.login-links,
+.form-links {
+    text-align: center;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+    font-size: 0.95rem;
+}
+
+.login-links a,
+.form-links a {
+    color: #0A2472;
+    text-decoration: none;
+    font-weight: 500;
+    transition: 0.3s;
+}
+
+.login-links a:hover,
+.form-links a:hover {
+    color: #E63946;
+    text-decoration: underline;
+}
+
+.signup-link {
+    margin-bottom: 10px;
+    border-top: none;
+    padding-top: 0;
+}
+
+/* ============================================
+   LOGO HEADER
+============================================ */
+.auth-logo {
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.auth-logo img {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 3px solid #0A2472;
+    padding: 5px;
+    background: white;
+    box-shadow: 0 4px 15px rgba(10,36,114,0.2);
+}
+
+.auth-logo h3 {
+    color: #0A2472;
+    margin-top: 15px;
+    font-size: 1.3rem;
+    font-weight: 500;
+}
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+@media (max-width: 768px) {
+    .navbar {
+        padding: 15px 20px;
+    }
+
+    .logo-area span {
+        font-size: 1.2rem;
+    }
+
+    .nav-links {
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .login-container,
+    .register-container {
+        margin: 30px 20px;
+        padding: 25px;
+    }
+
+    .login-container h2,
+    .register-container h2 {
+        font-size: 1.6rem;
+    }
+}
+
+body, html {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.video-background {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: -1; /* keep it behind content */
+}
+
+.video-background video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(2px) opacity(0.9);
+}
+

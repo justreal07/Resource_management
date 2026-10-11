@@ -1,0 +1,634 @@
+/* ============================================
+   GOOGLE FONT
+============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600&display=swap');
+
+/* ============================================
+   RESET & BASE
+============================================ */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+
+/* ✅ ENSURE INPUTS & BUTTONS USE OSWALD */
+input,
+button,
+textarea,
+select {
+    font-family: 'Roboto' !important;
+}
+
+body {
+    font-family: 'Roboto' !important;
+    background: #F4F6FB;
+    color: #1A1A1A;
+    line-height: 1.6;
+    font-size: 20px;
+    margin: 0;
+    padding: 0;
+
+}
+
+/* ============================================
+   NAVBAR
+============================================ */
+.navbar {
+    background: linear-gradient(135deg, #0A2472, #8B0000);
+    padding: 20px 40px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+    position: sticky;
+    top: 0;
+    z-index: 999;
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.logo-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.logo-area img {
+    width: 50px;
+    background: rgb(255, 255, 255);
+    border-radius: 150%;
+    padding: 0px;
+}
+
+.logo-area span {
+    font-size: 1.6rem;
+    color: white;
+    font-weight: 600;
+}
+
+.nav-links {
+    display: flex;
+    gap: 20px;
+    align-items: right 10px;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+     font-weight: bold;
+    padding: 10px 20px;
+    border-radius: 0px;
+    font-size: 1.1rem;
+    transition: 0.3s;
+}
+
+.nav-links a:hover {
+    background: #5939e6;
+    transform: translateY(-2px);
+}
+
+.welcome-text {
+    color: #E0E7FF;
+    font-size: 1.1rem;
+}
+
+.logout-btn {
+    color: white;
+    text-decoration: none;
+    padding: 10px 20px;
+    border-radius: 0px;
+    font-size: 1.1rem;
+    transition: 0.3s;
+}
+.bg {
+    width: 100%;
+    height: 200px; /* you control the frame height here */
+    position: relative;
+    overflow: hidden;
+}
+
+.bg img {
+    width: 100%;
+    height: 100%; 
+    object-fit: cover; /* expands image to fill frame */
+    display: block;
+}
+
+.logout-btn:hover {
+    background: linear-gradient(135deg, #ff4757, #c0392b) !important;
+    transform: translateY(-2px);
+}
+.bg img {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: auto;
+}
+/* ============================================
+   SLIDESHOW
+============================================ */
+.slideshow-container {
+    max-width: 1200px;
+    margin: 100px auto;
+    border-radius: 0px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(10,36,114,0.2);
+}
+
+.mySlides {
+    display: none;
+}
+
+.mySlides img {
+    width: 100%;
+}
+
+/* DOTS */
+.dot-container {
+    text-align: center;
+    padding: 15px;
+}
+
+.dot {
+    height: 15px;
+    width: 15px;
+    margin: 5px;
+    background: #3B82F6;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dot.active {
+    background: #E63946;
+}
+
+/* ============================================
+   PROGRAM SECTION
+============================================ */
+.program-section {
+    padding: 60px 30px;
+}
+
+.program-section h2 {
+    text-align: center;
+    font-size: 2.8rem;
+    color: #ffffff;
+    margin-bottom: 40px;
+}
+
+.card-container {
+    max-width: 1200px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+}
+
+.program-card {
+    background: white;
+    border-radius: 18px;
+    padding: 30px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(10,36,114,0.1);
+    border-top: 5px solid #E63946;
+    transition: 0.3s;
+}
+
+.program-card:hover {
+    transform: translateY(-6px);
+    border-top: 5px solid #0A2472;
+}
+
+.program-card h3 {
+    color: #0A2472;
+    margin-bottom: 10px;
+}
+
+.program-card p {
+    color: #555;
+}
+
+/* BUTTON IMAGE */
+.btn img {
+    width: 100px;
+    height: 100px;
+    border-radius: 30%;
+    border: 3px solid #0A2472;
+    margin-top: 15px;
+    transition: 0.3s;
+    
+}
+
+.btn img:hover {
+    transform: scale(1.08);
+    border-color: #E63946;
+}
+
+/* ============================================
+   FOOTER
+============================================ */
+.footer {
+    background: linear-gradient(135deg, #0A2472, #8B0000);
+    color: white;
+    padding: 40px;
+    font-size: 25px;
+}
+
+.footer-container {
+    max-width: 1200px;
+    margin: auto;
+}
+
+.footer h4 {
+    color: #E63946;
+}
+
+.map-container iframe {
+    width: 100%;
+    height: 300px;
+    border-radius: 10px;
+}
+
+/* ============================================
+   CHATBOT
+============================================ */
+#chat-toggle {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    background: #E63946;
+    color: white;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    position: fixed;
+}
+
+/* ============================================
+   🔵🟡 AI BOT 3 DOT INDICATOR (NEW ADDITION)
+============================================ */
+
+#chat-toggle::after {
+    content: "...";
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    background: #0A2472;
+    color: white;
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 10px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    animation: dotBlink 1.5s infinite;
+}
+
+/* blinking animation */
+@keyframes dotBlink {
+    0% { opacity: 0.3; }
+    50% { opacity: 1; }
+    100% { opacity: 0.3; }
+}
+
+#chat-container {
+    position: fixed;
+    bottom: 100px;
+    right: 25px;
+    width: 350px;
+    height: 500px;
+    background: white;
+    border-radius: 15px;
+    display: none;
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(10,36,114,0.2);
+}
+
+#chat-header {
+    background: linear-gradient(135deg, #0A2472, #E63946);
+    color: white;
+    padding: 15px;
+}
+
+#chat-messages {
+    flex: 1;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+.user-message {
+    background: #E63946;
+    color: white;
+    padding: 8px;
+    margin: 5px;
+    border-radius: 8px;
+    text-align: right;
+}
+
+.quick-questions {
+    margin-top: 10px;
+}
+
+.quick-questions button {
+    display: block;
+    width: 100%;
+    margin: 5px 0;
+    padding: 8px;
+    border: none;
+    border-radius: 6px;
+    background: #0A2472;
+    color: white;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.quick-questions button:hover {
+    background: #E63946;
+}
+
+#chat-input {
+    display: flex;
+    padding: 10px;
+    background-color: #0A2472;
+}
+
+#chat-input input {
+    flex: 1;
+    padding: 8px;
+}
+
+#chat-input button {
+    background: #E63946;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+}
+
+/* ============================================
+   MESSAGE BOX / ALERT STYLES (THEMED)
+============================================ */
+
+
+/* Chat Toggle Container */
+#chat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #2a2a3d;
+  color: #000000;
+  padding: 0.8rem 1.2rem;   /* slightly larger padding */
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: 'Roboto', sans-serif;
+  font-size: 1rem;          /* adjust text size */
+  transition: background 0.3s ease, transform 0.2s ease;
+}
+
+#chat-toggle:hover {
+  background: #00c6ff;
+  color: #fff;
+  transform: scale(1.05);   /* subtle hover grow */
+}
+
+/* Chat Icon Size */
+.chat-icon {
+  width: 100px;   /* increase size */
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover; /* keeps image proportion */
+}
+
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* SUCCESS MESSAGE */
+.message-box.success,
+.alert-success,
+.notification-message.success {
+    background: linear-gradient(135deg, #d4edda, #c3e6cb);
+    border-left-color: #28a745;
+    color: #155724;
+}
+
+.message-box.success i,
+.alert-success i,
+.notification-message.success i {
+    color: #28a745;
+    font-size: 1.3rem;
+}
+
+.message-box.success strong,
+.alert-success strong,
+.notification-message.success strong {
+    color: #155724;
+}
+
+/* ERROR MESSAGE */
+.message-box.error,
+.alert-danger,
+.notification-message.error {
+    background: linear-gradient(135deg, #f8d7da, #f5c6cb);
+    border-left-color: #E63946;
+    color: #721c24;
+}
+
+.message-box.error i,
+.alert-danger i,
+.notification-message.error i {
+    color: #E63946;
+    font-size: 1.3rem;
+}
+
+.message-box.error strong,
+.alert-danger strong,
+.notification-message.error strong {
+    color: #721c24;
+}
+
+/* WARNING MESSAGE */
+.message-box.warning,
+.alert-warning,
+.notification-message.warning {
+    background: linear-gradient(135deg, #fff3cd, #ffeeba);
+    border-left-color: #ffc107;
+    color: #856404;
+}
+
+.message-box.warning i,
+.alert-warning i,
+.notification-message.warning i {
+    color: #ffc107;
+    font-size: 1.3rem;
+}
+
+.message-box.warning strong,
+.alert-warning strong,
+.notification-message.warning strong {
+    color: #856404;
+}
+
+/* INFO MESSAGE (THEME COLOR) */
+.message-box.info,
+.alert-info,
+.notification-message.info {
+    background: linear-gradient(135deg, #d1ecf1, #bee5eb);
+    border-left-color: #0A2472;
+    color: #0c5460;
+}
+
+.message-box.info i,
+.alert-info i,
+.notification-message.info i {
+    color: #0A2472;
+    font-size: 1.3rem;
+}
+
+.message-box.info strong,
+.alert-info strong,
+.notification-message.info strong {
+    color: #0A2472;
+}
+
+/* PRIMARY THEMED MESSAGE (Main Brand Color) */
+.message-box.primary,
+.alert-primary,
+.notification-message.primary {
+    background: linear-gradient(135deg, #cfe2ff, #b6d4fe);
+    border-left-color: #0A2472;
+    color: #084298;
+}
+
+.message-box.primary i,
+.alert-primary i,
+.notification-message.primary i {
+    color: #0A2472;
+    font-size: 1.3rem;
+}
+
+.message-box.primary strong,
+.alert-primary strong,
+.notification-message.primary strong {
+    color: #0A2472;
+}
+
+/* DANGER THEMED MESSAGE (Accent Red) */
+.message-box.danger,
+.alert-red,
+.notification-message.danger {
+    background: linear-gradient(135deg, #ffe0e0, #ffc9c9);
+    border-left-color: #8B0000;
+    color: #670000;
+}
+
+.message-box.danger i,
+.alert-red i,
+.notification-message.danger i {
+    color: #8B0000;
+    font-size: 1.3rem;
+}
+
+.message-box.danger strong,
+.alert-red strong,
+.notification-message.danger strong {
+    color: #670000;
+}
+
+/* CLOSE BUTTON FOR MESSAGE BOX */
+.message-box .close-btn,
+.alert .close-btn,
+.notification-message .close-btn {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.message-box .close-btn:hover,
+.alert .close-btn:hover,
+.notification-message .close-btn:hover {
+    opacity: 1;
+}
+
+/* CONTENT WRAPPER */
+.message-content {
+    flex: 1;
+}
+
+.message-content p {
+    margin: 0;
+    font-size: 1rem;
+}
+
+/* ============================================
+   RESPONSIVE MESSAGE BOX
+============================================ */
+@media (max-width: 768px) {
+    .message-box,
+    .alert,
+    .notification-message {
+        flex-direction: column;
+        align-items: flex-start;
+        padding: 12px 15px;
+        font-size: 0.95rem;
+    }
+
+    .message-box i,
+    .alert i,
+    .notification-message i {
+        margin-bottom: 8px;
+    }
+
+    .message-box .close-btn,
+    .alert .close-btn,
+    .notification-message .close-btn {
+        margin-left: 0;
+        align-self: flex-end;
+    }
+}
+
+/* ============================================
+   RESPONSIVE
+============================================ */
+@media (max-width: 768px) {
+    .nav-links {
+        flex-direction: column;
+        align-items: center;
+        
+    }
+
+    .program-section h2 {
+        font-size: 2rem;
+    }
+}
+
+
+
+
+
+
+
+
+
+
+

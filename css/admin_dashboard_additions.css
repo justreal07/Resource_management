@@ -1,0 +1,100 @@
+/* ========== DASHBOARD ACTIONS & ALERTS ========== */
+.dashboard-actions {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    display: flex;
+    gap: 15px;
+    z-index: 100;
+}
+
+.btn-add-applicant {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #B02A37 0%, #dc2626 100%);
+    color: white;
+    text-decoration: none;
+    border-radius: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(176, 42, 55, 0.3);
+}
+
+.btn-add-applicant:hover {
+    background: linear-gradient(135deg, #8B1F2A 0%, #B02A37 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(176, 42, 55, 0.4);
+}
+
+.btn-add-applicant:active {
+    transform: translateY(0);
+}
+
+.btn-add-applicant i {
+    font-size: 18px;
+}
+
+/* Ensure content has relative positioning for absolute child elements */
+.content {
+    position: relative;
+}
+
+/* Add padding to content top to accommodate the floating button */
+.content > h1 {
+    margin-right: 200px;
+}
+
+/* Alert Styles */
+.alert {
+    padding: 16px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: 15px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.alert i {
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-top: 2px;
+}
+
+.alert-success {
+    background-color: #dcfce7;
+    color: #146C43;
+    border-left: 4px solid #146C43;
+}
+
+.alert-error {
+    background-color: #fee2e2;
+    color: #B02A37;
+    border-left: 4px solid #B02A37;
+}
+
+.alert-link {
+    color: inherit;
+    text-decoration: underline;
+    font-weight: 600;
+    margin-left: 10px;
+}
+
+.alert-link:hover {
+    opacity: 0.8;
+}

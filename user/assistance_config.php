@@ -1,0 +1,402 @@
+<?php
+/**
+ * Assistance Programs - shared settings
+ *
+ * Used by the 3 application forms, the 3 photo-upload pages and submit_assistance.php.
+ * To change the required documents of a program, edit its 'documents' list below —
+ * the upload page and the server-side check both read from it.
+ */
+
+// ---- Photo upload rules (documents must be PHOTOS only) ----
+const PHOTO_MAX_BYTES      = 10 * 1024 * 1024;   // 10 MB per photo (browser shrinks big photos before upload)
+const PHOTOS_PER_DOCUMENT  = 3;                   // max photos per requirement (e.g. front & back of an ID)
+const PHOTO_ALLOWED_TYPES  = [                    // detected MIME type => saved file extension
+    'image/jpeg' => 'jpg',
+    'image/png'  => 'png',
+    'image/webp' => 'webp',
+];
+
+// Fields that are about the applicant themself — safe to reuse from ANY earlier application
+const SHARED_PROFILE_FIELDS = [
+    'first_name', 'middle_name', 'last_name',
+    'house_no', 'street', 'barangay', 'municipality', 'province',
+    'sex', 'contact_number',
+];
+
+// ---- Input limits ----
+// Longest value per field (the database column sizes), so nothing gets cut off silently
+const FIELD_MAX_LENGTH = [
+    'first_name' => 100, 'middle_name' => 100, 'last_name' => 100,
+    'house_no' => 50, 'street' => 100, 'barangay' => 100, 'municipality' => 100, 'province' => 100,
+    'contact_number' => 20, 'petitioner_name' => 150, 'relationship' => 100,
+    'hospital' => 150, 'diagnosis' => 255, 'purpose' => 2000,
+];
+// Names of people: letters (any language), spaces, dots, apostrophes and hyphens only
+const PERSON_NAME_FIELDS = ['first_name', 'middle_name', 'last_name', 'petitioner_name'];
+// Earliest birthdate / date of death accepted
+const OLDEST_DATE = '1900-01-01';
+
+$ASSISTANCE_PROGRAMS = [
+    'medical' => [
+        'type_id'   => 1,
+        'name'      => 'Medical Assistance',
+        'tagline'   => 'Financial help for hospital bills, laboratory fees and medicines.',
+        'form_page' => 'Medical Assistance.php',
+        'doc_page'  => 'medicaldoc.php',
+        'image'     => '../asset/medical.jpg',
+        'icon'      => 'fa-briefcase-medical',
+        'tone'      => 'red',
+        // How often: shown on the forms, My Account and to the chat assistant. Follows person_rules.php.
+        'frequency' => 'Once per patient; again with office approval',
+        'cooldown_days' => 0,      // no account-level wait: applying again for the same patient needs an admin's permission (person_rules.php)
+        // Document name => short hint shown under it
+        'documents' => [
+            'Letter of Intent'                                   => 'Photo of your signed letter of intent.',
+            'Brgy Indigency & Residency (Applicant & Patient)'   => 'Photos of the barangay certificates of both the applicant and the patient.',
+            'Valid ID with 3 specimen signatures'                => 'Front and back of the ID, with the 3 signatures visible.',
+            'Original copy medical certificate or certified true copy of clinical abstract' => 'Make sure the doctor\'s name and signature are readable.',
+            'MSWD Case Study'                                    => 'Photo of every page of the case study.',
+        ],
+        // Fields re-filled from the user's last application of this same program
+        'remember'  => ['petitioner_name', 'relationship', 'claimant_age', 'beneficiary_birthdate'],
+    ],
+    'burial' => [
+        'type_id'   => 2,
+        'name'      => 'Burial Assistance',
+        'tagline'   => 'Support for wake, casket and burial expenses of a family member.',
+        'form_page' => 'burial_assistance_form.php',
+        'doc_page'  => 'burialdoc.php',
+        'image'     => '../asset/burial.jpg',
+        'icon'      => 'fa-hand-holding-heart',
+        'tone'      => 'blue',
+        'frequency' => 'Once per deceased person',
+        'cooldown_days' => 0,      // no account-level wait: one application per deceased person (person_rules.php)
+        'documents' => [
+            'Letter of Intent'                                   => 'Photo of your signed letter of intent.',
+            'Brgy Indigency & Residency (Applicant & Patient)'   => 'Photos of the barangay certificates.',
+            'Valid ID with 3 specimen signatures'                => 'Front and back of the ID, with the 3 signatures visible.',
+            'Certified True Copy of Death Certificate'           => 'The whole certificate must be visible and readable.',
+            'MSWD Case Study'                                    => 'Photo of every page of the case study.',
+        ],
+        'remember'  => ['claimant_age'],
+    ],
+    'opd' => [
+        'type_id'   => 3,
+        'name'      => 'Outpatient Diagnosis (OPD)',
+        'tagline'   => 'Scheduling of check-ups, laboratory tests and hospital referral.',
+        'form_page' => 'opdform.php',
+        'doc_page'  => 'opddoc.php',
+        'image'     => '../asset/opd.jpg',
+        'icon'      => 'fa-stethoscope',
+        'tone'      => 'green',
+        'frequency' => 'For every check-up your doctor schedules',
+        'cooldown_days' => 0,      // no limit: patients request a vehicle for every check-up their doctor schedules
+        'documents' => [
+            'Blue Card Schedule' => 'Photo of the blue card showing your schedule.',
+            'Valid ID'           => 'Front and back of a valid government ID.',
+        ],
+        'remember'  => ['age', 'hospital', 'petitioner_name', 'relationship'],
+    ],
+];
+
+function get_program(string $key): ?array {
+    global $ASSISTANCE_PROGRAMS;
+    return $ASSISTANCE_PROGRAMS[$key] ?? null;
+}
+
+/** Program settings by assistance_type_id (1, 2, 3), with its key added as 'key'. */
+function get_program_by_type($type_id): ?array {
+    global $ASSISTANCE_PROGRAMS;
+    foreach ($ASSISTANCE_PROGRAMS as $key => $p) {
+        if ($p['type_id'] === (int)$type_id) return $p + ['key' => $key];
+    }
+    return null;
+}
+
+/**
+ * Values to pre-fill an application form with, so returning applicants
+ * don't have to type everything again.
+ *
+ * Order: what they typed earlier this session (came back from the upload step)
+ *      → their last application of the same program
+ *      → their last application of any program (personal + address fields only)
+ *      → their account name.
+ * Contact number / address saved in their profile override the above.
+ *
+ * @return array ['values' => [...], 'source' => 'session'|'same'|'other'|'profile'|'account'|'off', 'date' => ?string]
+ */
+function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
+    $program = get_program($key);
+
+    if (!empty($_SESSION[$key . '_form_data'])) {
+        return ['values' => $_SESSION[$key . '_form_data'], 'source' => 'session', 'date' => null];
+    }
+
+    $values = [];
+    $source = 'account';
+    $date   = null;
+    $defaults = ['municipality' => 'General Mariano Alvarez', 'province' => 'Cavite'];
+
+    $stmt = $pdo->prepare("SELECT * FROM applicant_accounts WHERE id = ?");
+    $stmt->execute([$account_id]);
+    $acc = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+
+    // Turned off in My Account → Preferences
+    if (isset($acc['autofill_enabled']) && !$acc['autofill_enabled']) {
+        return ['values' => $defaults, 'source' => 'off', 'date' => null];
+    }
+
+    $stmt = $pdo->prepare("SELECT * FROM applicant WHERE account_id = ? AND assistance_type_id = ? ORDER BY created_at DESC LIMIT 1");
+    $stmt->execute([$account_id, $program['type_id']]);
+    $last = $stmt->fetch(PDO::FETCH_ASSOC);
+    $fields = array_merge(SHARED_PROFILE_FIELDS, $program['remember']);
+
+    if (!$last) {
+        $stmt = $pdo->prepare("SELECT * FROM applicant WHERE account_id = ? ORDER BY created_at DESC LIMIT 1");
+        $stmt->execute([$account_id]);
+        $last = $stmt->fetch(PDO::FETCH_ASSOC);
+        $fields = SHARED_PROFILE_FIELDS;
+        $source = $last ? 'other' : 'account';
+    } else {
+        $source = 'same';
+    }
+
+    if ($last) {
+        foreach ($fields as $f) {
+            if (isset($last[$f]) && $last[$f] !== '') $values[$f] = $last[$f];
+        }
+        $date = $last['created_at'];
+    } elseif ($acc) {
+        $values['first_name'] = $acc['firstname'];
+        $values['last_name']  = $acc['lastname'];
+    }
+
+    // Contact number and address saved in My Account → Profile are the most up to date
+    $profile_fields = ['phone' => 'contact_number', 'sex' => 'sex', 'house_no' => 'house_no', 'street' => 'street',
+                       'barangay' => 'barangay', 'municipality' => 'municipality', 'province' => 'province'];
+    $used_profile = false;
+    foreach ($profile_fields as $col => $field) {
+        if (!empty($acc[$col])) {
+            $values[$field] = $acc[$col];
+            $used_profile = true;
+        }
+    }
+    if ($source === 'account' && $used_profile) $source = 'profile';
+
+    // Services are for GMA residents, so these are almost always the same
+    $values += $defaults;
+
+    return ['values' => $values, 'source' => $source, 'date' => $date];
+}
+
+/**
+ * Validate the posted application fields (on the server; the browser checks are only a convenience).
+ *
+ * @param array $data     cleaned POST values (see posted_fields)
+ * @param array $required names of required fields
+ * @return array field => error message
+ */
+function validate_application(array $data, array $required): array {
+    $errors = [];
+    $today = date('Y-m-d');
+    foreach ($required as $f) {
+        if (($data[$f] ?? '') === '') $errors[$f] = 'This field is required.';
+    }
+
+    // Length and allowed characters
+    foreach ($data as $f => $v) {
+        if (isset($errors[$f]) || !is_string($v) || $v === '') continue;
+        if (isset(FIELD_MAX_LENGTH[$f]) && mb_strlen($v) > FIELD_MAX_LENGTH[$f]) {
+            $errors[$f] = 'This is too long (maximum ' . FIELD_MAX_LENGTH[$f] . ' characters).';
+        } elseif (in_array($f, PERSON_NAME_FIELDS, true)) {
+            // A comma is allowed only in the one-box full names ("Dela Cruz, Juan")
+            $comma = $f === 'petitioner_name' ? ',' : '';
+            if (!preg_match('/^\p{L}[\p{L}\p{M} .\'’\p{Pd}' . $comma . ']*$/u', $v)) {
+                $errors[$f] = 'Use letters only (spaces, dots, apostrophes and hyphens are fine).';
+            } elseif ($f !== 'middle_name' && preg_match_all('/\p{L}/u', $v) < 2) {
+                $errors[$f] = 'Please write the name in full, not just an initial.';
+            }
+        } elseif (in_array($f, ['barangay', 'municipality', 'province', 'relationship', 'hospital'], true) && !preg_match('/\p{L}/u', $v)) {
+            $errors[$f] = 'Please write this in words.';
+        }
+    }
+
+    if (!isset($errors['barangay']) && !empty($data['barangay']) && !in_array($data['barangay'], BARANGAYS, true)) {
+        $errors['barangay'] = 'Please choose your barangay from the list.';
+    }
+    if (!isset($errors['contact_number']) && !empty($data['contact_number']) && !preg_match('/^[0-9]{11}$/', $data['contact_number'])) {
+        $errors['contact_number'] = 'The contact number must be exactly 11 digits, e.g. 09171234567.';
+    }
+    foreach (['claimant_age', 'age'] as $f) {
+        if (!empty($data[$f]) && (!ctype_digit((string)$data[$f]) || $data[$f] < 0 || $data[$f] > 120)) {
+            $errors[$f] = 'Enter a valid age.';
+        }
+    }
+    if (!empty($data['sex']) && !in_array($data['sex'], ['Male', 'Female'], true)) {
+        $errors['sex'] = 'Please choose an option.';
+    }
+
+    // OPD check-up: a real date, from today up to a year ahead
+    if (!empty($data['checkup_date']) && !isset($errors['checkup_date'])) {
+        if (!is_ymd($data['checkup_date'])) {
+            $errors['checkup_date'] = 'Enter a valid date.';
+        } elseif ($data['checkup_date'] < $today) {
+            $errors['checkup_date'] = 'The check-up date cannot be in the past.';
+        } elseif ($data['checkup_date'] > date('Y-m-d', strtotime('+1 year'))) {
+            $errors['checkup_date'] = 'The check-up date must be within the next 12 months.';
+        }
+    }
+
+    // Birthdate of the person the application is for (Medical: the patient, Burial: the deceased)
+    $birth = $data['beneficiary_birthdate'] ?? '';
+    if ($birth !== '' && !isset($errors['beneficiary_birthdate'])) {
+        if (!is_ymd($birth)) {
+            $errors['beneficiary_birthdate'] = 'Enter a valid birthdate.';
+        } elseif ($birth > $today) {
+            $errors['beneficiary_birthdate'] = 'The birthdate cannot be in the future.';
+        } elseif ($birth < OLDEST_DATE) {
+            $errors['beneficiary_birthdate'] = 'Please check the year of birth.';
+        }
+    }
+    $death = $data['date_of_death'] ?? '';
+    if ($death !== '' && !isset($errors['date_of_death'])) {
+        if (!is_ymd($death)) {
+            $errors['date_of_death'] = 'Enter a valid date of death.';
+        } elseif ($death > $today) {
+            $errors['date_of_death'] = 'The date of death cannot be in the future.';
+        } elseif ($death < OLDEST_DATE) {
+            $errors['date_of_death'] = 'Please check the year of death.';
+        } elseif (is_ymd($birth) && $death < $birth) {
+            $errors['date_of_death'] = 'The date of death cannot be earlier than the birthdate.';
+        }
+    }
+    return $errors;
+}
+
+/** True for a real calendar date written as YYYY-MM-DD (2026-02-30 is not). */
+function is_ymd(string $value): bool {
+    $d = DateTime::createFromFormat('!Y-m-d', $value);
+    return $d !== false && $d->format('Y-m-d') === $value;
+}
+
+/** php.ini size like "40M" → bytes. */
+function ini_size_bytes(string $size): int {
+    $n = (int)$size;
+    switch (strtoupper(substr(trim($size), -1))) {   // intentional fall-through
+        case 'G': $n *= 1024;
+        case 'M': $n *= 1024;
+        case 'K': $n *= 1024;
+    }
+    return $n;
+}
+
+// Medical form: the claimant section is only filled in when the assistance is for another person
+const CLAIMANT_FIELDS = ['petitioner_name', 'claimant_age', 'relationship'];
+
+/**
+ * "For myself": the patient is also the claimant, so the claimant details are taken
+ * from the patient's own answers instead of being asked again.
+ *
+ * @return array petitioner_name, claimant_age and relationship ('Self')
+ */
+function medical_self_claimant(array $values): array {
+    $name = trim(preg_replace('/\s+/u', ' ', implode(' ', [
+        $values['first_name'] ?? '', $values['middle_name'] ?? '', $values['last_name'] ?? '',
+    ])));
+    $age = '';
+    $birth = $values['beneficiary_birthdate'] ?? '';
+    if (is_ymd($birth) && $birth <= date('Y-m-d')) {
+        $age = (string)min(120, (new DateTime($birth))->diff(new DateTime('today'))->y);
+    }
+    return [
+        'petitioner_name' => mb_substr($name, 0, FIELD_MAX_LENGTH['petitioner_name']),
+        'claimant_age'    => $age,
+        'relationship'    => 'Self',
+    ];
+}
+
+// The barangays of General Mariano Alvarez - the applicant picks one on the forms
+const BARANGAYS = [
+    'Aldiano Olaes', 'Barangay 1 Poblacion', 'Barangay 2 Poblacion', 'Barangay 3 Poblacion',
+    'Barangay 4 Poblacion', 'Barangay 5 Poblacion', 'Benjamin Tirona', 'Bernardo Pulido',
+    'Epifanio Malia', 'Fiorello Carimag', 'Francisco De Castro', 'Francisco Reyes',
+    'Gavino Maderan', 'Gregoria de Jesus', 'Jacinto Lumbreras', 'Inocencio Salud',
+    'Kapitan Kua', 'Koronel Jose P. Elises', 'Macario Dacon', 'Marcelino Memije',
+    'Nicolasa Virata', 'Pantaleon Granados', 'Ramon Cruz', 'San Gabriel',
+    'San Jose', 'Severino de las Alas',
+];
+
+// Choices for the "reason" fields. The last choice, "Others", lets the applicant type their own.
+const OTHER_CHOICE = 'Others';
+const MEDICAL_PURPOSES = [
+    'Hospital bill / confinement', 'Medicines', 'Laboratory tests / diagnostics', 'Surgery / operation',
+    'Dialysis / chemotherapy', 'Medical supplies / equipment',
+];
+const OPD_REASONS = [
+    'Follow-up check-up', 'General check-up', 'Hypertension', 'Diabetes', 'Heart / cardiac concern',
+    'Respiratory / lung concern', 'Pregnancy / prenatal check-up', 'Laboratory / imaging request',
+];
+
+// Suggestions shown while typing (any answer is accepted). Used by the online forms and the
+// office's walk-in form on the dashboard, so both offer the same choices.
+const OPD_HOSPITALS = [
+    'Philippine General Hospital', 'Ospital ng Maynila Medical Center', 'Santa Ana Hospital', 'Tondo Medical Center',
+    'Jose R. Reyes Memorial Medical Center', 'San Lazaro Hospital', 'Justice Jose Abad Santos General Hospital',
+    'Ospital ng Sampaloc', 'Dr. Jose Fabella Memorial Hospital (National maternity hospital)', 'Ospital ng Tondo (District hospital)',
+    'Gat Andres Bonifacio Memorial Medical Center', 'Ospital ng Pandacan', 'Ospital ng Malate', 'Ospital ng Sta. Mesa',
+    'Ospital ng Maynila Satellite / District Hospitals',
+];
+const RELATIONSHIP_SUGGESTIONS = [
+    'medical' => ['Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Grandchild', 'Guardian'],
+    'burial'  => ['Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Grandchild', 'Authorized Representative'],
+    'opd'     => ['Self', 'Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Caregiver'],
+];
+
+/**
+ * A choice field is posted as the select (name) plus a text box (name_other).
+ * Turn that into the final single value in $_POST[name]: the picked choice, or the
+ * typed text when "Others" is picked. Returns an error message if it is not valid.
+ */
+function resolve_choice_post(string $name, array $options, bool $required): ?string {
+    $picked = $_POST[$name] ?? '';
+    $other  = $_POST[$name . '_other'] ?? '';
+    $picked = is_string($picked) ? trim($picked) : '';
+    $other  = is_string($other) ? trim($other) : '';
+
+    if ($picked === OTHER_CHOICE) {
+        $GLOBALS['choice_other_picked'][$name] = true;   // so the form can re-show the "Others" box after an error
+        $_POST[$name] = $other;
+        return $other === '' ? 'Please type your answer in the box.' : null;
+    }
+    if ($picked !== '' && !in_array($picked, $options, true)) {
+        $_POST[$name] = '';
+        return 'Please choose one of the options.';
+    }
+    $_POST[$name] = $picked;
+    return ($picked === '' && $required) ? 'This field is required.' : null;
+}
+
+/**
+ * Cleaned POST values for the given field names: text only (an array or broken
+ * characters become empty), no control characters, single spaces on one line
+ * (the purpose box keeps its line breaks), trimmed.
+ */
+function posted_fields(array $names): array {
+    $out = [];
+    foreach ($names as $n) {
+        $v = $_POST[$n] ?? '';
+        if (!is_string($v) || !mb_check_encoding($v, 'UTF-8')) $v = '';
+        $v = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $v);
+        if ($n !== 'purpose') $v = preg_replace('/[\s\x{00A0}\x{2000}-\x{200B}\x{3000}]+/u', ' ', $v);
+        $v = trim($v);
+        // Spaces and dashes typed in a phone number are ignored (0917 123 4567 → 09171234567)
+        if ($n === 'contact_number') {
+            $v = preg_replace('/[\s-]+/', '', $v);
+            if (preg_match('/^\+?63(9\d{9})$/', $v, $m)) $v = '0' . $m[1];   // +63 917... → 0917...
+        }
+        // "N/A", "none" or "-" as a middle name means there is none
+        if ($n === 'middle_name' && in_array(strtolower($v), ['n/a', 'na', 'none', '-', '.'], true)) $v = '';
+        $out[$n] = $v;
+    }
+    return $out;
+}

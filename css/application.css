@@ -1,0 +1,141 @@
+h2{
+margin-bottom:10px;
+}
+
+.add-btn{
+display:inline-block;
+padding:10px 16px;
+background:#2c7be5;
+color:white;
+text-decoration:none;
+border-radius:5px;
+margin-bottom:15px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+background:white;
+}
+
+th, td{
+padding:12px;
+border:1px solid #ddd;
+text-align:left;
+}
+
+th{
+bbackground: linear-gradient(135deg, #2d6a4f 0%, #1a472a 100%);
+color:white;
+}
+
+.action a{
+margin-right:6px;
+padding:6px 10px;
+border-radius:4px;
+color:white;
+text-decoration:none;
+font-size:14px;
+}
+
+.view{
+background:#17a2b8;
+}
+
+.edit{
+background:#28a745;
+}
+
+.delete{
+background:#dc3545;
+}
+
+
+
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+/* Admin add new applicant */
+
+
+
+
+/* General page styling */
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f9;
+    margin: 0;
+    padding: 20px;
+    color: #333;
+}
+
+/* Heading */
+h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #2c3e50;
+}
+
+/* Form container */
+form {
+    max-width: 500px;
+    margin: 0 auto;
+    background: #fff;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+/* Labels and inputs */
+form label {
+    font-weight: bold;
+    display: block;
+    margin: 10px 0 5px;
+}
+
+form input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    transition: border 0.3s;
+}
+
+form input[type="text"]:focus {
+    border-color: #3498db;
+    outline: none;
+}
+
+/* Button styling */
+/* Wrap your buttons in a container */
+.button-group {
+    display: flex;
+    justify-content: flex-end; /* align buttons to the right */
+    gap: 15px;                 /* space between buttons */
+    margin-top: 20px;          /* space above the group */
+}
+
+/* Style for all buttons */
+.button-group button {
+    padding: 12px 24px;
+    background: #3498db;
+    border: none;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+/* Hover effect */
+.button-group button:hover {
+    background: #2980b9;
+}
+
