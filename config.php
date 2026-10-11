@@ -1,5 +1,6 @@
 <?php
-session_start();
+// Starts the session with safe cookie settings (see includes/session_start.php)
+require_once __DIR__ . '/includes/session_start.php';
 
 // Logged-in staff/admin id, saved as approved_by / disapproved_by / changed_by.
 // The approve/disapprove/update pages read $_SESSION['user_id']; login stores it in $_SESSION['user']['id'].

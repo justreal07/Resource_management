@@ -1,1 +1,12 @@
 /vendor
+
+# Private settings and keys (Google sign-in, AI chat).
+# Copy each *.local.php.example to *.local.php and fill in your own values.
+*.local.php
+
+# Uploaded applicant photos and profile pictures hold personal data, so they stay out of git.
+# The .htaccess files are kept because they stop uploaded files from running as code.
+/documents/*
+!/documents/.htaccess
+/avatars/*
+!/avatars/.htaccess

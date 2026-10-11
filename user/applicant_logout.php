@@ -1,7 +1,7 @@
 <?php
 // Logs the applicant out. Admin/staff sign-in uses the same browser session: when an admin is also
 // signed in on this browser they stay signed in (before, this logged them out too).
-session_start();
+require_once __DIR__ . '/../includes/session_start.php';
 
 if (empty($_SESSION['user'])) {
     $_SESSION = [];

@@ -1,0 +1,8 @@
+<?php
+// Local AI chat settings for user/ai_chat.php.
+// Copy this file to ai_chat.local.php and fill in your own key.
+// ai_chat.local.php is ignored by git: never commit it or share it.
+return [
+    'GEMINI_API_KEY' => 'REPLACE_WITH_YOUR_GEMINI_API_KEY',
+    'GEMINI_MODEL'   => 'gemini-3.8-flash',
+];
