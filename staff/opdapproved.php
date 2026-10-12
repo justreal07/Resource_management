@@ -4,12 +4,12 @@ define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
 
 // Fetch only approved OPD applicants
-// (name parts read separately: CONCAT() with an empty (NULL) middle name gave no name at all)
+// (name and address parts read separately: CONCAT() with an empty (NULL) part gave no text at all.
+// No amount: OPD is a vehicle schedule, nothing is released.)
 $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name,
-    CONCAT(COALESCE(a.house_no, ''), ' ', COALESCE(a.street, ''), ', ', a.barangay, ', ', a.municipality, ', ', a.province) AS address,
+    a.house_no, a.street, a.barangay, a.municipality, a.province,
     a.contact_number,
-    a.created_at,
-    a.amount
+    a.created_at
 FROM applicant a
 WHERE a.assistance_type_id = 3 AND a.status = 'Approved'
 ORDER BY a.created_at DESC");
@@ -24,7 +24,7 @@ echo ui_type_tabs(3, 'approved');
     <?= ui_table($applicants, [
         ['label' => 'Patient', 'type' => 'person'],
         ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
+        ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
     ], [
         'empty' => ['No approved OPD requests yet', 'Requests you approve will be listed here.'],

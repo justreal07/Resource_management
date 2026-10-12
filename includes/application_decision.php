@@ -100,9 +100,13 @@ function decision_csrf_field(): string
     return '<input type="hidden" name="decision_token" value="' . htmlspecialchars(decision_csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
 }
 
+/**
+ * Forms post the token as the decision_token field; page scripts (fetch, e.g. the staff tools) send it
+ * in the X-Decision-Token header. Another site can't set that header, so it's as safe as the field.
+ */
 function decision_csrf_ok(): bool
 {
-    $sent = $_POST['decision_token'] ?? '';
+    $sent = $_POST['decision_token'] ?? ($_SERVER['HTTP_X_DECISION_TOKEN'] ?? '');
     return is_string($sent) && !empty($_SESSION['decision_token']) && hash_equals($_SESSION['decision_token'], $sent);
 }
 

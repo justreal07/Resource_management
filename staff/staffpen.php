@@ -5,10 +5,12 @@ define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
 
 // Fetch ONLY PENDING Outpatient Diagnosis applicants (assistance_type_id = 3).
-// (This page used to load the approved list by mistake; same query as opd/opd_pending.php now.)
+// (This page used to load the approved list by mistake.)
+// Address parts are read separately and joined by ui_address(): CONCAT() in SQL gave no address at all
+// when one part was empty (NULL).
 $stmt = $pdo->prepare("
     SELECT a.id, a.first_name, a.middle_name, a.last_name,
-        CONCAT(COALESCE(a.house_no, ''), ' ', COALESCE(a.street, ''), ', ', a.barangay, ', ', a.municipality, ', ', a.province) AS address,
+        a.house_no, a.street, a.barangay, a.municipality, a.province,
         a.contact_number,
         a.created_at,
         a.status
@@ -19,7 +21,7 @@ $stmt = $pdo->prepare("
 $stmt->execute();
 $pendingApplicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'opd']);
+admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'pending']);   // "To review" in the menu
 echo ui_page_head('OPD requests to review', 'Pending requests, newest first. Approve and Disapprove both ask you to confirm.');
 echo ui_type_tabs(3, 'pending');
 ?>
@@ -28,7 +30,7 @@ echo ui_type_tabs(3, 'pending');
         ['label' => 'Patient', 'type' => 'person'],
         ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
         ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
+        ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
     ], [
         'empty' => ['No OPD requests waiting', 'New requests will appear here.'],

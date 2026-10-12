@@ -3,9 +3,9 @@ require_once '../config.php';
 define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
 
-$id = isset($_GET['id']) ? $_GET['id'] : (isset($_GET['applicant_id']) ? $_GET['applicant_id'] : null);
+$id = (int)($_GET['id'] ?? $_GET['applicant_id'] ?? 0);
 
-if(!$id){
+if($id <= 0){
     admin_layout_start(['title' => 'Update OPD request', 'section' => 'opd']);
     echo ui_state('alert', 'No request was chosen', 'Open a request from the OPD lists.', '<a class="btn btn-secondary btn-sm" href="listopd.php">Go to OPD applications</a>', 'state-error');
     admin_layout_end();
@@ -27,11 +27,13 @@ if(!$row){
 /* CHANGED (Disapprove): the status/remarks form goes through decision_save_update_form()
    (application_decision.php): role checked on the server, only a Pending application can be
    approved or disapproved, row lock against two people deciding at once, who/when recorded.
-   A decided application only gets its remarks changed. */
+   A decided application only gets its remarks changed.
+   After saving, staff land on the record they just updated (it used to be the dashboard). */
+$recordUrl = 'view_opd_applicant.php?id=' . (int)$row['id'];
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
     $result = decision_save_update_form($pdo, $row);
     $_SESSION[$result['ok'] ? 'success_message' : 'error_message'] = $result['message'];
-    header('Location: ' . ($result['ok'] ? 'staff_dashboard.php' : 'Opdupdate.php?id=' . (int)$row['id']));
+    header('Location: ' . ($result['ok'] ? $recordUrl : 'Opdupdate.php?id=' . (int)$row['id']));
     exit();
 }
 
@@ -40,5 +42,5 @@ $type->execute([$row['assistance_type_id']]);
 $type_name = $type->fetchColumn();
 
 admin_layout_start(['title' => 'Update OPD request', 'section' => 'opd']);
-echo ui_status_update_form($row, $type_name ?: 'Not specified', 'staff_dashboard.php');
+echo ui_status_update_form($row, $type_name ?: 'Not specified', $recordUrl);
 admin_layout_end();

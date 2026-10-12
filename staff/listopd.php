@@ -3,13 +3,14 @@ require_once '../config.php';
 define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
 
-// Fetch OPD applicants (assistance_type_id = 3) with all relevant fields
+// Fetch OPD applicants (assistance_type_id = 3) with all relevant fields.
+// Requests without a check-up date go last (MySQL sorts an empty date first otherwise).
 $stmt = $pdo->query("
     SELECT a.*, at.name as assistance_type
     FROM applicant a
     LEFT JOIN assistance_types at ON a.assistance_type_id = at.id
     WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved'
-    ORDER BY a.checkup_date ASC, a.created_at DESC
+    ORDER BY a.checkup_date IS NULL, a.checkup_date ASC, a.created_at DESC
 ");
 $applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
 

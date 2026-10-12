@@ -567,7 +567,10 @@ function ui_column_chart(array $values, array $axisLabels, array $longLabels, ca
     return ui_viz($spec, $html . '</ol></div>');
 }
 
-/** Horizontal bars, sorted as given, value at the tip. Items: ['label' => ..., 'value' => ..., 'other' => bool]. */
+/**
+ * Horizontal bars, sorted as given, value at the tip.
+ * Items: ['label' => ..., 'value' => ..., 'other' => bool, 'hover' => text shown on hover (default: the value)].
+ */
 function ui_bar_list(array $items, callable $format): string
 {
     if (!$items) return '';
@@ -578,11 +581,12 @@ function ui_bar_list(array $items, callable $format): string
         'labels' => array_values($labels),
         'titles' => array_values($labels),
         'values' => array_values(array_map(function ($i) { return (float)$i['value']; }, $items)),
-        'tips'   => array_values(array_map(function ($i) use ($format) { return (string)$format((float)$i['value']); }, $items)),
+        'tips'   => array_values(array_map(function ($i) use ($format) { return (string)($i['hover'] ?? $format((float)$i['value'])); }, $items)),
         'other'  => array_values(array_map(function ($i) { return !empty($i['other']); }, $items)),
         'unit'   => ui_unit_of($format),
+        // every bar carries its value at the tip
+        'texts'  => array_values(array_map(function ($i) use ($format) { return (string)$format((float)$i['value']); }, $items)),
     ];
-    $spec['texts'] = $spec['tips'];   // every bar carries its value at the tip
     $html = '<ol class="bar-list">';
     foreach ($items as $item) {
         $label = trim((string)$item['label']) !== '' ? $item['label'] : '(not given)';
@@ -749,8 +753,9 @@ function ui_year_form(string $year, string $anchor): string
  * counts that open each list, the 10 newest applications, and applications per month.
  * $actions: the buttons of each recent row (default: View).
  */
-function ui_type_overview(int $typeId, array $stats, array $recent, array $monthlyData, string $year, ?callable $actions = null): string
+function ui_type_overview(int $typeId, array $stats, array $recent, array $monthlyData, string $year, ?callable $actions = null, string $afterCards = ''): string
 {
+    // $afterCards: a page's own panel between the count cards and the recent list (staff: upcoming check-ups)
     $t = ui_types()[$typeId];
     [$short, $long] = ui_month_labels();
 
@@ -762,7 +767,7 @@ function ui_type_overview(int $typeId, array $stats, array $recent, array $month
         ['label' => 'Pending', 'value' => number_format((int)$stats['pending']), 'href' => ui_type_url($typeId, 'pending'), 'status' => 'Pending'],
         ['label' => 'Approved', 'value' => number_format((int)$stats['approved']), 'href' => ui_type_url($typeId, 'approved'), 'status' => 'Approved'],
     ];
-    $html .= ui_stat_cards($cards);
+    $html .= ui_stat_cards($cards) . $afterCards;
 
     $html .= '<section class="panel" aria-labelledby="recentTitle"><div class="panel-head"><h3 id="recentTitle">Recent applications</h3>'
         . '<p class="panel-sub">The 10 newest, from any date</p></div>'

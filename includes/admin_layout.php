@@ -59,11 +59,15 @@ function admin_nav(): array
     ];
 }
 
-/** Menu of the OPD staff side (staff/ pages). An admin who opens a staff page sees it too. */
+/**
+ * Menu of the OPD staff side (staff/ pages). An admin who opens a staff page sees it too.
+ * "To review" (staffpen.php) is one click away and carries the waiting count, so the count isn't shown twice.
+ */
 function staff_nav(): array
 {
     return [
-        'opd'     => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['staff', 'admin'], 'type' => 3],
+        'opd'     => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['staff', 'admin']],
+        'pending' => ['href' => ui_type_url(3, 'pending'), 'label' => 'To review', 'icon' => 'clock', 'roles' => ['staff', 'admin'], 'type' => 3],
         'reports' => ['href' => '../staff/opd_staff_report.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
     ];
 }
@@ -99,6 +103,17 @@ function ui_vendor_libs(): array
              'sri' => 'sha384-SYICI4PMW+pxP5q8GD54EWVcWS1hKFjzKyBg4VDtBiysoLQZdMieTSxYFMzHzXYC'],
         ]],
     ];
+}
+
+/**
+ * Tools shown on every staff page for a signed-in staff member (or an admin on a staff page),
+ * in a corner of the screen: the place for the staff chat assistant. Each tool adds its HTML here.
+ * Its script reads AdminUI.cfg.csrfToken and sends it as the X-Decision-Token header
+ * (checked by decision_csrf_ok()), with the same role check as the pages: decision_can($user, 3).
+ */
+function staff_widgets(): string
+{
+    return '';
 }
 
 /** Applications waiting for review per program, for the menu badges. */
@@ -318,6 +333,12 @@ function admin_layout_end(array $opts = []): void
         'loginUrl'        => ui_login_url(),
         'vendor'          => ui_vendor_libs(),
     ], $opts['config'] ?? []);
+    // Staff pages: the form token for staff tools that send data with fetch (see staff_widgets())
+    $staffTools = ui_area() === 'staff' && decision_user() !== null;
+    if ($staffTools) {
+        $config['csrfToken'] = decision_csrf_token();
+    }
+    $widgets = $staffTools ? staff_widgets() : '';
     ?>
         </main>
     </div>
@@ -342,6 +363,11 @@ function admin_layout_end(array $opts = []): void
 </dialog>
 
 <?= $opts['after'] ?? '' ?>
+
+<?php if ($widgets !== ''): ?>
+<!-- Staff tools (staff_widgets()): bottom-right corner, every staff page -->
+<div class="staff-widgets no-print" id="staffWidgets"><?= $widgets ?></div>
+<?php endif; ?>
 
 <script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="../js/admin_ui.js"></script>

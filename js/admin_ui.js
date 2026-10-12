@@ -728,6 +728,9 @@
         }
     };
 
+    // Height of a horizontal bar chart with this many bars (page scripts that show more or fewer bars use it too)
+    const hbarHeight = (rows) => rows * 34 + 12;
+
     function textWidth(texts, font) {
         const ctx = document.createElement('canvas').getContext('2d');
         ctx.font = '600 14px ' + font;
@@ -747,7 +750,7 @@
 
         const box = document.createElement('div');
         box.className = 'viz-canvas';
-        box.style.height = (spec.type === 'column' ? 264 : spec.type === 'stack' ? rows * 40 + 48 : rows * 34 + 12) + 'px';
+        box.style.height = (spec.type === 'column' ? 264 : spec.type === 'stack' ? rows * 40 + 48 : hbarHeight(rows)) + 'px';
         const canvas = document.createElement('canvas');
         canvas.setAttribute('role', 'img');
         // The HTML chart's screen-reader text is hidden with it, so the canvas carries the values
@@ -924,7 +927,7 @@
 
     window.AdminUI = {
         cfg, store, serverNow, iconHtml, setButtonBusy, showFieldError, clearFieldError, formatDate,
-        openDialog, closeDialog, confirmAction, loadLib,
+        openDialog, closeDialog, confirmAction, loadLib, hbarHeight,
         markServerContact() { lastServerContact = Date.now(); }
     };
     window.confirmAction = confirmAction;

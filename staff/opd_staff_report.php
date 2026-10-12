@@ -3,19 +3,12 @@ require_once '../config.php';
 define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
 
-// Get selected date (only a real YYYY-MM-DD reaches the query and the page)
+// Get selected date (only a real YYYY-MM-DD reaches the query and the page).
+// Opens on today: staff plan the day's trips. (It used to open on the latest check-up date, which could be
+// a future day.) A day with no check-ups offers the nearest days that have some, below.
 $selected_date = ui_ymd($_GET['date'] ?? '');
 if ($selected_date === '') {
-    // Default to the most recent date with applicants
-    $latest_date_stmt = $pdo->query("
-        SELECT DATE(checkup_date) as date
-        FROM applicant
-        WHERE assistance_type_id = 3 AND status <> 'Disapproved'
-        ORDER BY checkup_date DESC
-        LIMIT 1
-    ");
-    $latest = $latest_date_stmt->fetch(PDO::FETCH_ASSOC);
-    $selected_date = $latest && $latest['date'] ? $latest['date'] : date('Y-m-d');
+    $selected_date = date('Y-m-d');
 }
 
 // Fetch OPD applicants for selected date
@@ -45,19 +38,22 @@ $stats_stmt = $pdo->prepare("
 $stats_stmt->execute([$selected_date]);
 $stats = $stats_stmt->fetch(PDO::FETCH_ASSOC);
 
-// A day with no check-ups: offer the latest days that have some
+// A day with no check-ups: offer the 5 days nearest to it that have some, in date order
 $available_dates = [];
 $has_any = 0;
 if (count($applicants) === 0) {
-    // (ordered by the selected column: with DISTINCT, MySQL refuses to order by a column it doesn't return)
-    $available_dates_stmt = $pdo->query("
-        SELECT DISTINCT DATE(checkup_date) as date
+    // (GROUP BY instead of DISTINCT: MySQL lets you order by an expression of a grouped column)
+    $available_dates_stmt = $pdo->prepare("
+        SELECT DATE(checkup_date) as date
         FROM applicant
         WHERE assistance_type_id = 3 AND status <> 'Disapproved' AND checkup_date IS NOT NULL
-        ORDER BY date DESC
+        GROUP BY DATE(checkup_date)
+        ORDER BY ABS(DATEDIFF(DATE(checkup_date), ?))
         LIMIT 5
     ");
+    $available_dates_stmt->execute([$selected_date]);
     $available_dates = $available_dates_stmt->fetchAll(PDO::FETCH_ASSOC);
+    usort($available_dates, function ($a, $b) { return strcmp((string)$a['date'], (string)$b['date']); });
     $has_any = (int)$pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 3 AND status <> 'Disapproved'")->fetchColumn();
 }
 
@@ -122,7 +118,7 @@ echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you c
                 $links .= '<a class="btn btn-secondary btn-sm" href="opd_staff_report.php?date=' . ui_e($d['date']) . '">' . ui_e(ui_date($d['date'])) . '</a>';
             }
             echo ui_state('inbox', 'No OPD check-ups on this day',
-                $has_any ? ($has_any === 1 ? 'There is 1 OPD record' : 'There are ' . number_format($has_any) . ' OPD records') . ' in the system. Pick another date' . ($links !== '' ? ', or open one of the latest check-up days below.' : '.')
+                $has_any ? ($has_any === 1 ? 'There is 1 OPD record' : 'There are ' . number_format($has_any) . ' OPD records') . ' in the system. Pick another date' . ($links !== '' ? ', or open one of the nearest check-up days below.' : '.')
                          : 'No OPD records exist in the system yet.',
                 $links !== '' ? '<div class="page-actions">' . $links . '</div>' : '');
             ?>
