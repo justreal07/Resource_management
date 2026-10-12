@@ -16,7 +16,7 @@ $notification_count = 0;
 $user = null;
 $assistance_eligibility = [];
 
-// Check if user is logged in and fetch user data
+// Check if user is logged in and fetch user data pogi
 if(isset($_SESSION['applicant'])) {
     $applicant_id = $_SESSION['applicant']['id'];
 
