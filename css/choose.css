@@ -1,0 +1,171 @@
+/* ============================================
+   CHOOSE YOUR ASSISTANCE (user/choose_assistance.php)
+   The page right after signing up. It reuses the home page's look (css/home.css: the
+   colours, .program-card, .req-panel, .eligibility, .btn) and only adds what is new here.
+   Every rule is scoped to .ch-*, so the home page is not affected.
+   Sizes are in rem, so the Text size buttons (112.5% / 125%) make everything bigger without clipping.
+============================================ */
+
+.ch-page { background: var(--bg); }
+
+/* ---- Header: brand on the left, "Skip for now" on the right ---- */
+.ch-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    min-height: var(--header-h);
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+.ch-header .brand { min-width: 0; }
+.ch-header-skip { flex: none; }
+
+/* ---- Welcome and the getting-started strip ---- */
+.ch-main { padding: 40px 0 56px; }
+.ch-intro { max-width: 760px; margin: 0 auto 32px; text-align: center; }
+.ch-eyebrow {
+    display: inline-block;
+    margin-bottom: 10px;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #a4161a;               /* darker than the home page's red tag: 6.7:1 on the page background */
+}
+.ch-title {
+    margin: 0 0 12px;
+    font-size: clamp(1.6rem, 3vw, 2.3rem);
+    line-height: 1.2;
+    color: var(--ink);
+    overflow-wrap: anywhere;       /* a very long first name wraps instead of running off the screen */
+}
+.ch-lead { margin: 0 auto 24px; color: var(--body); font-size: 1.05rem; }
+
+.ch-steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+.ch-steps li {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px 8px 8px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    color: var(--body);
+    font-weight: 600;
+    font-size: 0.95rem;
+}
+.ch-step-dot {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    background: #eef2fb;
+    color: var(--navy);
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+.ch-steps .is-done { color: #14603a; border-color: #b9e3cc; background: var(--green-soft); }
+.ch-steps .is-done .ch-step-dot { background: #1b7f4c; color: #fff; }
+.ch-steps .is-current { color: var(--navy); border-color: var(--navy); box-shadow: inset 0 0 0 1px var(--navy); }
+.ch-steps .is-current .ch-step-dot { background: var(--navy); color: #fff; }
+
+/* ---- The cards (the grid and card look come from .program-grid / .program-card) ---- */
+.ch-grid { list-style: none; margin: 0; padding: 0; }
+.ch-card-title { font-size: 1.4rem; margin: 0 0 8px; color: var(--ink); line-height: 1.25; }
+.ch-tagline { margin: 0 0 14px; color: var(--body); font-size: 0.97rem; }
+.ch-often {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 0 0 16px;
+    font-size: 0.93rem;
+    color: var(--ink);
+}
+.ch-often i { margin-top: 0.25em; color: var(--navy); }
+
+/* The program's own colour on its icon (tone-red / tone-blue / tone-green from home.css);
+   scoped here so the home page keeps its one-colour cards */
+.ch-card .program-icon.tone-red   { background: linear-gradient(135deg, #ef5350, #c62828); }
+.ch-card .program-icon.tone-blue  { background: linear-gradient(135deg, #3f6fd8, var(--navy)); }
+.ch-card .program-icon.tone-green { background: linear-gradient(135deg, #2bb673, #1b7f4c); }
+
+/* The icon sits inside the picture area (it would be cut off at the picture's lower edge) */
+.ch-card .program-icon { bottom: 14px; }
+.ch-card .program-body { padding-top: 26px; }
+
+/* "What you'll need" is a heading here (for screen readers), shown at the size of the home page's label */
+.ch-card .program-body .req-title { font-size: 0.78rem; line-height: 1.4; margin: 0 0 12px; }
+.ch-card .req-count { flex: none; white-space: nowrap; }   /* "5 photos" stays on one line */
+
+/* The status line ("Available") sits right above the button */
+.ch-card .eligibility { margin: 0 0 14px; }
+
+/* "Start application": a large tap target that may wrap to two lines at the largest text size */
+.ch-cta {
+    min-height: 3.25rem;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.25;
+}
+.ch-cta:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+
+/* A program that can't be applied for now: greyed, no lift, the button can't be pressed */
+.ch-card.is-disabled { box-shadow: var(--shadow-sm); }
+.ch-card.is-disabled:hover { transform: none; border-color: var(--line); box-shadow: var(--shadow-sm); }
+.ch-card.is-disabled .program-media { filter: grayscale(1); opacity: 0.7; }
+.ch-cta-off,
+.ch-cta-off:hover {
+    background: #e8ebf2;
+    color: #4a5268;                /* 6.6:1 on its grey: still readable */
+    border-color: #c9cfdd;
+    box-shadow: none;
+    transform: none;
+    cursor: not-allowed;
+}
+
+/* ---- Skip link under the cards ---- */
+.ch-skip { margin: 32px auto 0; max-width: 640px; text-align: center; color: var(--body); }
+.ch-skip a { color: var(--navy); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.ch-skip a:hover { color: #071a52; }
+
+/* Only the copyright line: no empty band above it. The coloured stripe normally sits inside the
+   footer's top padding (a negative margin), so without the padding it gets plain margins. */
+.ch-footer { margin-top: 0; padding: 0; }
+.ch-footer::before { margin: 0; }
+
+/* ---- Larger text and smaller screens ---- */
+/* Three cards side by side only while they have room; at 125% text they move to two, then one */
+@media (max-width: 1100px) {
+    .ch-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+    .ch-main { padding: 28px 0 40px; }
+    .ch-grid { grid-template-columns: minmax(0, 1fr); gap: 22px; }
+    .ch-intro { text-align: left; margin-bottom: 24px; }
+    .ch-steps { justify-content: flex-start; }
+    .ch-steps li { width: 100%; }      /* one step per row: no squeezed pills on a phone */
+}
+@media (max-width: 480px) {
+    .ch-header-skip { padding: 10px 14px; }
+    .ch-header .brand-logos img + img { display: none; }   /* one logo, so the title has room */
+    .ch-header .brand-text small { display: none; }
+    /* The title wraps to two lines instead of being cut to "Muni…" (larger text sizes) */
+    .ch-header .brand-text { overflow: visible; }
+    .ch-header .brand-text strong { white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.2; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ch-card, .ch-card:hover { transform: none; }
+}

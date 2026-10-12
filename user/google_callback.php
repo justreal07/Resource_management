@@ -54,6 +54,7 @@ try {
     $stmt = $pdo->prepare('SELECT * FROM applicant_accounts WHERE username = ? OR email = ? ORDER BY (username = ?) DESC LIMIT 1');
     $stmt->execute([$email, $email, $email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    $isNewAccount = !$user;   // first Google sign-in: the account is created below
 
     // A regular username/password account that saved this email is signed in as-is and keeps its password
     $isGoogleAccount = !$user || strcasecmp($user['username'], $email) === 0;
@@ -79,7 +80,8 @@ try {
         'auth_type' => $isGoogleAccount ? 'google' : 'password'
     ]);
 
-    header('Location: landingpage.php');
+    // A new account goes on to choose its first assistance; an existing one goes home as before
+    header('Location: ' . ($isNewAccount ? 'choose_assistance.php' : 'landingpage.php'));
     exit();
 } catch (Exception $e) {
     error_log('Google OAuth Error: ' . $e->getMessage());

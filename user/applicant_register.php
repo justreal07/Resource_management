@@ -80,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'lastname' => $old['lastname'],
                 'email' => $old['email'] !== '' ? $old['email'] : null,
             ]);
-            header('Location: landingpage.php');
+            // Next: choose the assistance for the first application (or skip to the home page from there)
+            header('Location: choose_assistance.php');
             exit;
         } catch (PDOException $e) {
             error_log('Registration failed: ' . $e->getMessage());
