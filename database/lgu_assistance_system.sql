@@ -65,8 +65,6 @@ CREATE TABLE `applicant` (
   `contact_number` varchar(20) DEFAULT NULL,
   `wheelchair` enum('Yes','No') NOT NULL DEFAULT 'No',
   `stretcher` enum('Yes','No') NOT NULL DEFAULT 'No',
-  `rejected_at` datetime DEFAULT NULL COMMENT 'Old Rejected flow; removed by migration_disapprove_cleanup.sql',
-  `rejected_by` int(11) DEFAULT NULL COMMENT 'Old Rejected flow; removed by migration_disapprove_cleanup.sql',
   `disapproved_by` int(11) DEFAULT NULL COMMENT 'User ID of the admin/staff who disapproved the application',
   `disapproved_at` datetime DEFAULT NULL COMMENT 'When the application was disapproved',
   `disapproval_remarks` text DEFAULT NULL COMMENT 'Optional reason, shown to the applicant',
@@ -236,25 +234,6 @@ CREATE TABLE `medical_reapply_decisions` (
 -- --------------------------------------------------------
 
 --
--- Stand-in structure for view `rejected_applicants`
--- (See below for the actual view)
---
-CREATE TABLE `rejected_applicants` (
-`id` int(11)
-,`name` varchar(302)
-,`address` varchar(457)
-,`contact_number` varchar(20)
-,`status` varchar(50)
-,`created_at` timestamp
-,`rejected_at` datetime
-,`rejected_by_name` varchar(100)
-,`rejection_reason` text
-,`assistance_type` varchar(100)
-);
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `reports`
 --
 
@@ -293,13 +272,6 @@ CREATE TABLE `users` (
 -- --------------------------------------------------------
 
 --
--- Structure for view `rejected_applicants`
---
-DROP TABLE IF EXISTS `rejected_applicants`;
-
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `rejected_applicants`  AS SELECT `a`.`id` AS `id`, concat(`a`.`first_name`,' ',ifnull(`a`.`middle_name`,''),' ',coalesce(`a`.`last_name`,'')) AS `name`, concat(coalesce(`a`.`house_no`,''),' ',coalesce(`a`.`street`,''),', ',`a`.`barangay`,', ',`a`.`municipality`,', ',`a`.`province`) AS `address`, `a`.`contact_number` AS `contact_number`, `a`.`status` AS `status`, `a`.`created_at` AS `created_at`, `a`.`rejected_at` AS `rejected_at`, `u`.`full_name` AS `rejected_by_name`, `a`.`remarks` AS `rejection_reason`, `t`.`name` AS `assistance_type` FROM ((`applicant` `a` left join `users` `u` on(`a`.`rejected_by` = `u`.`id`)) join `assistance_types` `t` on(`a`.`assistance_type_id` = `t`.`id`)) WHERE `a`.`status` = 'Rejected' ORDER BY `a`.`rejected_at` DESC ;
-
---
 -- Indexes for dumped tables
 --
 
@@ -309,7 +281,6 @@ CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW 
 ALTER TABLE `applicant`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `uq_person_rule` (`person_rule_key`),
-  ADD KEY `applicant_rejected_by_fk` (`rejected_by`),
   ADD KEY `applicant_approved_by_fk` (`approved_by`),
   ADD KEY `fk_applicant_disapproved_by` (`disapproved_by`),
   ADD KEY `idx_disapproved_at` (`disapproved_at`),
@@ -465,7 +436,6 @@ ALTER TABLE `users`
 ALTER TABLE `applicant`
   ADD CONSTRAINT `applicant_ibfk_1` FOREIGN KEY (`assistance_type_id`) REFERENCES `assistance_types` (`id`) ON UPDATE CASCADE,
   ADD CONSTRAINT `applicant_approved_by_fk` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  ADD CONSTRAINT `applicant_rejected_by_fk` FOREIGN KEY (`rejected_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_applicant_disapproved_by` FOREIGN KEY (`disapproved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_applicant_account` FOREIGN KEY (`account_id`) REFERENCES `applicant_accounts` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   ADD CONSTRAINT `fk_applicant_beneficiary` FOREIGN KEY (`beneficiary_id`) REFERENCES `beneficiaries` (`id`);
