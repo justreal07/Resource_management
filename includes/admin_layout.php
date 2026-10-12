@@ -13,7 +13,14 @@
  * Styles: css/admin_ui.css. Behaviour: js/admin_ui.js. Building blocks: admin_components.php.
  */
 require_once __DIR__ . '/application_decision.php';
+require_once __DIR__ . '/admin_security.php';
 require_once __DIR__ . '/admin_components.php';
+
+// Activity log, "turned off" staff accounts: create their tables/columns the first time (does nothing once done).
+// Here, at the top of the page, so it never runs in the middle of a transaction.
+if (($GLOBALS['pdo'] ?? null) instanceof PDO) {
+    admin_tools_ensure($GLOBALS['pdo']);
+}
 
 /* Every page that uses this layout needs a sign-in: an admin on admin pages, staff or an admin on
    staff pages (the ones with define('UI_AREA', 'staff')). Others go to the sign-in page.
@@ -47,6 +54,7 @@ function admin_nav(): array
         'burial'    => ['href' => ui_type_url(2, 'overview'), 'label' => 'Burial Assistance', 'icon' => 'burial', 'roles' => ['admin'], 'type' => 2],
         'opd'       => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['admin'], 'type' => 3],
         'reports'   => ['href' => '../reports/reports.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['admin']],
+        'activity'  => ['href' => '../Main_dashboard/activity_log.php', 'label' => 'Activity Log', 'icon' => 'clock', 'roles' => ['admin']],
         'settings'  => ['href' => '../Main_dashboard/admin_settings.php', 'label' => 'Admin Settings', 'icon' => 'settings', 'roles' => ['admin']],
     ];
 }
@@ -281,7 +289,7 @@ function admin_layout_start(array $page): void
             <?php if ($user && !decision_schema_ready($GLOBALS['pdo'])): ?>
                 <div class="alert alert-warning" role="status"><?= ui_icon('alert', 'alert-icon') ?>
                     <div class="alert-body"><strong>Database update needed.</strong> Disapprove won't work until the system administrator runs
-                        <code>database/migration_disapprove.sql</code> in phpMyAdmin. Approve works as usual.</div>
+                        <code>database/migrations/migration_disapprove.sql</code> in phpMyAdmin. Approve works as usual.</div>
                 </div>
             <?php endif; ?>
 
@@ -289,7 +297,7 @@ function admin_layout_start(array $page): void
                 <div class="alert alert-warning" role="status"><?= ui_icon('alert', 'alert-icon') ?>
                     <div class="alert-body"><strong>Database update needed.</strong> Medical and Burial applications are accepted, but the person checks are off
                         (one Burial per deceased person, no Medical for a deceased person, Medical re-applications need your permission)
-                        until the system administrator runs <code>database/migration_person_rules.sql</code> in phpMyAdmin.</div>
+                        until the system administrator runs <code>database/migrations/migration_person_rules.sql</code> in phpMyAdmin.</div>
                 </div>
             <?php endif; ?>
 

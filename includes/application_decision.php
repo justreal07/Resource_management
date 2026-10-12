@@ -17,7 +17,7 @@
  *   - Medical: a re-apply permission it used up is given back (new row in the permission log)
  *   - the applicant is told "not approved, you may apply again" (account_helpers.php)
  *
- * Needs database/migration_disapprove.sql (Approve works without it; Disapprove asks for it).
+ * Needs database/migrations/migration_disapprove.sql (Approve works without it; Disapprove asks for it).
  */
 
 const DECISION_PENDING = 'Pending';
@@ -36,20 +36,25 @@ function decision_roles(int $typeId): array
 }
 
 /**
- * Is the signed-in account still in the database with the same role? An admin can remove a staff
- * account (Admin settings), and someone already signed in must lose access at once, not when
- * their session ends. If the check itself fails (database error) the sign-in is kept.
+ * Is the signed-in account still in the database with the same role, and not turned off? An admin can
+ * remove or turn off a staff account (Admin settings), and someone already signed in must lose access
+ * at once, not when their session ends. If the check itself fails (database error) the sign-in is kept.
  */
 function decision_account_active(int $id, string $role): bool
 {
     global $pdo;
     static $checked = [];
     $key = $id . ':' . $role;
+    static $hasActiveColumn = null;   // users.is_active comes from migration_admin_tools.sql; without it, only "still exists" is checked
     if (!isset($checked[$key])) {
         try {
-            $stmt = $pdo->prepare('SELECT 1 FROM users WHERE id = ? AND role = ?');
+            if ($hasActiveColumn === null) {
+                $hasActiveColumn = (bool)$pdo->query("SHOW COLUMNS FROM users LIKE 'is_active'")->fetchColumn();
+            }
+            $stmt = $pdo->prepare('SELECT ' . ($hasActiveColumn ? 'is_active' : '1') . ' FROM users WHERE id = ? AND role = ?');
             $stmt->execute([$id, $role]);
-            $checked[$key] = (bool)$stmt->fetchColumn();
+            $active = $stmt->fetchColumn();   // false = no such account; 0 = turned off by an admin
+            $checked[$key] = $active !== false && (int)$active === 1;
         } catch (Throwable $e) {
             error_log('decision_account_active: ' . $e->getMessage());
             return true;
@@ -193,7 +198,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
     try {
         if ($decision === 'disapprove' && !decision_schema_ready($pdo)) {
             return decision_result(false, 'setup', 'Applications can\'t be disapproved until the database update is installed. '
-                . 'Ask the system administrator to run database/migration_disapprove.sql.');
+                . 'Ask the system administrator to run database/migrations/migration_disapprove.sql.');
         }
 
         // A first look (no lock), to know which person this is for

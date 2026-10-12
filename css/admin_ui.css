@@ -374,6 +374,10 @@ a:hover { color: var(--c-primary-hover); }
 .page-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 
 .tabs { overflow-x: auto; border-bottom: 1px solid var(--c-border); }
+/* The program tabs with Export CSV / Print beside them */
+.tabs-bar { display: flex; flex-wrap: wrap; align-items: stretch; }
+.tabs-bar .tabs { flex: 1 1 28rem; min-width: 0; }
+.tabs-tools { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 0 0 1px 16px; margin-left: auto; border-bottom: 1px solid var(--c-border); }
 .tabs ul { display: flex; gap: 4px; min-width: max-content; }
 .tabs a {
     display: inline-flex;
@@ -1421,7 +1425,7 @@ body:not(.swal2-toast-shown) .swal2-container.swal2-noanimation { background: rg
 @media print {
     body { background: #fff; }
     .sidebar, .sidebar-backdrop, .topbar, .skip-link, .quick-actions, .filters, .report-filters, .month-pills,
-    .tabs, .pagination, .cell-action, .table-view, .table-tools, .no-print, .alert, .mobile-user { display: none !important; }
+    .tabs, .tabs-bar, .pagination, .cell-action, .table-view, .table-tools, .no-print, .alert, .mobile-user { display: none !important; }
     .main-col { margin: 0; }
     .content { padding: 0; max-width: none; }
     .panel, .chart, .stat-card { box-shadow: none; break-inside: avoid; }

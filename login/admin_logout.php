@@ -1,8 +1,15 @@
 <?php
 require_once '../config.php'; // config.php already starts the session
 
+require_once '../includes/admin_security.php';
+
 // Remember the role so the login page opens on the same tab
 $role = ($_SESSION['user']['role'] ?? '') === 'admin' ? 'admin' : 'staff';
+
+// Activity log (only when someone was really signed in)
+if (!empty($_SESSION['user']['id'])) {
+    activity_log('logout', 'Signed out.');
+}
 
 if (!empty($_SESSION['applicant'])) {
     // An applicant is also signed in on this browser (same session): keep them signed in, end only the admin/staff sign-in

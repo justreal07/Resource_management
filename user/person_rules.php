@@ -25,7 +25,7 @@
  *                               the same check again inside the saving transaction
  *   decideMedicalReapply()      admin side: grant or deny a Medical re-application
  *
- * Needs database/migration_person_rules.sql. Until it is run, Medical and Burial applications
+ * Needs database/migrations/migration_person_rules.sql. Until it is run, Medical and Burial applications
  * are accepted without these checks (person_rules_installed()), and the admin pages say the
  * database update is needed. Before, every Medical and Burial application failed at step 1.
  */
@@ -35,7 +35,7 @@ require_once __DIR__ . '/assistance_config.php';
 const PERSON_LOCK_TIMEOUT = 10;
 
 /**
- * Has database/migration_person_rules.sql been run? (the two tables and the applicant columns)
+ * Has database/migrations/migration_person_rules.sql been run? (the two tables and the applicant columns)
  * Asked once per request.
  */
 function person_rules_installed(PDO $pdo): bool

@@ -132,7 +132,7 @@ $allTimeByType = [1 => $medical, 2 => $burial, 3 => $opd];
    SELECT only: nothing on this page writes to the database.
 ====================== */
 
-// Person rules (Medical re-apply, deceased flag) need database/migration_person_rules.sql.
+// Person rules (Medical re-apply, deceased flag) need database/migrations/migration_person_rules.sql.
 // Until it is run, the dashboard simply leaves those parts out.
 $hasPersonRules = false;
 try {

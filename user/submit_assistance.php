@@ -116,7 +116,7 @@ if (!is_dir($upload_dir)) {
 $saved_files = [];
 $type_id = $program['type_id'];
 $f = $form_data;
-// The birthdate / date of death columns come with database/migration_person_rules.sql
+// The birthdate / date of death columns come with database/migrations/migration_person_rules.sql
 $with_person_columns = person_rules_installed($pdo);
 
 // date_released is left empty: it is the day the assistance is handed over, not the day the form was sent

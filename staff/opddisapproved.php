@@ -32,7 +32,7 @@ echo ui_type_tabs(3, 'disapproved');
 if (!decision_can($user, 3)) {
     echo ui_state('lock', 'Sign in to see this list', 'Only OPD staff and administrators can see disapproved OPD requests.');
 } elseif (!decision_schema_ready($pdo)) {
-    echo ui_state('alert', 'The database update hasn\'t been installed yet', 'Run database/migration_disapprove.sql in phpMyAdmin, then open this page again.', '', 'state-error');
+    echo ui_state('alert', 'The database update hasn\'t been installed yet', 'Run database/migrations/migration_disapprove.sql in phpMyAdmin, then open this page again.', '', 'state-error');
 } elseif ($failed) {
     echo ui_load_error('the disapproved list', 'opddisapproved.php');
 } else {

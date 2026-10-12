@@ -1,6 +1,8 @@
 <?php
 require_once '../config.php';
 require_once '../includes/application_decision.php';   // decision_csrf_field() / decision_csrf_ok(): the form token
+require_once '../includes/admin_security.php';          // activity_log()
+admin_tools_ensure($pdo);
 
 $errors = [];
 $fullname = '';
@@ -65,6 +67,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $stmt = $pdo->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)");
             $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT), $fullname, $role]);
+            // Activity log: who made the account (nobody signed in = the very first admin)
+            activity_log('staff_created', ucfirst($role) . ' account created: ' . $fullname . ' (@' . $username . ').',
+                $signedInAdmin ? null : ['name' => $fullname, 'role' => $role]);
 
             $_SESSION['register_flash'] = ['username' => $username, 'role' => $role];
             // An admin adding accounts stays here; everyone else goes on to sign in

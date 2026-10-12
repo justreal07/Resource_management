@@ -106,7 +106,7 @@ function take_flashes(): array {
    plus "you can apply again" reminders.
    ============================================================ */
 function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): array {
-    // CHANGED (Disapprove): a.* so this works before and after database/migration_disapprove.sql
+    // CHANGED (Disapprove): a.* so this works before and after database/migrations/migration_disapprove.sql
     // (disapproved_at / disapproval_remarks are read only when they are there)
     $stmt = $pdo->prepare("
         SELECT a.*, at.name AS type_name

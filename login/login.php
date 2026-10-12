@@ -1,5 +1,6 @@
 <?php
 require_once '../config.php';
+require_once '../includes/admin_security.php';   // activity log, wrong-password limit
 
 // Where each role goes after signing in
 $dashboards = [
@@ -37,22 +38,56 @@ if (!isset($dashboards[$role])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    admin_tools_ensure($pdo);   // activity log, wrong-password limit, "turned off" accounts (skipped quietly if it can't)
+    $ip = admin_client_ip();
+
     if ($username === '' || $password === '') {
         $errors[] = 'Please enter both your username and password.';
+    } elseif (($waitSeconds = login_wait_seconds($pdo, $username, $ip)) > 0) {
+        // Too many wrong passwords from this computer for this username: no password is checked until the wait is over
+        $minutes = (int)ceil($waitSeconds / 60);
+        $errors[] = 'Too many wrong passwords. For safety, please wait ' . $minutes . ' minute' . ($minutes === 1 ? '' : 's') . ' before trying again.';
     } else {
         $stmt = $pdo->prepare("SELECT * FROM users WHERE username = ? AND role = ?");
         $stmt->execute([$username, $role]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($user && password_verify($password, $user['password'])) {
-            // New session id on login so an old/stolen one can't be reused
-            session_regenerate_id(true);
-            $_SESSION['user'] = ['id'=>$user['id'],'username'=>$user['username'],'role'=>$role,'name'=>$user['full_name']];
-            header('Location: ' . $dashboards[$role]);
-            exit;
-        }
+            $actor = ['id' => (int)$user['id'], 'name' => (string)(($user['full_name'] ?? '') !== '' ? $user['full_name'] : $user['username']), 'role' => $role];
 
-        $errors[] = "That username and password don't match any " . ucfirst($role) . " account. Check that the right role is selected.";
+            // An admin turned this account off (Admin settings > OPD staff): the password is right, but it cannot sign in
+            if (array_key_exists('is_active', $user) && (int)$user['is_active'] === 0) {
+                activity_log('login_blocked', 'A turned-off ' . $role . ' account tried to sign in.', $actor);
+                $errors[] = 'This account has been turned off. Please ask the office administrator.';
+            } else {
+                // New session id on login so an old/stolen one can't be reused
+                session_regenerate_id(true);
+                $_SESSION['user'] = ['id'=>$user['id'],'username'=>$user['username'],'role'=>$role,'name'=>$user['full_name']];
+                login_clear_failures($pdo, $username, $ip);
+                try {
+                    $pdo->prepare("UPDATE users SET last_login_at = NOW() WHERE id = ?")->execute([$user['id']]);
+                } catch (PDOException $e) {
+                    error_log('last_login_at: ' . $e->getMessage());   // column missing: signing in still works
+                }
+                activity_log('login_success', 'Signed in as ' . $role . '.', $actor);
+                header('Location: ' . $dashboards[$role]);
+                exit;
+            }
+        } else {
+            $fails = login_record_failure($pdo, $username, $ip);
+            activity_log('login_failed', 'Wrong username or password for "' . mb_substr($username, 0, 50) . '" (' . $role . ').', ['name' => mb_substr($username, 0, 50)]);
+            if ($fails >= LOGIN_MAX_FAILS) {
+                activity_log('login_locked', 'Too many wrong passwords for "' . mb_substr($username, 0, 50) . '": a ' . LOGIN_WINDOW_MINUTES . ' minute wait started.', ['name' => mb_substr($username, 0, 50)]);
+                $errors[] = 'Too many wrong passwords. For safety, please wait ' . LOGIN_WINDOW_MINUTES . ' minutes before trying again.';
+            } else {
+                $message = "That username and password don't match any " . ucfirst($role) . " account. Check that the right role is selected.";
+                if ($fails >= LOGIN_MAX_FAILS - 2) {
+                    $left = LOGIN_MAX_FAILS - $fails;
+                    $message .= ' You have ' . $left . ' more ' . ($left === 1 ? 'try' : 'tries') . ' before a ' . LOGIN_WINDOW_MINUTES . ' minute wait.';
+                }
+                $errors[] = $message;
+            }
+        }
     }
 }
 ?>
