@@ -16,7 +16,7 @@
  * (ann_clean_html) before it is saved, so even a hijacked admin account can't put a script
  * in front of the public. Every other value is escaped when it is printed.
  *
- * Needs database/migration_announcements.sql; until it is run both pages say so.
+ * Needs database/migrations/migration_announcements.sql; until it is run both pages say so.
  */
 
 const ANN_TITLE_MAX = 200;

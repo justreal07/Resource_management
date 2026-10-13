@@ -64,7 +64,7 @@ if (!decision_csrf_ok()) {
 }
 if (!ann_table_ready($pdo)) {
     ann_respond($is_ajax, 503, ['ok' => false, 'code' => 'setup',
-        'message' => 'Announcements need a database update first. Ask the system administrator to run database/migration_announcements.sql.']);
+        'message' => 'Announcements need a database update first. Ask the system administrator to run database/migrations/migration_announcements.sql.']);
 }
 
 $action = (string)($_POST['action'] ?? '');

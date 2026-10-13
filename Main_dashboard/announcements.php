@@ -319,7 +319,7 @@ echo ui_page_head('Announcements', 'News and notices for the public. Published o
              . '<a class="btn btn-secondary" href="../user/announcements.php" target="_blank" rel="noopener">' . ann_icon('arrow') . 'See the public page</a>' : '');
 
 if (!$ready) {
-    echo ui_state('alert', 'Announcements need a database update', 'Ask the system administrator to run database/migration_announcements.sql in phpMyAdmin, then open this page again.', '', 'state-error');
+    echo ui_state('alert', 'Announcements need a database update', 'Ask the system administrator to run database/migrations/migration_announcements.sql in phpMyAdmin, then open this page again.', '', 'state-error');
     admin_layout_end();
     exit();
 }
