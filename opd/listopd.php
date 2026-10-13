@@ -27,7 +27,7 @@ echo ui_type_tabs(3, 'all');
         ['label' => 'Accompanied by', 'type' => 'text', 'value' => function ($r) {
             return trim(($r['petitioner_name'] ?? '') . (($r['relationship'] ?? '') !== '' ? ' (' . $r['relationship'] . ')' : ''));
         }],
-        ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address(['barangay' => $r['barangay'], 'municipality' => $r['municipality']]); }],
+        ['label' => 'Address', 'type' => 'text', 'trim_home' => true, 'value' => function ($r) { return ui_address(['barangay' => $r['barangay'], 'municipality' => $r['municipality']]); }],
     ], ['empty' => ['No OPD patients yet', 'Requests filed online or added as walk-ins will be listed here.']]) ?>
 </section>
 <?php

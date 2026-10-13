@@ -23,7 +23,7 @@ echo ui_type_tabs(3, 'approved');
     <?= ui_table($applicants, [
         ['label' => 'Patient', 'type' => 'person'],
         ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
+        ['label' => 'Address', 'type' => 'text', 'trim_home' => true, 'key' => 'address'],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
     ], [
         'empty' => ['No approved OPD requests yet', 'Requests you approve will be listed here.'],

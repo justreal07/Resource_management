@@ -21,9 +21,8 @@ echo ui_type_tabs(2, 'pending');
 <section class="panel" aria-label="Burial applications to review">
     <?= ui_table($applicants, [
         ['label' => 'Claimant', 'type' => 'person'],
-        ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
         ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
+        ['label' => 'Address', 'type' => 'text', 'trim_home' => true, 'key' => 'address'],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
         ['label' => 'Amount', 'type' => 'html', 'render' => 'ui_amount_input'],
     ], [

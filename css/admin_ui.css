@@ -174,11 +174,11 @@ a:hover { color: var(--c-primary-hover); }
     position: relative;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     min-height: 44px;
-    padding: 10px 12px;
+    padding: 10px 10px;
     color: var(--c-nav-text);
-    font-size: var(--fs-base);
+    font-size: 0.9375rem;   /* 15px: "Medical Assistance" and its count fit on one line */
     text-decoration: none;
     border-radius: var(--radius-sm);
 }
@@ -555,7 +555,7 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
     color: var(--c-danger-text);
     font-size: var(--fs-sm);
     font-weight: 600;
-    border-radius: 999px;
+    border-radius: var(--radius-sm);   /* not a full pill: the text may wrap to two lines in a narrow card */
 }
 .queue-go {
     display: inline-flex;
@@ -769,11 +769,13 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-
 
 .data-table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 .data-table th, .data-table td {
-    padding: 12px 14px;
+    padding: 12px 10px;
     text-align: left;
     vertical-align: top;
     border-bottom: 1px solid var(--c-border);
 }
+.data-table th:first-child, .data-table td:first-child { padding-left: 14px; }
+.data-table th:last-child, .data-table td:last-child { padding-right: 14px; }
 .data-table thead th {
     background: var(--c-surface-2);
     color: var(--c-heading);
@@ -789,9 +791,24 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-
 a.row-link { font-weight: 600; text-underline-offset: 3px; }
 .ref { display: block; color: var(--c-text-muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 .cell-main .badge { margin-top: 4px; }
+/* A name never breaks into one word per line: the other columns give way first */
+.data-table td.cell-main { min-width: 9.5rem; }
 .cell-sub { display: block; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .cell-warn { color: var(--c-danger-text); font-weight: 600; }
-.cell-action { text-align: right !important; }
+/* The buttons column keeps the width its buttons need, so Approve is never cut off at the table edge */
+.cell-action { text-align: right !important; width: 1%; white-space: nowrap; }
+/* On a narrow screen the table scrolls sideways; the buttons column stays pinned on the right so Approve / Disapprove are always in reach */
+@media (min-width: 761px) {
+    .table-wrap:not(.table-wrap-wide) .data-table th.cell-action,
+    .table-wrap:not(.table-wrap-wide) .data-table td.cell-action {
+        position: sticky;
+        right: 0;
+        background: var(--c-surface);
+        box-shadow: -6px 0 6px -6px rgba(16, 24, 40, 0.14);
+    }
+    .table-wrap:not(.table-wrap-wide) .data-table th.cell-action { background: var(--c-surface-2); }
+    .table-wrap:not(.table-wrap-wide) .data-table tbody tr:hover td.cell-action { background: var(--c-surface-2); }
+}
 /* Row buttons in an even grid: one or two in a row, four as 2 x 2 (View, Edit / Disapprove, Approve) */
 .row-actions { display: inline-grid; grid-template-columns: repeat(2, auto); gap: 6px; }
 .row-actions > :only-child { grid-column: 1 / -1; }
@@ -810,7 +827,7 @@ a.row-link { font-weight: 600; text-underline-offset: 3px; }
     border-radius: var(--radius-sm);
 }
 .amount-box:focus-within { border-color: var(--c-focus); outline: 3px solid var(--c-focus); outline-offset: 2px; }
-.amount-box .amount-input { width: 120px; min-height: 40px; border: 0; padding-left: 2px; }
+.amount-box .amount-input { width: 108px; min-height: 40px; border: 0; padding-left: 2px; }
 .amount-box .amount-input:focus-visible { outline: none; }
 .amount-box .amount-input[aria-invalid="true"] { border: 0 !important; box-shadow: none; }   /* the box shows the error, not the inner field */
 .amount-box:has([aria-invalid="true"]) { border-color: var(--c-danger-text); box-shadow: inset 0 0 0 1px var(--c-danger-text); }

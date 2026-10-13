@@ -22,7 +22,7 @@ echo ui_type_tabs(1, 'all');
         ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
         ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
         ['label' => 'Amount', 'type' => 'amount', 'key' => 'amount'],
-        ['label' => 'Address', 'type' => 'text', 'value' => 'ui_address'],
+        ['label' => 'Address', 'type' => 'text', 'trim_home' => true, 'value' => 'ui_address'],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
     ], ['empty' => ['No Medical applications yet', 'Applications filed online or added as walk-ins will be listed here.']]) ?>
 </section>

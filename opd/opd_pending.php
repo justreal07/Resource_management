@@ -25,9 +25,8 @@ echo ui_type_tabs(3, 'pending');
 <section class="panel" aria-label="OPD requests to review">
     <?= ui_table($pendingApplicants, [
         ['label' => 'Patient', 'type' => 'person'],
-        ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
         ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
+        ['label' => 'Address', 'type' => 'text', 'trim_home' => true, 'key' => 'address'],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
     ], [
         'empty' => ['No OPD requests waiting', 'New requests will appear here.'],

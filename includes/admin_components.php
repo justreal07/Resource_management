@@ -321,7 +321,7 @@ function ui_table(array $rows, array $columns, array $opts = []): string
         $method = $type === 'html' ? ' data-sort-method="none"' : ($type === 'amount' ? ' data-sort-method="number"' : '');
         $html .= '<th scope="col"' . ($type === 'amount' ? ' class="num"' : '') . $method . '>' . ui_e($c['label']) . '</th>';
     }
-    if (!empty($opts['actions'])) $html .= '<th scope="col" data-sort-method="none"><span class="visually-hidden">Actions</span></th>';
+    if (!empty($opts['actions'])) $html .= '<th scope="col" class="cell-action" data-sort-method="none"><span class="visually-hidden">Actions</span></th>';
     $html .= '</tr></thead><tbody data-search-rows="' . $id . '">';
 
     foreach ($rows as $row) {
@@ -365,8 +365,14 @@ function ui_table(array $rows, array $columns, array $opts = []): string
                     break;
                 default:
                     $text = trim(preg_replace('/\s+/u', ' ', (string)$value), " ,");
-                    $searchText[] = $text;
-                    $content = $text !== '' ? ui_e($text) : '<span class="muted">Not given</span>';
+                    $searchText[] = $text;   // search always sees the full text, even when a shorter one is shown
+                    if (!empty($c['trim_home'])) {
+                        // Address column: leave out "General Mariano Alvarez, Cavite" (same on almost every row) so rows stay short
+                        $shown = ui_trim_home_place($text);
+                        $content = $shown !== '' ? ($shown !== $text ? '<span title="' . ui_e($text) . '">' . ui_e($shown) . '</span>' : ui_e($shown)) : '<span class="muted">Not given</span>';
+                    } else {
+                        $content = $text !== '' ? ui_e($text) : '<span class="muted">Not given</span>';
+                    }
             }
             $cells .= '<td' . ($cls !== '' ? ' class="' . $cls . '"' : '') . ' data-label="' . ui_e($c['label']) . '"'
                 . ($sortKey !== null ? ' data-sort="' . ui_e(mb_strtolower($sortKey)) . '"' : '') . '>' . $content . '</td>';
@@ -383,6 +389,17 @@ function ui_table(array $rows, array $columns, array $opts = []): string
             . '<button type="button" class="btn btn-secondary btn-sm" data-search-clear="' . $id . '">Clear search</button></div>';
     }
     return $html;
+}
+
+/**
+ * Takes the office's own town off the end of an address ("10 Rizal St., Poblacion, General Mariano Alvarez, Cavite"
+ * becomes "10 Rizal St., Poblacion"). An address from anywhere else is returned unchanged, so nothing is hidden
+ * that tells the office the applicant lives outside General Mariano Alvarez.
+ */
+function ui_trim_home_place(string $address): string
+{
+    $short = trim(preg_replace('/,\s*General\s+Mariano\s+Alvarez(?:\s*,\s*Cavite)?\s*$/iu', '', $address) ?? $address, " ,");
+    return $short !== '' ? $short : $address;
 }
 
 /** Comma-separated address from whichever parts the row has. */

@@ -26,7 +26,7 @@ echo ui_type_tabs(1, 'approved');
         ['label' => 'Applicant', 'type' => 'person'],
         ['label' => 'Amount given', 'type' => 'amount', 'key' => 'amount'],
         ['label' => 'Date approved', 'type' => 'datetime', 'value' => function ($r) { return $r['approved_at'] ?? $r['created_at']; }],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
+        ['label' => 'Address', 'type' => 'text', 'trim_home' => true, 'key' => 'address'],
         ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
     ], [
         'empty' => ['No approved Medical applications yet', 'Applications you approve will be listed here.'],
