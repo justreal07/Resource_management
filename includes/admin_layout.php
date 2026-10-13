@@ -54,6 +54,7 @@ function admin_nav(): array
         'burial'    => ['href' => ui_type_url(2, 'overview'), 'label' => 'Burial Assistance', 'icon' => 'burial', 'roles' => ['admin'], 'type' => 2],
         'opd'       => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['admin'], 'type' => 3],
         'reports'   => ['href' => '../reports/reports.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['admin']],
+        'announcements' => ['href' => '../Main_dashboard/announcements.php', 'label' => 'Announcements', 'icon' => 'megaphone', 'roles' => ['admin']],
         'activity'  => ['href' => '../Main_dashboard/activity_log.php', 'label' => 'Activity Log', 'icon' => 'clock', 'roles' => ['admin']],
         'settings'  => ['href' => '../Main_dashboard/admin_settings.php', 'label' => 'Admin Settings', 'icon' => 'settings', 'roles' => ['admin']],
     ];
@@ -227,6 +228,7 @@ function admin_layout_start(array $page): void
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M4 20h16"/></symbol>
     <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></symbol>
     <symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></symbol>
+    <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M3 10v4h4l8 5V5L7 10H3zM18 9a4 4 0 0 1 0 6M7 14l1.5 6h3L10 15"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
 </svg>
 

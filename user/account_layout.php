@@ -28,6 +28,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
             ['my_account.php#applications', 'fa-gauge-high', 'Dashboard', $active === 'account', 'applications'],
             ['my_documents.php', 'fa-folder-open', 'My Documents', $active === 'documents', null],
             ['user_notifications.php', 'fa-bell', 'Notifications', $active === 'notifications', null],
+            ['announcements.php', 'fa-bullhorn', 'Announcements', false, null],
         ],
         'Account' => [
             ['my_account.php#profile', 'fa-user-pen', 'Profile', false, 'profile'],

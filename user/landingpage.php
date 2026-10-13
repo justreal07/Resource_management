@@ -163,6 +163,7 @@ $programs = [
         <nav class="nav-menu" id="navMenu" aria-label="Main">
             <a href="landingpage.php" class="nav-link active">Home</a>
             <a href="#programs" class="nav-link">Programs</a>
+            <a href="announcements.php" class="nav-link">Announcements</a>
             <a href="#how-it-works" class="nav-link">How to Apply</a>
             <a href="#faq" class="nav-link">FAQs</a>
             <a href="#contact" class="nav-link">Contact</a>
@@ -742,6 +743,7 @@ $programs = [
             <h4>Quick Links</h4>
             <ul class="footer-links">
                 <li><a href="landingpage.php">Home</a></li>
+                <li><a href="announcements.php">Announcements</a></li>
                 <li><a href="#how-it-works">How to Apply</a></li>
                 <li><a href="#faq">FAQs</a></li>
                 <?php if($is_logged_in): ?>

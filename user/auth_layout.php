@@ -60,6 +60,7 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
         <nav class="nav-menu" id="navMenu" aria-label="Main">
             <a href="landingpage.php" class="nav-link">Home</a>
             <a href="landingpage.php#programs" class="nav-link">Programs</a>
+            <a href="announcements.php" class="nav-link">Announcements</a>
             <a href="landingpage.php#how-it-works" class="nav-link">How to Apply</a>
             <a href="landingpage.php#faq" class="nav-link">FAQs</a>
             <div class="nav-actions">
