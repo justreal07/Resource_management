@@ -10,6 +10,9 @@ if (isset($_SESSION['applicant'])) {
 
 $errors = [];
 $old = ['firstname' => '', 'lastname' => '', 'username' => '', 'email' => ''];
+// Contact number and address: saved on the account and used to auto-fill the application forms
+$contact = ['contact_number' => '', 'house_no' => '', 'street' => '', 'barangay' => '',
+            'municipality' => 'General Mariano Alvarez', 'province' => 'Cavite'];
 
 if (isset($_SESSION['oauth_error'])) {
     $errors[] = $_SESSION['oauth_error'];
@@ -21,14 +24,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $old[$key] = trim($_POST[$key] ?? '');
     }
     $old['email'] = strtolower($old['email']);
+    // Same cleaning and checks as the application forms (e.g. "0917 123 4567" → 09171234567)
+    $contact = posted_fields(array_keys($contact));
     $password = trim($_POST['password'] ?? '');
     $confirm_password = trim($_POST['confirm_password'] ?? '');
 
     if (!csrf_valid()) {
         $errors[] = 'Your session expired. Please try again.';
     } else {
-        if ($old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $password === '' || $confirm_password === '') {
+        $contact_errors = validate_application($contact, ['contact_number', 'barangay', 'municipality', 'province']);
+        if ($old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $password === '' || $confirm_password === ''
+            || in_array('This field is required.', $contact_errors, true)) {
             $errors[] = 'Please fill in all required fields.';
+        }
+        $labels = ['contact_number' => 'Contact number', 'house_no' => 'House no.', 'street' => 'Street',
+                   'barangay' => 'Barangay', 'municipality' => 'Municipality', 'province' => 'Province'];
+        foreach ($contact_errors as $field => $message) {
+            if ($message !== 'This field is required.') $errors[] = $labels[$field] . ': ' . $message;
         }
         if ($old['username'] !== '' && !preg_match('/^[A-Za-z0-9._]{4,50}$/', $old['username'])) {
             $errors[] = 'Username must be 4–50 characters: letters, numbers, dots or underscores only.';
@@ -63,13 +75,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         try {
-            $stmt = $pdo->prepare('INSERT INTO applicant_accounts (firstname, lastname, username, email, password) VALUES (?, ?, ?, ?, ?)');
+            $stmt = $pdo->prepare('INSERT INTO applicant_accounts (firstname, lastname, username, email, password,
+                                   phone, house_no, street, barangay, municipality, province) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
             $stmt->execute([
                 $old['firstname'],
                 $old['lastname'],
                 $old['username'],
                 $old['email'] !== '' ? $old['email'] : null,
                 password_hash($password, PASSWORD_DEFAULT),
+                $contact['contact_number'],
+                $contact['house_no'] ?: null,
+                $contact['street'] ?: null,
+                $contact['barangay'],
+                $contact['municipality'],
+                $contact['province'],
             ]);
 
             // Sign the new applicant in right away
@@ -92,8 +111,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$value = function (string $key) use ($old): string {
-    return htmlspecialchars($old[$key]);
+$value = function (string $key) use ($old, $contact): string {
+    return htmlspecialchars($old[$key] ?? $contact[$key] ?? '');
 };
 
 auth_page_start('Sign up', 'register', function () { ?>
@@ -155,6 +174,68 @@ auth_page_start('Sign up', 'register', function () { ?>
                 <i class="fas fa-envelope"></i>
             </div>
             <span class="field-hint">You can also log in with this email.</span>
+        </div>
+
+        <div class="field">
+            <label for="contact_number">Contact number</label>
+            <div class="input-wrap">
+                <input type="tel" id="contact_number" name="contact_number" required maxlength="20" inputmode="numeric" autocomplete="tel"
+                       value="<?php echo $value('contact_number'); ?>" placeholder="09XX XXX XXXX">
+                <i class="fas fa-phone"></i>
+            </div>
+            <span class="field-hint">11-digit mobile number, e.g. 09171234567.</span>
+        </div>
+
+        <div class="auth-subhead">
+            <strong><i class="fas fa-home"></i> Home address</strong>
+            <span>Your contact number and address will be filled in for you on every application form.</span>
+        </div>
+
+        <div class="field-row">
+            <div class="field">
+                <label for="house_no">House no. <span class="optional">Optional</span></label>
+                <div class="input-wrap">
+                    <input type="text" id="house_no" name="house_no" maxlength="50" value="<?php echo $value('house_no'); ?>" placeholder="e.g. Blk 5 Lot 12">
+                    <i class="fas fa-hashtag"></i>
+                </div>
+            </div>
+            <div class="field">
+                <label for="street">Street <span class="optional">Optional</span></label>
+                <div class="input-wrap">
+                    <input type="text" id="street" name="street" maxlength="100" autocomplete="address-line1" value="<?php echo $value('street'); ?>" placeholder="e.g. Sampaguita St.">
+                    <i class="fas fa-road"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="field">
+            <label for="barangay">Barangay</label>
+            <div class="input-wrap">
+                <select id="barangay" name="barangay" required autocomplete="address-level3">
+                    <option value="">Choose your barangay</option>
+                    <?php foreach (BARANGAYS as $b): ?>
+                        <option value="<?php echo htmlspecialchars($b); ?>"<?php echo $contact['barangay'] === $b ? ' selected' : ''; ?>><?php echo htmlspecialchars($b); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <i class="fas fa-map-marker-alt"></i>
+            </div>
+        </div>
+
+        <div class="field-row field-row-wide-first">
+            <div class="field">
+                <label for="municipality">Municipality</label>
+                <div class="input-wrap">
+                    <input type="text" id="municipality" name="municipality" required maxlength="100" autocomplete="address-level2" value="<?php echo $value('municipality'); ?>">
+                    <i class="fas fa-city"></i>
+                </div>
+            </div>
+            <div class="field">
+                <label for="province">Province</label>
+                <div class="input-wrap">
+                    <input type="text" id="province" name="province" required maxlength="100" autocomplete="address-level1" value="<?php echo $value('province'); ?>">
+                    <i class="fas fa-map"></i>
+                </div>
+            </div>
         </div>
 
         <div class="field-row">

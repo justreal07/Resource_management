@@ -34,7 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($p['firstname'] === '' || $p['lastname'] === '') $errors[] = 'First name and last name are required.';
         if (!preg_match('/^[A-Za-z0-9._@-]{3,100}$/', $p['username'])) $errors[] = 'Username must be 3 or more characters (letters, numbers, . _ - @ only).';
         if ($p['email'] !== '' && !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
-        if ($p['phone'] !== '' && !preg_match('/^\+?[0-9][0-9\s-]{6,14}$/', $p['phone'])) $errors[] = 'Please enter a valid phone number, e.g. 09171234567.';
+        // Same format the application forms accept, since the forms are filled in from these values
+        $p['phone'] = preg_replace('/[\s-]+/', '', $p['phone']);
+        if (preg_match('/^\+?63(9\d{9})$/', $p['phone'], $m)) $p['phone'] = '0' . $m[1];
+        if ($p['phone'] !== '' && !preg_match('/^[0-9]{11}$/', $p['phone'])) $errors[] = 'The mobile number must be exactly 11 digits, e.g. 09171234567.';
+        if ($p['barangay'] !== '' && !in_array($p['barangay'], BARANGAYS, true)) $errors[] = 'Please choose your barangay from the list.';
         if ($p['sex'] !== '' && !in_array($p['sex'], ['Male', 'Female'], true)) $errors[] = 'Please choose a valid sex.';
 
         if (!$errors && $p['username'] !== $user['username']) {
@@ -396,7 +400,12 @@ account_page_start($ctx, 'My Account', 'account', [
                 </div>
                 <div class="field span-2">
                     <label for="barangay">Barangay</label>
-                    <input type="text" id="barangay" name="barangay" value="<?= e($profile['barangay'] ?? '') ?>">
+                    <select id="barangay" name="barangay" autocomplete="address-level3">
+                        <option value="">Choose your barangay</option>
+                        <?php foreach (BARANGAYS as $b): ?>
+                            <option value="<?= e($b) ?>"<?= ($profile['barangay'] ?? '') === $b ? ' selected' : '' ?>><?= e($b) ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
                 <div class="field span-2">
                     <label for="municipality">Municipality</label>

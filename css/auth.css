@@ -87,6 +87,7 @@
 ============================================ */
 .auth-form { display: grid; gap: 16px; }
 .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.field-row-wide-first { grid-template-columns: 1.7fr 1fr; }   /* room for "General Mariano Alvarez" */
 
 .field label {
     display: flex;
@@ -110,7 +111,8 @@
     font-size: 0.95rem;
     pointer-events: none;
 }
-.input-wrap input {
+.input-wrap input,
+.input-wrap select {
     width: 100%;
     height: 50px;
     padding: 0 16px 0 44px;
@@ -122,13 +124,42 @@
     color: var(--ink);
     transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
 }
+/* Dropdown: own arrow on the right, same look as the text boxes */
+.input-wrap select {
+    appearance: none;
+    padding-right: 44px;
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%236b7390' stroke-width='2' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 18px center;
+}
+.input-wrap select:invalid { color: #9aa1b8; }
+.input-wrap select option { color: var(--ink); }
 .input-wrap input::placeholder { color: #9aa1b8; }
-.input-wrap input:focus {
+.input-wrap input:focus,
+.input-wrap select:focus {
     outline: none;
     border-color: var(--navy);
-    background: #fff;
+    background-color: #fff;
     box-shadow: 0 0 0 4px rgba(10, 36, 114, 0.12);
 }
+
+/* Section title inside the form (e.g. "Home address") */
+.auth-subhead {
+    margin-top: 6px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+}
+.auth-subhead strong {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Poppins', sans-serif;
+    color: var(--ink);
+    font-size: 1rem;
+}
+.auth-subhead strong i { color: var(--navy); }
+.auth-subhead span { display: block; margin-top: 2px; font-size: 0.85rem; color: var(--muted); }
 .input-wrap input:focus + i,
 .input-wrap:focus-within > i { color: var(--navy); }
 .input-wrap.has-toggle input { padding-right: 52px; }
