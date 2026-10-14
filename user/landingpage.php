@@ -850,6 +850,8 @@ $programs = [
 <script>
 // ========================================
 // TEXT SIZE (accessibility)
+// The page always opens and refreshes at the normal size (100%); the buttons only enlarge it
+// for this visit, and the choice is not remembered.
 // ========================================
 (function() {
     const buttons = document.querySelectorAll('.text-size button');
@@ -857,13 +859,8 @@ $programs = [
         document.documentElement.style.fontSize = size + '%';
         buttons.forEach(b => b.setAttribute('aria-pressed', b.dataset.size === String(size)));
     }
-    let saved = '100';
-    try { saved = localStorage.getItem('portalTextSize') || '100'; } catch (e) {}
-    applySize(saved);
-    buttons.forEach(b => b.addEventListener('click', function() {
-        applySize(this.dataset.size);
-        try { localStorage.setItem('portalTextSize', this.dataset.size); } catch (e) {}
-    }));
+    applySize('100');
+    buttons.forEach(b => b.addEventListener('click', function() { applySize(this.dataset.size); }));
 })();
 
 // ========================================

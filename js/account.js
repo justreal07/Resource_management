@@ -216,18 +216,15 @@
         });
     });
 
-    /* ---------- Text size (saved on this device) ---------- */
+    /* ---------- Text size: pages open at the normal size; this enlarges the page for this visit only ---------- */
     const sizeBtns = $$('.acc-size-picker button');
     if (sizeBtns.length) {
-        let current = '100';
-        try { current = localStorage.getItem('portalTextSize') || '100'; } catch (e) {}
         function setSize(size) {
             document.documentElement.style.fontSize = size + '%';
             sizeBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.size === String(size)); });
-            try { localStorage.setItem('portalTextSize', size); } catch (e) {}
         }
         sizeBtns.forEach(function (b) { b.addEventListener('click', function () { setSize(b.dataset.size); }); });
-        sizeBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.size === current); });
+        setSize('100');
     }
 
     /* ---------- Notification filters ---------- */

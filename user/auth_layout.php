@@ -18,7 +18,7 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
     <link rel="stylesheet" href="<?php echo htmlspecialchars(portal_asset('../css/auth.css')); ?>">
     <?php portal_head(); ?>
 </head>
-<body class="auth-page">
+<body class="auth-page auth-page-<?php echo htmlspecialchars($active); ?>">
 
 <a href="#main" class="skip-link">Skip to main content</a>
 
@@ -107,20 +107,15 @@ function auth_page_end(): void {
 
 <?php portal_scripts(); ?>
 <script>
-// Text size (same setting as the landing page)
+// Text size: opens at the normal size; the buttons enlarge this visit only (not remembered, like the landing page)
 (function() {
     const buttons = document.querySelectorAll('.text-size button');
     function applySize(size) {
         document.documentElement.style.fontSize = size + '%';
         buttons.forEach(b => b.setAttribute('aria-pressed', b.dataset.size === String(size)));
     }
-    let saved = '100';
-    try { saved = localStorage.getItem('portalTextSize') || '100'; } catch (e) {}
-    applySize(saved);
-    buttons.forEach(b => b.addEventListener('click', function() {
-        applySize(this.dataset.size);
-        try { localStorage.setItem('portalTextSize', this.dataset.size); } catch (e) {}
-    }));
+    applySize('100');
+    buttons.forEach(b => b.addEventListener('click', function() { applySize(this.dataset.size); }));
 })();
 
 // Header shadow + mobile menu

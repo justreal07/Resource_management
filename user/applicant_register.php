@@ -13,9 +13,11 @@ $errors = [];
 $consent_error = '';
 $consent = false;
 $old = ['firstname' => '', 'lastname' => '', 'username' => '', 'email' => ''];
-// Contact number and address: saved on the account and used to auto-fill the application forms
-$contact = ['contact_number' => '', 'house_no' => '', 'street' => '', 'barangay' => '',
-            'municipality' => 'General Mariano Alvarez', 'province' => 'Cavite'];
+// Contact number and address: saved on the account and used to auto-fill the application forms.
+// The municipality and province are not asked: the portal is only for residents of General Mariano Alvarez, Cavite.
+const REGISTER_MUNICIPALITY = 'General Mariano Alvarez';
+const REGISTER_PROVINCE = 'Cavite';
+$contact = ['contact_number' => '', 'house_no' => '', 'street' => '', 'barangay' => ''];
 
 if (isset($_SESSION['oauth_error'])) {
     $errors[] = $_SESSION['oauth_error'];
@@ -35,13 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!csrf_valid()) {
         $errors[] = 'Your session expired. Please try again.';
     } else {
-        $contact_errors = validate_application($contact, ['contact_number', 'barangay', 'municipality', 'province']);
+        $contact_errors = validate_application($contact, ['contact_number', 'barangay']);
         if ($old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $password === '' || $confirm_password === ''
             || in_array('This field is required.', $contact_errors, true)) {
             $errors[] = 'Please fill in all required fields.';
         }
         $labels = ['contact_number' => 'Contact number', 'house_no' => 'House no.', 'street' => 'Street',
-                   'barangay' => 'Barangay', 'municipality' => 'Municipality', 'province' => 'Province'];
+                   'barangay' => 'Barangay'];
         foreach ($contact_errors as $field => $message) {
             if ($message !== 'This field is required.') $errors[] = $labels[$field] . ': ' . $message;
         }
@@ -97,8 +99,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $contact['house_no'] ?: null,
                 $contact['street'] ?: null,
                 $contact['barangay'],
-                $contact['municipality'],
-                $contact['province'],
+                REGISTER_MUNICIPALITY,
+                REGISTER_PROVINCE,
                 PRIVACY_NOTICE_VERSION,
             ]);
 
@@ -137,20 +139,29 @@ auth_page_start('Sign up', 'register', function () { ?>
     </ol>
 <?php });
 ?>
-    <div class="auth-card-head">
+    <?php /* A wide card (css/auth.css, .auth-page-register): the title, then the Google button on the left with
+             "or sign up with a username" beside it, then the account and contact details side by side */ ?>
+    <div class="auth-card-head auth-card-head-row">
         <div class="card-icon"><i class="fas fa-user-plus"></i></div>
-        <h2>Create your account</h2>
-        <p>It's free and only takes a minute.</p>
+        <div class="auth-card-title">
+            <h2>Create your account</h2>
+            <p>It's free and only takes a minute.</p>
+        </div>
     </div>
 
     <?php auth_alerts($errors); ?>
 
-    <?php google_button('register', 'Sign up with Google'); ?>
-
-    <div class="auth-divider">or sign up with a username</div>
+    <div class="auth-alt-row">
+        <?php google_button('register', 'Sign up with Google'); ?>
+        <div class="auth-divider">or sign up with a username</div>
+    </div>
 
     <form method="POST" class="auth-form" data-auth-form novalidate>
         <?php echo csrf_field(); ?>
+
+        <div class="auth-cols">
+        <fieldset class="auth-col">
+        <legend class="auth-col-title"><i class="fas fa-user-circle"></i> Your account</legend>
 
         <div class="field-row">
             <div class="field">
@@ -187,6 +198,35 @@ auth_page_start('Sign up', 'register', function () { ?>
             <span class="field-hint">You can also log in with this email.</span>
         </div>
 
+        <div class="field-row">
+            <div class="field">
+                <label for="password">Password</label>
+                <div class="input-wrap has-toggle">
+                    <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password" data-strength="#pwStrength">
+                    <i class="fas fa-lock"></i>
+                    <button type="button" class="toggle-password" data-toggle-password="password" aria-label="Show password" aria-pressed="false"><i class="fas fa-eye"></i></button>
+                </div>
+            </div>
+            <div class="field">
+                <label for="confirm_password">Confirm password</label>
+                <div class="input-wrap has-toggle">
+                    <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password" data-match="password">
+                    <i class="fas fa-lock"></i>
+                    <button type="button" class="toggle-password" data-toggle-password="confirm_password" aria-label="Show password" aria-pressed="false"><i class="fas fa-eye"></i></button>
+                </div>
+                <small class="pui-match" data-match-msg="confirm_password" aria-live="polite"></small>
+            </div>
+        </div>
+        <div class="pui-strength" id="pwStrength" aria-live="polite">
+            <div class="pui-strength-bar"><span></span></div>
+            <small class="pui-strength-text">Use at least 8 characters with letters and numbers.</small>
+        </div>
+        </fieldset>
+
+        <fieldset class="auth-col">
+        <legend class="auth-col-title"><i class="fas fa-home"></i> Contact &amp; home address</legend>
+        <p class="auth-col-note">Filled in for you on every application form.</p>
+
         <div class="field">
             <label for="contact_number">Contact number</label>
             <div class="input-wrap">
@@ -197,23 +237,18 @@ auth_page_start('Sign up', 'register', function () { ?>
             <span class="field-hint">11-digit mobile number, e.g. 09171234567.</span>
         </div>
 
-        <div class="auth-subhead">
-            <strong><i class="fas fa-home"></i> Home address</strong>
-            <span>Your contact number and address will be filled in for you on every application form.</span>
-        </div>
-
         <div class="field-row">
             <div class="field">
                 <label for="house_no">House no. <span class="optional">Optional</span></label>
                 <div class="input-wrap">
-                    <input type="text" id="house_no" name="house_no" maxlength="50" value="<?php echo $value('house_no'); ?>" placeholder="e.g. Blk 5 Lot 12">
+                    <input type="text" id="house_no" name="house_no" maxlength="50" value="<?php echo $value('house_no'); ?>" placeholder="Blk 5 Lot 12">
                     <i class="fas fa-hashtag"></i>
                 </div>
             </div>
             <div class="field">
                 <label for="street">Street <span class="optional">Optional</span></label>
                 <div class="input-wrap">
-                    <input type="text" id="street" name="street" maxlength="100" autocomplete="address-line1" value="<?php echo $value('street'); ?>" placeholder="e.g. Sampaguita St.">
+                    <input type="text" id="street" name="street" maxlength="100" autocomplete="address-line1" value="<?php echo $value('street'); ?>" placeholder="Rizal St.">
                     <i class="fas fa-road"></i>
                 </div>
             </div>
@@ -232,53 +267,16 @@ auth_page_start('Sign up', 'register', function () { ?>
             </div>
         </div>
 
-        <div class="field-row field-row-wide-first">
-            <div class="field">
-                <label for="municipality">Municipality</label>
-                <div class="input-wrap">
-                    <input type="text" id="municipality" name="municipality" required maxlength="100" autocomplete="address-level2" value="<?php echo $value('municipality'); ?>">
-                    <i class="fas fa-city"></i>
-                </div>
-            </div>
-            <div class="field">
-                <label for="province">Province</label>
-                <div class="input-wrap">
-                    <input type="text" id="province" name="province" required maxlength="100" autocomplete="address-level1" value="<?php echo $value('province'); ?>">
-                    <i class="fas fa-map"></i>
-                </div>
-            </div>
-        </div>
-
-        <div class="field-row">
-            <div class="field">
-                <label for="password">Password</label>
-                <div class="input-wrap has-toggle">
-                    <input type="password" id="password" name="password" required minlength="8" autocomplete="new-password" placeholder="Min. 8 characters" data-strength="#pwStrength">
-                    <i class="fas fa-lock"></i>
-                    <button type="button" class="toggle-password" data-toggle-password="password" aria-label="Show password" aria-pressed="false"><i class="fas fa-eye"></i></button>
-                </div>
-            </div>
-            <div class="field">
-                <label for="confirm_password">Confirm password</label>
-                <div class="input-wrap has-toggle">
-                    <input type="password" id="confirm_password" name="confirm_password" required minlength="8" autocomplete="new-password" placeholder="Re-enter password" data-match="password">
-                    <i class="fas fa-lock"></i>
-                    <button type="button" class="toggle-password" data-toggle-password="confirm_password" aria-label="Show password" aria-pressed="false"><i class="fas fa-eye"></i></button>
-                </div>
-                <small class="pui-match" data-match-msg="confirm_password" aria-live="polite"></small>
-            </div>
-        </div>
-        <div class="pui-strength" id="pwStrength" aria-live="polite">
-            <div class="pui-strength-bar"><span></span></div>
-            <small class="pui-strength-text">Use at least 8 characters with letters and numbers.</small>
-        </div>
-
+        <?php /* Under the address, so both columns end at about the same height */ ?>
         <?php echo privacy_consent_field('account', $consent, $consent_error); ?>
+        </fieldset>
+        </div>
 
-        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-user-plus"></i> Create Account</button>
+        <div class="auth-form-foot">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create Account</button>
+            <p class="auth-switch">Already have an account? <a href="applicant_login.php">Log in here</a></p>
+            <a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
+        </div>
     </form>
-
-    <p class="auth-switch">Already have an account? <a href="applicant_login.php">Log in here</a></p>
-    <div class="auth-links"><a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
 <?php
 auth_page_end();

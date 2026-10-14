@@ -169,21 +169,16 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
 
 <?php portal_scripts(); ?>
 <script>
-// Text size (same setting as the home page, saved on this device)
+// Text size: opens at the normal size; the buttons enlarge this visit only (not remembered, like the home page)
 (function () {
     const buttons = document.querySelectorAll('.text-size button');
     function applySize(size) {
         document.documentElement.style.fontSize = size + '%';
         buttons.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.size === String(size)); });
     }
-    let saved = '100';
-    try { saved = localStorage.getItem('portalTextSize') || '100'; } catch (e) {}
-    applySize(saved);
+    applySize('100');
     buttons.forEach(function (b) {
-        b.addEventListener('click', function () {
-            applySize(this.dataset.size);
-            try { localStorage.setItem('portalTextSize', this.dataset.size); } catch (e) {}
-        });
+        b.addEventListener('click', function () { applySize(this.dataset.size); });
     });
 })();
 </script>

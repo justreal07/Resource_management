@@ -59,8 +59,10 @@ function portal_head(): void {
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="<?= htmlspecialchars(portal_asset('../css/portal-ui.css')) ?>">
     <script>
-        // Text size picked on any page (saved on this device), applied before the page draws
-        try { var s = localStorage.getItem('portalTextSize'); if (s === '112.5' || s === '125') document.documentElement.style.fontSize = s + '%'; } catch (e) {}
+        // Every page opens and refreshes at the normal text size. The "Text size" buttons only enlarge the page
+        // being viewed; the choice is not remembered (it used to be saved, so one click on a bigger "A" kept the whole
+        // site enlarged on every visit). This clears a size saved by the old version.
+        try { localStorage.removeItem('portalTextSize'); } catch (e) {}
     </script>
     <?php
 }

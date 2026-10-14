@@ -497,7 +497,7 @@ account_page_start($ctx, 'My Account', 'account', [
 
         <div class="ap-card acc-card">
             <h3 class="acc-h3"><i class="fas fa-text-height"></i> Text size</h3>
-            <p class="acc-small ap-muted">Make the text bigger and easier to read. Saved on this device.</p>
+            <p class="acc-small ap-muted">Make the text bigger and easier to read on this page. Pages always open at the normal size.</p>
             <div class="acc-size-picker" role="group" aria-label="Text size">
                 <button type="button" data-size="100"><span style="font-size:.9rem">A</span>Normal</button>
                 <button type="button" data-size="112.5"><span style="font-size:1.15rem">A</span>Large</button>
