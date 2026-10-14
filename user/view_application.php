@@ -2,6 +2,7 @@
 require_once '../config.php';
 require_once 'application_eligibility.php';
 require_once 'account_layout.php';
+require_once '../includes/feedback.php';
 
 $ctx = account_context($pdo);
 $account_id = (int)$ctx['user']['id'];
@@ -77,6 +78,11 @@ $person_label = $type === 2 ? 'Applicant' : 'Patient';
 $can_reapply = $status === 'Disapproved' && $program && !empty($program['form_page']);
 $disapproval_reason = trim((string)($app['disapproval_remarks'] ?? ''));
 
+// Satisfaction survey (includes/feedback.php): once the office has decided, the rating given,
+// or a link to the Feedback page (feedback.php) to give one
+$can_rate = in_array($status, ['Approved', 'Disapproved'], true) && feedback_ensure($pdo);
+$feedback = $can_rate ? feedback_for_application($pdo, $app_id) : null;
+
 function detail_row(string $label, $value): void {
     if ($value === null || $value === '') return;
     echo '<div><dt>' . e($label) . '</dt><dd>' . e($value) . '</dd></div>';
@@ -131,6 +137,21 @@ account_page_start($ctx, "Application #$app_id", 'account', [
         <a href="<?= e(str_replace(' ', '%20', $program['form_page'])) ?>" class="ap-btn ap-btn-primary acc-btn-sm no-print"><i class="fas fa-redo"></i> Apply again</a>
     <?php endif; ?>
 </div>
+
+<?php if ($can_rate): ?>
+<!-- SATISFACTION SURVEY: answered on the Feedback page -->
+<div class="ap-card acc-card no-print pui-fb-card" id="feedback">
+    <h3 class="acc-h3"><i class="fas fa-star"></i> How did we do?</h3>
+    <?php if ($feedback): ?>
+        <?= feedback_given_html($feedback) ?>
+    <?php else: ?>
+        <div class="pui-fb-cta">
+            <p>Tell us how we did on this request. It takes a few seconds, and it never affects your application.</p>
+            <a href="feedback.php?id=<?= (int)$app_id ?>#app-<?= (int)$app_id ?>" class="ap-btn ap-btn-primary acc-btn-sm"><i class="fas fa-star"></i> Rate our service</a>
+        </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <div class="acc-two acc-details">
     <div class="ap-card acc-card">

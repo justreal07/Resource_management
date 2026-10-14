@@ -2,6 +2,7 @@
 require_once '../config.php';
 require_once 'account_helpers.php';
 require_once 'auth_layout.php';
+require_once '../includes/privacy.php';
 
 if (isset($_SESSION['applicant'])) {
     header('Location: landingpage.php');
@@ -9,6 +10,8 @@ if (isset($_SESSION['applicant'])) {
 }
 
 $errors = [];
+$consent_error = '';
+$consent = false;
 $old = ['firstname' => '', 'lastname' => '', 'username' => '', 'email' => ''];
 // Contact number and address: saved on the account and used to auto-fill the application forms
 $contact = ['contact_number' => '', 'house_no' => '', 'street' => '', 'barangay' => '',
@@ -53,6 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($password !== $confirm_password) {
             $errors[] = 'Passwords do not match.';
         }
+        // The Data Privacy Act needs the applicant's consent before the account (and its details) is kept
+        $consent = privacy_consent_given();
+        if (!$consent) {
+            $consent_error = 'Please read the Data Privacy Notice and tick the box to agree.';
+            $errors[] = $consent_error;
+        }
     }
 
     if (!$errors) {
@@ -76,7 +85,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$errors) {
         try {
             $stmt = $pdo->prepare('INSERT INTO applicant_accounts (firstname, lastname, username, email, password,
-                                   phone, house_no, street, barangay, municipality, province) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+                                   phone, house_no, street, barangay, municipality, province, privacy_accepted_at, privacy_version)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?)');
             $stmt->execute([
                 $old['firstname'],
                 $old['lastname'],
@@ -89,6 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $contact['barangay'],
                 $contact['municipality'],
                 $contact['province'],
+                PRIVACY_NOTICE_VERSION,
             ]);
 
             // Sign the new applicant in right away
@@ -261,6 +272,8 @@ auth_page_start('Sign up', 'register', function () { ?>
             <div class="pui-strength-bar"><span></span></div>
             <small class="pui-strength-text">Use at least 8 characters with letters and numbers.</small>
         </div>
+
+        <?php echo privacy_consent_field('account', $consent, $consent_error); ?>
 
         <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-user-plus"></i> Create Account</button>
     </form>

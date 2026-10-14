@@ -9,7 +9,8 @@ $month = isset($_GET['month']) ? $_GET['month'] : date('m');
 $week = isset($_GET['week']) ? intval($_GET['week']) : null;
 
 // Only known values reach the reports: several report queries put $year and $month straight into the SQL.
-$reportTypes = ['overview' => 'Overview', 'medical' => 'Medical Assistance', 'burial' => 'Burial Assistance', 'opd' => 'Outpatient Diagnosis'];
+$reportTypes = ['overview' => 'Overview', 'medical' => 'Medical Assistance', 'burial' => 'Burial Assistance', 'opd' => 'Outpatient Diagnosis',
+                'feedback' => 'Client feedback'];   // the satisfaction survey (includes/feedback.php)
 $ranges = ['year' => 'Full year', 'month' => 'One month', 'week' => 'One week'];   // "Decade" was removed: it showed the same as Full year
 if (!is_string($report_type) || !isset($reportTypes[$report_type])) $report_type = 'overview';
 if (!is_string($date_range) || !isset($ranges[$date_range])) $date_range = 'year';
@@ -119,6 +120,8 @@ echo ui_page_head('Reports', 'Totals and lists to print or open in Excel.',
         include __DIR__ . '/burial_report.php';
     } elseif($report_type == 'opd') {
         include __DIR__ . '/opd_report.php';
+    } elseif($report_type == 'feedback') {
+        include __DIR__ . '/feedback_report.php';
     }
     ?>
 </div>

@@ -81,7 +81,8 @@ try {
     ]);
 
     // A new account goes on to choose its first assistance; an existing one goes home as before
-    header('Location: ' . ($isNewAccount ? 'choose_assistance.php' : 'landingpage.php'));
+    // New accounts choose their first program; others go back to the account page they were opening, or home
+    header('Location: ' . ($isNewAccount ? 'choose_assistance.php' : take_after_login()));
     exit();
 } catch (Exception $e) {
     error_log('Google OAuth Error: ' . $e->getMessage());

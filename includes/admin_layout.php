@@ -251,7 +251,9 @@ function admin_layout_start(array $page): void
                         <a class="nav-link" href="<?= ui_e($item['href']) ?>"<?= $key === $section ? ' aria-current="page"' : '' ?>>
                             <?= ui_icon($item['icon']) ?>
                             <span class="nav-text"><?= ui_e($item['label']) ?></span>
-                            <?php if ($n > 0): ?><span class="nav-count"><?= $n ?><span class="visually-hidden"> waiting</span></span><?php endif; ?>
+                            <?php if (isset($item['type'])): /* always printed (hidden at 0) so admin_live.js can show it when the first one arrives */ ?>
+                                <span class="nav-count" data-live-nav="<?= (int)$item['type'] ?>"<?= $n > 0 ? '' : ' hidden' ?>><span data-live-nav-n><?= $n ?></span><span class="visually-hidden"> waiting</span></span>
+                            <?php endif; ?>
                         </a>
                     </li>
                 <?php endforeach; ?>
@@ -373,6 +375,7 @@ function admin_layout_end(array $opts = []): void
 
 <script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="../js/admin_ui.js"></script>
+<script src="../js/admin_live.js"></script>
 <?php foreach ($opts['scripts'] ?? [] as $src): ?>
 <script src="<?= ui_e($src) ?>"></script>
 <?php endforeach; ?>

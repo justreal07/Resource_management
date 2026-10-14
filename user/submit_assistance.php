@@ -2,6 +2,8 @@
 require_once '../config.php';
 require_once 'assistance_config.php';
 require_once 'person_rules.php';
+require_once 'account_helpers.php';   // ensure_user_schema()
+require_once '../includes/privacy.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
@@ -47,6 +49,13 @@ if (!isset($_SESSION[$form_data_key])) {
 $form_data = $_SESSION[$form_data_key];
 // The person rules (deceased, earlier Medical application, one Burial per person)
 // are checked again while saving, in STEP 2.
+
+// The Data Privacy Act needs the applicant's consent before the application and its photos are kept.
+// (The browser already asks for the box to be ticked; this is the check that counts.)
+if (!privacy_consent_given()) {
+    $_SESSION['privacy_consent_error'] = 'Please tick the box to agree to the Data Privacy Notice.';
+    back_with_errors($doc_page, ['Please read the Data Privacy Notice and tick the box to agree, then add your photos again.']);
+}
 
 // ============================================================
 // STEP 1: Check every photo BEFORE saving anything
@@ -188,7 +197,14 @@ if (!$result['ok']) {
     back_with_errors($doc_page, [$result['message']]);
 }
 
-// Done - clear the saved answers and show the confirmation (Post/Redirect/Get, so refresh won't resubmit)
+// Done - remember the consent on the account, clear the saved answers and show the confirmation
+// (Post/Redirect/Get, so refresh won't resubmit)
+try {
+    ensure_user_schema($pdo);   // the privacy columns, if this sign-in hasn't added them yet (after the save: DDL ends a transaction)
+} catch (Throwable $e) {
+    error_log('submit_assistance ensure_user_schema: ' . $e->getMessage());
+}
+privacy_record_consent($pdo, $account_id);
 unset($_SESSION[$form_data_key]);
 header('Location: submission_confirmation.php?id=' . $result['id']);
 exit;

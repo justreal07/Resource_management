@@ -5,6 +5,7 @@
    - Bottom menu on phones
    - Dialogs and toasts (SweetAlert2), photo viewer (Viewer.js), guided tour (Driver.js)
    - Form helpers: finished sections, dates in words, password strength, Caps Lock
+   - Data privacy "I agree" box, satisfaction survey
 ============================================ */
 
 .pui-sr {
@@ -394,7 +395,149 @@ body.swal2-toast-shown .swal2-container:has(.pui-toast-offer) { width: min(440px
 .pui-copy:hover { background: #eef2fb; }
 .pui-copy.is-copied { border-color: #9fdcbb; background: var(--green-soft, #e3f6ec); color: var(--green, #1e9e5a); }
 
+/* ============================================
+   DATA PRIVACY CONSENT (sign up, upload step; includes/privacy.php)
+============================================ */
+.pui-consent {
+    margin: 4px 0 18px;
+    padding: 14px 16px;
+    background: #f6f8fd;
+    border: 1px solid var(--line, #e4e8f2);
+    border-radius: 12px;
+}
+.ap-upload-card .pui-consent { margin: 18px 0 0; }
+.pui-consent.is-invalid { background: #fdf1f1; border-color: #e3a8a8; }
+.pui-consent-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin: 0;
+    color: var(--ink, #14213D);
+    font-size: 0.93rem;
+    font-weight: 500;
+    line-height: 1.55;
+    cursor: pointer;
+}
+.pui-consent-label input {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    margin: 1px 0 0;
+    accent-color: var(--navy, #0A2472);
+    cursor: pointer;
+}
+.pui-consent-label a { color: var(--navy, #0A2472); font-weight: 700; text-decoration: underline; }
+.pui-consent-error { display: flex; align-items: center; gap: 6px; margin: 8px 0 0 34px; color: #a4161a; font-size: 0.88rem; font-weight: 700; }
+
+/* ============================================
+   SATISFACTION SURVEY (Feedback page user/feedback.php, application page; includes/feedback.php)
+   The five faces are radio buttons: the chosen one is outlined and tinted, and keeps its text label,
+   so the answer never depends on colour alone.
+============================================ */
+.pui-fb-card { margin-top: 20px; }
+.pui-fb-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.pui-fb-cta p { margin: 0; flex: 1 1 18rem; color: var(--body, #3d4660); }
+
+/* Feedback page: one card per decided application */
+.pui-fb-section-title { margin-top: 8px; }
+.pui-fb-section-title + .pui-fb-app, .pui-fb-app + .pui-fb-app { margin-top: 14px; }
+section + section .pui-fb-section-title { margin-top: 30px; }
+.pui-fb-app.is-focus { border: 2px solid var(--gold, #F4B400); box-shadow: 0 0 0 4px #fff4d6; }
+.pui-fb-app-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+.pui-fb-app-icon {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    background: #eef2fb;
+    color: var(--navy, #0A2472);
+    font-size: 1.1rem;
+}
+.pui-fb-app-head h3 { margin: 0; font-size: 1.05rem; color: var(--ink, #14213D); }
+.pui-fb-app-head h3 span { color: var(--muted, #6b7390); font-weight: 600; }
+.pui-fb-app-head h3 .pui-fb-tag {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 10px;
+    border-radius: 999px;
+    background: #fff4d6;
+    color: #7a4b00;
+    font-size: 0.78rem;
+    font-weight: 700;
+    vertical-align: 2px;
+}
+.pui-fb-app-head p { margin: 2px 0 0; color: #5b6380; font-size: 0.9rem; }
+.pui-fb-app-head a { color: var(--navy, #0A2472); font-weight: 600; }
+.pui-fb-done { display: flex; align-items: center; gap: 10px; margin-top: 14px; color: #155c33; font-weight: 600; }
+.pui-fb-done i { font-size: 1.3rem; }
+.pui-fb { display: grid; gap: 10px; container-type: inline-size; }
+.pui-fb-scale { margin: 0; padding: 0; border: 0; min-width: 0; }
+.pui-fb-scale legend { margin-bottom: 8px; padding: 0; color: var(--ink, #14213D); font-weight: 700; font-size: 0.95rem; }
+.pui-fb-faces { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; }
+.pui-fb-face { position: relative; margin: 0; cursor: pointer; }
+.pui-fb-face input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.pui-fb-face span {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    height: 100%;
+    padding: 10px 4px 8px;
+    border: 2px solid var(--line, #e4e8f2);
+    border-radius: 12px;
+    background: #fff;
+    color: #5b6380;
+    text-align: center;
+    transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.pui-fb-face i { font-size: 1.6rem; }
+.pui-fb-face small { font-size: 0.78rem; font-weight: 600; line-height: 1.2; }
+.pui-fb-face:hover span { border-color: #b7c3dd; transform: translateY(-2px); }
+.pui-fb-face input:focus-visible + span { outline: 3px solid var(--gold, #F4B400); outline-offset: 2px; }
+/* Chosen: red for 1-2, amber for 3, green for 4-5 (text stays dark: 4.5:1 or better) */
+.pui-fb-face input:checked + span { border-color: var(--navy, #0A2472); box-shadow: 0 0 0 1px var(--navy, #0A2472); }
+.pui-fb-1 input:checked + span, .pui-fb-2 input:checked + span { background: #fdecec; color: #8f1d1d; }
+.pui-fb-3 input:checked + span { background: #fff4d6; color: #7a4b00; }
+.pui-fb-4 input:checked + span, .pui-fb-5 input:checked + span { background: #e3f6ec; color: #155c33; }
+.pui-fb-label { margin: 4px 0 0; color: var(--ink, #14213D); font-weight: 700; font-size: 0.93rem; }
+.pui-fb-label span { color: var(--muted, #6b7390); font-weight: 500; }
+.pui-fb textarea {
+    width: 100%;
+    min-height: 76px;
+    padding: 10px 12px;
+    font: inherit;
+    font-size: 0.95rem;
+    color: var(--ink, #14213D);
+    background: #fff;
+    border: 1px solid #8792a2;
+    border-radius: 10px;
+    resize: vertical;
+}
+.pui-fb textarea:focus-visible { outline: 3px solid var(--gold, #F4B400); outline-offset: 1px; border-color: var(--navy, #0A2472); }
+.pui-fb-note { display: flex; align-items: baseline; gap: 6px; margin: 0; color: #5b6380; font-size: 0.82rem; }
+.pui-fb-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.pui-fb-given { display: flex; align-items: flex-start; gap: 12px; }
+.pui-fb-given-face { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 50%; font-size: 1.5rem; }
+.pui-fb-given-face.pui-fb-1, .pui-fb-given-face.pui-fb-2 { background: #fdecec; color: #8f1d1d; }
+.pui-fb-given-face.pui-fb-3 { background: #fff4d6; color: #7a4b00; }
+.pui-fb-given-face.pui-fb-4, .pui-fb-given-face.pui-fb-5 { background: #e3f6ec; color: #155c33; }
+.pui-fb-given strong { color: var(--ink, #14213D); }
+.pui-fb-given p { margin: 4px 0; color: var(--body, #3d4660); font-style: italic; overflow-wrap: anywhere; }
+.pui-fb-given small { color: #5b6380; }
+/* A narrow card (phones): the five answers become a list, face and label
+   side by side, so no label is cut in the middle of a word */
+@container (max-width: 560px) {
+    .pui-fb-faces { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+    .pui-fb-face span { flex-direction: row; gap: 12px; padding: 8px 14px; text-align: left; }
+    .pui-fb-face i { font-size: 1.4rem; }
+    .pui-fb-face small { font-size: 0.93rem; }
+    .pui-fb-face:hover span { transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .ap-section.is-complete .ap-section-num::after { animation: none; }
     .pui-btn:hover { transform: none; }
+    .pui-fb-face:hover span { transform: none; }
 }

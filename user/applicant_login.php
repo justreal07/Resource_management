@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     ->execute([password_hash($password, PASSWORD_DEFAULT), $applicant['id']]);
             }
             start_applicant_session($applicant);
-            header('Location: landingpage.php');
+            header('Location: ' . take_after_login());   // the account page they were trying to open, or home
             exit;
         } elseif ($applicant && !empty($applicant['google_token'])) {
             $errors[] = 'This account was created with Google. Please use "Continue with Google" above.';

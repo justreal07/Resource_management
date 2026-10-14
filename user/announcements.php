@@ -140,6 +140,7 @@ $h = 'ann_e';
         <nav class="ann-nav" aria-label="Main">
             <a href="landingpage.php">Home</a>
             <a href="announcements.php" aria-current="page">Announcements</a>
+            <a href="feedback.php">Feedback</a>
             <?php if ($isApplicant): ?>
                 <a href="my_account.php" class="btn btn-primary btn-sm"><i class="fas fa-user" aria-hidden="true"></i> My Account</a>
             <?php else: ?>
@@ -267,6 +268,7 @@ $h = 'ann_e';
         <div class="container">
             <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>
             <span class="gold">LGU Assistance Portal</span>
+            <span><a href="privacy.php" style="color:inherit;">Data Privacy Notice</a></span>
         </div>
     </div>
 </footer>

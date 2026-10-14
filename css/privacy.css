@@ -1,0 +1,76 @@
+/* ============================================
+   DATA PRIVACY NOTICE (user/privacy.php)
+   Loaded after css/home.css and css/announcements.css (header, footer and page heading come from there).
+   Sizes are in rem, so the portal's Text size buttons work. Every text colour is 4.5:1 or better.
+============================================ */
+
+.pv-wrap { max-width: 860px; }
+.pv-updated { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: #5b6380; font-size: 0.9rem; font-weight: 600; }
+
+/* "In short" box, in Filipino */
+.pv-summary {
+    margin: 0 0 22px;
+    padding: 18px 22px;
+    background: #fff8e1;
+    border: 1px solid #f0c64a;
+    border-left: 5px solid #F4B400;
+    border-radius: 14px;
+    color: #3d4660;
+}
+.pv-summary h2 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 1.1rem; color: #14213D; }
+.pv-summary h2 i { color: #8a5a00; }
+.pv-summary ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; }
+
+/* Table of contents */
+.pv-toc {
+    margin: 0 0 22px;
+    padding: 16px 22px;
+    background: #fff;
+    border: 1px solid #e4e8f2;
+    border-radius: 14px;
+}
+.pv-toc strong { display: block; margin-bottom: 8px; color: #14213D; }
+.pv-toc ol { margin: 0; padding-left: 1.4em; columns: 2 16rem; column-gap: 28px; }
+.pv-toc li { margin: 0 0 4px; break-inside: avoid; }
+.pv-toc a { color: #0A2472; font-weight: 600; }
+
+/* The notice */
+.pv-body {
+    padding: 8px 28px 26px;
+    background: #fff;
+    border: 1px solid #e4e8f2;
+    border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(10, 36, 114, 0.08);
+    color: #3d4660;
+    line-height: 1.7;
+}
+.pv-body section { padding-top: 18px; scroll-margin-top: 90px; }
+.pv-body section + section { border-top: 1px solid #eef1f7; margin-top: 18px; }
+.pv-body h2 { margin: 0 0 10px; font-size: 1.25rem; color: #14213D; }
+.pv-body h3 { margin: 16px 0 6px; font-size: 1rem; color: #14213D; }
+.pv-body p { margin: 0 0 10px; }
+.pv-body ul { margin: 0 0 10px; padding-left: 1.3em; display: grid; gap: 6px; }
+.pv-body a { color: #0A2472; font-weight: 600; }
+.pv-note {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    background: #fdf1f1;
+    border: 1px solid #ecc5c5;
+    border-radius: 10px;
+    color: #6b1d1d;
+}
+.pv-note i { margin-top: 0.3em; color: #a4161a; }
+
+.pv-contact-list { list-style: none; padding: 0 !important; }
+.pv-contact-list li { display: flex; align-items: flex-start; gap: 10px; }
+.pv-contact-list i { width: 1.2em; margin-top: 0.35em; color: #0A2472; text-align: center; }
+
+@media (max-width: 680px) {
+    .pv-body { padding: 4px 18px 20px; }
+    .pv-summary, .pv-toc { padding: 14px 16px; }
+}
+@media print {
+    .topbar, .ann-header, .ann-footer, .pv-toc { display: none !important; }
+    .pv-body { box-shadow: none; border: 0; padding: 0; }
+}

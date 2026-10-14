@@ -10,7 +10,8 @@ require_once __DIR__ . '/assistance_config.php';
  * Runs once per session; safe to call on every page.
  */
 function ensure_user_schema(PDO $pdo): void {
-    if (!empty($_SESSION['user_schema_v1'])) return;
+    // v2: privacy_accepted_at / privacy_version (when the applicant last agreed to the Data Privacy Notice, includes/privacy.php)
+    if (!empty($_SESSION['user_schema_v2'])) return;
     $pdo->exec("ALTER TABLE applicant_accounts
         ADD COLUMN IF NOT EXISTS email VARCHAR(150) NULL,
         ADD COLUMN IF NOT EXISTS phone VARCHAR(20) NULL,
@@ -21,8 +22,10 @@ function ensure_user_schema(PDO $pdo): void {
         ADD COLUMN IF NOT EXISTS municipality VARCHAR(100) NULL,
         ADD COLUMN IF NOT EXISTS province VARCHAR(100) NULL,
         ADD COLUMN IF NOT EXISTS autofill_enabled TINYINT(1) NOT NULL DEFAULT 1,
-        ADD COLUMN IF NOT EXISTS notifications_seen_at DATETIME NULL");
-    $_SESSION['user_schema_v1'] = true;
+        ADD COLUMN IF NOT EXISTS notifications_seen_at DATETIME NULL,
+        ADD COLUMN IF NOT EXISTS privacy_accepted_at DATETIME NULL,
+        ADD COLUMN IF NOT EXISTS privacy_version VARCHAR(20) NULL");
+    $_SESSION['user_schema_v2'] = true;
 }
 
 function get_current_user_row(PDO $pdo): ?array {
@@ -45,6 +48,21 @@ function start_applicant_session(array $account, array $extra = []): void {
         'lastname'  => $account['lastname'],
         'email'     => $account['email'] ?? null,
     ], $extra);
+}
+
+/**
+ * Where to go after signing in. An account page opened while signed out (e.g. Feedback from the header)
+ * remembers itself here (account_context()), so log in / Google sign-in return to it instead of the home page.
+ * Only a page of this folder is accepted ("feedback.php", "view_application.php?id=12"), never another site.
+ */
+function remember_after_login(string $page): void {
+    if (preg_match('/^[a-z_]+\.php(\?[A-Za-z0-9_=&-]*)?$/', $page)) $_SESSION['after_login'] = $page;
+}
+
+function take_after_login(string $default = 'landingpage.php'): string {
+    $page = $_SESSION['after_login'] ?? '';
+    unset($_SESSION['after_login']);
+    return is_string($page) && preg_match('/^[a-z_]+\.php(\?[A-Za-z0-9_=&-]*)?$/', $page) ? $page : $default;
 }
 
 function is_google_account(array $user): bool {

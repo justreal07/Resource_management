@@ -11,7 +11,7 @@ require_once __DIR__ . '/apply_layout.php';   // e() and other small helpers
  * (notifications + account menu) and the page header.
  * The look follows the Tabler dashboard template (tabler.io, MIT) - styles in css/dashboard.css.
  *
- * @param string $active  'account' | 'documents' | 'notifications'
+ * @param string $active  'account' | 'documents' | 'notifications' | 'feedback'
  * @param array  $hero    page header: ['eyebrow', 'title', 'subtitle', 'icon', 'actions' => raw HTML]
  * @param string $tour    guided tour of this page (a name from TOURS in js/portal-ui.js), '' for none
  */
@@ -28,6 +28,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
             ['my_account.php#applications', 'fa-gauge-high', 'Dashboard', $active === 'account', 'applications'],
             ['my_documents.php', 'fa-folder-open', 'My Documents', $active === 'documents', null],
             ['user_notifications.php', 'fa-bell', 'Notifications', $active === 'notifications', null],
+            ['feedback.php', 'fa-star', 'Feedback', $active === 'feedback', null],
             ['announcements.php', 'fa-bullhorn', 'Announcements', false, null],
         ],
         'Account' => [
@@ -156,6 +157,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                     <a href="my_account.php#applications"><i class="fas fa-list"></i> My Applications</a>
                     <a href="my_documents.php"><i class="fas fa-folder-open"></i> My Documents</a>
                     <a href="user_notifications.php"><i class="fas fa-bell"></i> Notifications</a>
+                    <a href="feedback.php"><i class="fas fa-star"></i> Feedback</a>
                     <a href="my_account.php#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
                     <a href="my_account.php#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
                     <a href="my_account.php#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
@@ -205,6 +207,7 @@ function account_page_end(array $scripts = []): void {
     <div class="ap-container">
         <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez</span>
         <span><i class="fas fa-phone"></i> Need help? Call (046) 123-4567 · Mon–Fri, 8 AM–5 PM</span>
+        <span><a href="privacy.php">Data Privacy Notice</a></span>
     </div>
 </footer>
 
@@ -225,6 +228,9 @@ function account_page_end(array $scripts = []): void {
  */
 function account_context(PDO $pdo): array {
     if (!isset($_SESSION['applicant'])) {
+        // Come back to this page after signing in (e.g. Feedback, opened from the header while signed out)
+        $query = (string)($_SERVER['QUERY_STRING'] ?? '');
+        remember_after_login(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')) . ($query !== '' ? '?' . $query : ''));
         header('Location: applicant_login.php');
         exit;
     }

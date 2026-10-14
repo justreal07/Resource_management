@@ -7,6 +7,7 @@
 require_once '../config.php';
 require_once 'assistance_config.php';
 require_once 'apply_layout.php';
+require_once __DIR__ . '/../includes/privacy.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
@@ -116,6 +117,10 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
             </li>
             <?php $i++; endforeach; ?>
         </ol>
+
+        <?php /* Required on every application (Data Privacy Act): checked again by submit_assistance.php */ ?>
+        <?= privacy_consent_field('application', false, $_SESSION['privacy_consent_error'] ?? '') ?>
+        <?php unset($_SESSION['privacy_consent_error']); ?>
 
         <div class="ap-actions">
             <a href="<?= e(str_replace(' ', '%20', $program['form_page'])) ?>" class="ap-btn ap-btn-ghost" data-guard-leave><i class="fas fa-arrow-left"></i> Back to form</a>

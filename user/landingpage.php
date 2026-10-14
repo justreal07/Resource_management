@@ -15,7 +15,7 @@ $notifications = [];
 $notification_count = 0;
 $user = null;
 $assistance_eligibility = [];
-    
+
 // Check if user is logged in and fetch user data  pogi ko
 if(isset($_SESSION['applicant'])) {
     $applicant_id = $_SESSION['applicant']['id'];
@@ -164,6 +164,8 @@ $programs = [
             <a href="landingpage.php" class="nav-link active">Home</a>
             <a href="#programs" class="nav-link">Programs</a>
             <a href="announcements.php" class="nav-link">Announcements</a>
+            <?php /* Rate our service (user/feedback.php); signed out, it asks to log in first and then opens */ ?>
+            <a href="feedback.php" class="nav-link">Feedback</a>
             <a href="#how-it-works" class="nav-link">How to Apply</a>
             <a href="#faq" class="nav-link">FAQs</a>
             <a href="#contact" class="nav-link">Contact</a>
@@ -635,6 +637,14 @@ $programs = [
                         No. OPD is for check-up and evaluation first. Admission depends on the doctor's assessment.
                     </div>
                 </details>
+                <details class="faq-item">
+                    <summary>Is my personal information safe? (Ligtas ba ang aking impormasyon?)</summary>
+                    <div class="faq-answer">
+                        Yes. Only authorized office staff can see your application and documents, and we use them only to process your request.
+                        We never sell your information. You have the right to see, correct and ask us to delete it.
+                        Read our <a href="privacy.php">Data Privacy Notice</a> to learn more.
+                    </div>
+                </details>
             </div>
 
             <?php /* data-type-line: typed out one after another when the card scrolls into view (script below) */ ?>
@@ -744,8 +754,10 @@ $programs = [
             <ul class="footer-links">
                 <li><a href="landingpage.php">Home</a></li>
                 <li><a href="announcements.php">Announcements</a></li>
+                <li><a href="feedback.php">Feedback</a></li>
                 <li><a href="#how-it-works">How to Apply</a></li>
                 <li><a href="#faq">FAQs</a></li>
+                <li><a href="privacy.php">Data Privacy Notice</a></li>
                 <?php if($is_logged_in): ?>
                     <li><a href="my_account.php">My Account</a></li>
                 <?php else: ?>
@@ -775,6 +787,7 @@ $programs = [
         <div class="container">
             <span>&copy; <?= date("Y") ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>
             <span class="gold">LGU Assistance Portal</span>
+            <span><a href="privacy.php" style="color:inherit;">Data Privacy Notice</a></span>
             <!-- Required credit: program illustrations are from Storyset (Freepik License) -->
             <span><a href="https://storyset.com/" target="_blank" rel="noopener" style="color:inherit;">Illustrations by Storyset</a></span>
         </div>

@@ -399,14 +399,15 @@ admin_layout_start([
                 <div class="panel-head">
                     <h2 id="actionTitle">Needs your action</h2>
                     <?php if (empty($loadFailed['queue'])): ?>
-                        <p class="panel-sub">
-                            <?php if ($queueTotal === 0): ?>
-                                <?= ui_icon('check-circle') ?> All caught up: no applications are waiting for review.
-                            <?php else: ?>
-                                <strong><?= number_format($queueTotal) ?></strong> <?= $queueTotal === 1 ? 'application is' : 'applications are' ?> waiting for review (any date)
-                            <?php endif; ?>
+                        <p class="panel-sub" aria-live="polite">
+                            <?php /* Both versions are printed; admin_live.js shows the one that fits as the numbers change */ ?>
+                            <span data-live-when="none"<?= $queueTotal === 0 ? '' : ' hidden' ?>><?= ui_icon('check-circle') ?> All caught up: no applications are waiting for review.</span>
+                            <span data-live-when="some"<?= $queueTotal === 0 ? ' hidden' : '' ?>>
+                                <strong data-live="pendingTotal"><?= number_format($queueTotal) ?></strong>
+                                <span data-live-plural="pendingTotal" data-one="application is" data-many="applications are"><?= $queueTotal === 1 ? 'application is' : 'applications are' ?></span> waiting for review (any date)
+                            </span>
                             <?php if (empty($loadFailed['stats'])): ?>
-                                · <?= number_format((int)$today) ?> new today
+                                · <span data-live="today"><?= number_format((int)$today) ?></span> new today
                             <?php endif; ?>
                         </p>
                     <?php endif; ?>
@@ -425,14 +426,14 @@ admin_layout_start([
                             $pastCheckup = (int)($q['past_checkup'] ?? 0);
                             ?>
                             <li>
-                                <a class="queue-card<?= $n === 0 ? ' is-clear' : '' ?>" href="<?= ui_e($t['queue']) ?>">
+                                <a class="queue-card<?= $n === 0 ? ' is-clear' : '' ?>" href="<?= ui_e($t['queue']) ?>" data-live-card="<?= (int)$id ?>">
                                     <span class="queue-icon"><?= ui_icon($t['icon']) ?></span>
                                     <span class="queue-main">
                                         <span class="queue-type"><?= ui_e($t['name']) ?></span>
                                         <?php if ($n === 0): ?>
-                                            <span class="queue-count">Nothing waiting</span>
+                                            <span class="queue-count" data-live-card-count>Nothing waiting</span>
                                         <?php else: ?>
-                                            <span class="queue-count"><strong><?= number_format($n) ?></strong> waiting for review</span>
+                                            <span class="queue-count" data-live-card-count><strong><?= number_format($n) ?></strong> waiting for review</span>
                                             <?php if ($id === 3 && !empty($q['next_checkup'])): ?>
                                                 <?php $days = (int)round((strtotime($q['next_checkup']) - strtotime(date('Y-m-d'))) / 86400); ?>
                                                 <span class="queue-meta">Next check-up: <?= ui_e(date('M j', strtotime($q['next_checkup']))) ?>
@@ -447,7 +448,7 @@ admin_layout_start([
                                             <?php endif; ?>
                                         <?php endif; ?>
                                     </span>
-                                    <span class="queue-go"><?= $n === 0 ? 'Open list' : 'Review' ?><?= ui_icon('chevron-right') ?></span>
+                                    <span class="queue-go"><span data-live-card-go><?= $n === 0 ? 'Open list' : 'Review' ?></span><?= ui_icon('chevron-right') ?></span>
                                 </a>
                             </li>
                         <?php endforeach; ?>
@@ -522,8 +523,8 @@ admin_layout_start([
 
                     <?php if (empty($loadFailed['stats'])): ?>
                         <p class="all-time">
-                            <strong>All time:</strong> <?= number_format((int)$total) ?> applications ·
-                            <?= number_format((int)$pending) ?> pending · <?= number_format((int)$approved) ?> approved
+                            <strong>All time:</strong> <span data-live="allTotal"><?= number_format((int)$total) ?></span> applications ·
+                            <span data-live="pendingTotal"><?= number_format((int)$pending) ?></span> pending · <span data-live="approved"><?= number_format((int)$approved) ?></span> approved
                         </p>
                     <?php endif; ?>
                 </section>
