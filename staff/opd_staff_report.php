@@ -11,11 +11,13 @@ if ($selected_date === '') {
     $selected_date = date('Y-m-d');
 }
 
-// Fetch OPD applicants for selected date
+// Fetch OPD applicants for selected date, with the departure time and pick-up point set when approving
+// (when those columns are there)
+$departureCols = decision_claim_ensure($pdo) ? ', a.claim_time, a.claim_place' : '';
 $stmt = $pdo->prepare("
     SELECT a.id, a.first_name, a.last_name, a.age, a.barangay, a.street, a.municipality,
-           a.diagnosis, a.hospital, a.checkup_date, a.petitioner_name, a.wheelchair, a.stretcher,
-           a.status, a.created_at, at.name as assistance_type
+           a.diagnosis, a.hospital, a.checkup_date, a.petitioner_name, a.relationship, a.wheelchair, a.stretcher,
+           a.status, a.created_at, at.name as assistance_type$departureCols
     FROM applicant a
     LEFT JOIN assistance_types at ON a.assistance_type_id = at.id
     WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved'
@@ -103,10 +105,11 @@ echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you c
                 ['label' => 'Patient', 'type' => 'person', 'link' => function ($r) { return ui_type_url(3, 'view', ['id' => (int)$r['id']]); }],
                 ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
                 ['label' => 'Check-up date', 'type' => 'date', 'key' => 'checkup_date'],
+                ['label' => 'Departure', 'type' => 'text', 'value' => 'ui_opd_departure'],
                 ['label' => 'Age', 'type' => 'text', 'key' => 'age'],
                 ['label' => 'Hospital', 'type' => 'text', 'key' => 'hospital'],
                 ['label' => 'Diagnosis', 'type' => 'text', 'key' => 'diagnosis'],
-                ['label' => 'Accompanied by', 'type' => 'text', 'key' => 'petitioner_name'],
+                ['label' => 'Accompanied by', 'type' => 'text', 'value' => 'ui_opd_companion'],
                 ['label' => 'Transport needs', 'type' => 'text', 'value' => $needs],
                 ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }],
             ], ['search' => false, 'wide' => true, 'noun' => 'patient', 'caption' => 'OPD check-ups on ' . $dayText]) ?>

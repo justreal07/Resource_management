@@ -5,7 +5,7 @@ require_once '../includes/admin_layout.php';
 // Fetch only approved OPD applicants
 // (name parts read separately: CONCAT() with an empty (NULL) middle name gave no name at all)
 $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name,
-    CONCAT(COALESCE(a.house_no, ''), ' ', COALESCE(a.street, ''), ', ', a.barangay, ', ', a.municipality, ', ', a.province) AS address,
+    CONCAT_WS(', ', NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(a.house_no), ''), NULLIF(TRIM(a.street), ''))), ''), NULLIF(TRIM(a.barangay), ''), NULLIF(TRIM(a.municipality), ''), NULLIF(TRIM(a.province), '')) AS address,
     a.contact_number,
     a.created_at,
     a.amount

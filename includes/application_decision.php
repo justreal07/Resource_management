@@ -11,6 +11,17 @@
  *   Record: approved_by / approved_at, or disapproved_by / disapproved_at / disapproval_remarks,
  *           from the signed-in user, plus a row in application_status_history.
  *
+ * Approving needs the approval details, typed in the Approve dialog on the Pending lists or on the Update page:
+ *   - Medical / Burial (they release money): the amount, and where, date and time to claim it.
+ *   - OPD (a trip in the LGU vehicle): the pick-up point and the departure time (4:00 AM unless changed).
+ *     The trip day is the patient's check-up date from the request (checkup_date): the staff schedule,
+ *     the daily report and the email all use it, so it is not typed again (claim_date stays empty).
+ *   - all: the hard copies to bring, and an optional note.
+ * After it is saved, the applicant is emailed those details (never the amount; includes/mailer.php) at
+ * their account's email address; a walk-in has no account, so the office tells them in person.
+ * A failed email never undoes the approval: the admin is told, and the applicant still sees the details
+ * in their account. Columns: database/migrations/migration_approval_claim.sql (added automatically).
+ *
  * A Disapproved application is "junked": it has no lasting effect on the person.
  *   - it is left out of every list, count and duplicate check (see person_rules.php)
  *   - Burial: a death recorded when it was filed is cleared again
@@ -24,6 +35,10 @@ const DECISION_PENDING = 'Pending';
 const DECISION_APPROVED = 'Approved';
 const DECISION_DISAPPROVED = 'Disapproved';
 const DISAPPROVAL_REMARKS_MAX = 1000;
+const CLAIM_PLACE_MAX = 255;          // claim details: the column sizes (migration_approval_claim.sql)
+const CLAIM_REQUIREMENTS_MAX = 2000;
+const CLAIM_NOTE_MAX = 1000;
+const OPD_DEPARTURE_DEFAULT = '04:00';   // the OPD vehicle leaves at 4:00 AM unless the office sets another time
 
 /* ============================================================
    WHO MAY DECIDE
@@ -148,7 +163,115 @@ function decision_needs_amount(int $typeId): bool
 
 function decision_result(bool $ok, string $code, string $message, ?array $app = null): array
 {
-    return ['ok' => $ok, 'code' => $code, 'message' => $message, 'application' => $app];
+    return ['ok' => $ok, 'code' => $code, 'message' => $message, 'application' => $app, 'warning' => null];
+}
+
+/* ============================================================
+   APPROVAL DETAILS: Medical / Burial claim, OPD trip
+   ============================================================ */
+
+/**
+ * Make sure applicant has the claim-detail columns (same as database/migrations/migration_approval_claim.sql).
+ * Called when a page starts (admin layout, the approve pages), never inside a transaction:
+ * ALTER TABLE ends a transaction in MySQL. Returns false if they are missing and could not be added.
+ */
+function decision_claim_ensure(PDO $pdo): bool
+{
+    static $result = null;
+    if ($result !== null) return $result;
+    if (!empty($_SESSION['claim_columns_ready'])) return $result = true;
+
+    $columns = [
+        'claim_place'            => "VARCHAR(255) NULL DEFAULT NULL COMMENT 'Approved: where to claim (Medical/Burial) or the pick-up point (OPD)'",
+        'claim_date'             => "DATE NULL DEFAULT NULL COMMENT 'Approved Medical/Burial: date to claim. OPD: empty, the trip day is checkup_date'",
+        'claim_time'             => "TIME NULL DEFAULT NULL COMMENT 'Approved: time to claim (Medical/Burial) or departure time (OPD)'",
+        'claim_requirements'     => "TEXT NULL DEFAULT NULL COMMENT 'Hard copies to bring or submit'",
+        'claim_note'             => "TEXT NULL DEFAULT NULL COMMENT 'Optional extra note in the approval email'",
+        'approval_email_sent_at' => "DATETIME NULL DEFAULT NULL COMMENT 'When the approval email was sent; NULL = not sent'",
+    ];
+    try {
+        $have = $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applicant'")->fetchAll(PDO::FETCH_COLUMN);
+        foreach ($columns as $name => $definition) {
+            if (!in_array($name, $have, true)) {
+                $pdo->exec("ALTER TABLE applicant ADD COLUMN $name $definition");
+            }
+        }
+        $_SESSION['claim_columns_ready'] = true;
+        return $result = true;
+    } catch (Throwable $e) {
+        error_log('decision_claim_ensure: ' . $e->getMessage());
+        return $result = false;
+    }
+}
+
+/** The claim-detail fields as the Approve dialog and the Update page post them. */
+function decision_claim_from_post(): array
+{
+    $raw = [];
+    foreach (['claim_place', 'claim_date', 'claim_time', 'claim_requirements', 'claim_note'] as $k) {
+        $raw[$k] = is_string($_POST[$k] ?? null) ? $_POST[$k] : '';
+    }
+    return $raw;
+}
+
+/**
+ * Check the approval details. Everything but the note is needed; a claim date can't be in the past.
+ * OPD has no date here: the trip day is the patient's check-up date (decision_opd_schedule_problem()).
+ * @return array{ok: bool, message: string, values: array}
+ */
+function decision_claim_parse(array $raw, int $typeId = 1): array
+{
+    $opd = $typeId === 3;
+    $line = function ($v) { return trim(preg_replace('/\s+/u', ' ', (string)$v) ?? ''); };
+    $block = function ($v) { return trim(preg_replace("/[ \t]+/u", ' ', str_replace("\r\n", "\n", (string)$v)) ?? ''); };
+    $fail = function (string $message) { return ['ok' => false, 'message' => $message, 'values' => []]; };
+
+    $place = $line($raw['claim_place'] ?? '');
+    $date = trim((string)($raw['claim_date'] ?? ''));
+    $time = trim((string)($raw['claim_time'] ?? ''));
+    $requirements = $block($raw['claim_requirements'] ?? '');
+    $note = $block($raw['claim_note'] ?? '');
+
+    if ($place === '') return $fail($opd ? 'Enter the pick-up point, where the patient boards the vehicle.' : 'Enter where the applicant will claim the assistance.');
+    if (mb_strlen($place) > CLAIM_PLACE_MAX) return $fail(($opd ? 'The pick-up point' : 'The place to claim') . ' is too long (up to ' . CLAIM_PLACE_MAX . ' characters).');
+
+    if (!$opd) {
+        $d = DateTime::createFromFormat('!Y-m-d', $date);
+        if ($date === '' || !$d || $d->format('Y-m-d') !== $date) return $fail('Choose the date the applicant will claim the assistance.');
+        if ($date < date('Y-m-d')) return $fail('The claim date has already passed. Choose today or a later date.');
+    }
+
+    $t = DateTime::createFromFormat('!H:i', substr($time, 0, 5));
+    if ($time === '' || !$t || $t->format('H:i') !== substr($time, 0, 5)) {
+        return $fail($opd ? 'Choose the departure time.' : 'Choose the time the applicant will claim the assistance.');
+    }
+
+    if ($requirements === '') return $fail('List the hard copies the applicant must bring or submit.');
+    if (mb_strlen($requirements) > CLAIM_REQUIREMENTS_MAX) return $fail('The list of hard copies is too long (up to ' . number_format(CLAIM_REQUIREMENTS_MAX) . ' characters).');
+    if (mb_strlen($note) > CLAIM_NOTE_MAX) return $fail('The extra note is too long (up to ' . number_format(CLAIM_NOTE_MAX) . ' characters).');
+
+    return ['ok' => true, 'message' => '', 'values' => [
+        'claim_place' => $place, 'claim_date' => $opd ? null : $date, 'claim_time' => $t->format('H:i:s'),
+        'claim_requirements' => $requirements, 'claim_note' => $note === '' ? null : $note,
+    ]];
+}
+
+/**
+ * Why an OPD request can't be scheduled yet, or null when it can. The trip is on the patient's
+ * check-up date, so it must be there and not already past. An admin can change it with Edit.
+ */
+function decision_opd_schedule_problem($checkupDate): ?string
+{
+    $date = trim((string)$checkupDate);
+    if ($date === '') {
+        return 'This request has no check-up date, so the trip can\'t be scheduled. An admin can add the patient\'s check-up date with Edit, then approve.';
+    }
+    if ($date < date('Y-m-d')) {
+        return 'The patient\'s check-up date (' . date('F j, Y', strtotime($date)) . ') has already passed, so the trip can\'t be scheduled. '
+            . 'Ask the patient for their new check-up date (an admin can change it with Edit), or disapprove the request.';
+    }
+    return null;
 }
 
 /**
@@ -156,10 +279,12 @@ function decision_result(bool $ok, string $code, string $message, ?array $app = 
  *
  * @param string $decision 'approve' or 'disapprove'
  * @param array  $opts     amount (?float), require_amount (bool), remarks (string, disapproval reason),
+ *                         claim (array: claim_place, claim_date (not OPD), claim_time, claim_requirements,
+ *                         claim_note; needed to approve), send_email (bool, default true),
  *                         expect_type (int: the page only handles this program), user (override for tests)
- * @return array{ok: bool, code: string, message: string, application: ?array}
- *         code: approved | disapproved | invalid | auth | forbidden | already | amount | remarks | setup | error.
- *         message is always safe to show (no SQL, no table names).
+ * @return array{ok: bool, code: string, message: string, application: ?array, warning: ?string}
+ *         code: approved | disapproved | invalid | auth | forbidden | already | amount | claim | remarks | setup | error.
+ *         message is always safe to show (no SQL, no table names). warning: the approval email was not sent.
  */
 function decide_application(PDO $pdo, $applicantId, string $decision, array $opts = []): array
 {
@@ -188,6 +313,8 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
             return decision_result(false, 'amount', 'Enter the amount to release (more than ₱0) before approving.');
         }
     }
+
+    $claim = null;   // checked once the program is known: only Medical/Burial have claim details
 
     $remarks = null;
     if ($decision === 'disapprove') {
@@ -226,6 +353,28 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         if ($peek['status'] !== DECISION_PENDING) {
             return decision_result(false, 'already', 'This application was already processed.', $app);
         }
+        // The applicant is told where, when and what to bring: Medical / Burial when to claim (with the
+        // amount, which stays out of the email), OPD the trip on the patient's check-up date
+        if ($decision === 'approve') {
+            if (decision_needs_amount($typeId) && $amount === null) {
+                return decision_result(false, 'amount', 'Enter the amount to release (more than ₱0) before approving.', $app);
+            }
+            if ($typeId === 3 && ($problem = decision_opd_schedule_problem($peek['checkup_date'] ?? '')) !== null) {
+                return decision_result(false, 'claim', $problem, $app);
+            }
+            if (!is_array($opts['claim'] ?? null)) {
+                return decision_result(false, 'claim', $typeId === 3
+                    ? 'Fill in the pick-up point, the departure time and what to bring before approving.'
+                    : 'Fill in where and when to claim, and the hard copies to bring, before approving.', $app);
+            }
+            $parsed = decision_claim_parse($opts['claim'], $typeId);
+            if (!$parsed['ok']) return decision_result(false, 'claim', $parsed['message'], $app);
+            $claim = $parsed['values'];
+            if (!decision_claim_ensure($pdo)) {
+                return decision_result(false, 'setup', 'Applications can\'t be approved until the database update is installed. '
+                    . 'Ask the system administrator to run database/migrations/migration_approval_claim.sql.', $app);
+            }
+        }
 
         // Same lock as a new submission for this person (person_lock_name() in person_rules.php), so a
         // disapproval that frees the person can't cross a submission for the same person.
@@ -251,9 +400,18 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
 
         if ($decision === 'approve') {
-            $sql = "UPDATE applicant SET status = 'Approved', approved_by = ?, approved_at = NOW()"
-                . ($amount !== null ? ', amount = ?' : '') . " WHERE id = ? AND status = 'Pending'";
-            $params = $amount !== null ? [$user['id'], $amount, $id] : [$user['id'], $id];
+            $set = "status = 'Approved', approved_by = ?, approved_at = NOW()";
+            $params = [$user['id']];
+            if ($amount !== null) {
+                $set .= ', amount = ?';
+                $params[] = $amount;
+            }
+            if ($claim !== null) {
+                $set .= ', claim_place = ?, claim_date = ?, claim_time = ?, claim_requirements = ?, claim_note = ?';
+                array_push($params, $claim['claim_place'], $claim['claim_date'], $claim['claim_time'], $claim['claim_requirements'], $claim['claim_note']);
+            }
+            $sql = "UPDATE applicant SET $set WHERE id = ? AND status = 'Pending'";
+            $params[] = $id;
         } else {
             $sql = "UPDATE applicant SET status = 'Disapproved', disapproved_by = ?, disapproved_at = NOW(), disapproval_remarks = ?
                     WHERE id = ? AND status = 'Pending'";
@@ -287,7 +445,17 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
 
     $label = $app['name'] . ' (Ref #' . $app['id'] . ')';
     if ($decision === 'approve') {
-        return decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 2) : '') . '.', $app);
+        $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 2) : '') . '.', $app);
+        // Only after the approval is saved: an email that fails must not undo it
+        if ($claim !== null && ($opts['send_email'] ?? true)) {
+            $mail = decision_send_approval_email($pdo, $id);
+            if ($mail['sent']) {
+                $result['message'] .= ' ' . $mail['note'];
+            } else {
+                $result['warning'] = $label . ' was approved, but ' . $mail['note'];
+            }
+        }
+        return $result;
     }
     return decision_result(true, 'disapproved', $label . ' was disapproved. The applicant may apply again.', $app);
 }
@@ -334,6 +502,108 @@ function decision_person_name(array $row): string
 }
 
 /* ============================================================
+   THE APPROVAL EMAIL
+   ============================================================ */
+
+/**
+ * Email the approval details of an approved application to the email on the applicant's account:
+ * Medical / Burial where and when to claim, OPD the trip (day, departure time, pick-up point).
+ * The text is built only from what the admin typed in the Approve dialog and the saved application.
+ * @return array{sent: bool, note: string} note: the end of the admin's message ("The claim details were emailed to ...").
+ */
+function decision_send_approval_email(PDO $pdo, int $id): array
+{
+    require_once __DIR__ . '/mailer.php';
+    try {
+        $stmt = $pdo->prepare('SELECT a.*, at.name AS type_name, acc.email AS account_email, acc.firstname AS account_firstname, acc.lastname AS account_lastname
+                               FROM applicant a
+                               LEFT JOIN assistance_types at ON at.id = a.assistance_type_id
+                               LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
+                               WHERE a.id = ?');
+        $stmt->execute([$id]);
+        $a = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('decision_send_approval_email #' . $id . ': ' . $e->getMessage());
+        $a = false;
+    }
+    $opd = $a && (int)$a['assistance_type_id'] === 3;
+    $what = $opd ? 'trip schedule' : 'claim details';
+    if (!$a || $a['status'] !== DECISION_APPROVED) {
+        return ['sent' => false, 'note' => 'the ' . $what . ' could not be emailed. Tell the applicant ' . ($opd ? 'the departure time and pick-up point.' : 'where and when to claim.')];
+    }
+    if ($a['account_id'] === null) {
+        return ['sent' => false, 'note' => 'no email was sent: this is a walk-in application with no applicant account. Give the applicant the ' . $what . ' in person or by phone.'];
+    }
+    $to = trim((string)$a['account_email']);
+    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return ['sent' => false, 'note' => 'no email was sent: the applicant\'s account has no email address. They can see the ' . $what . ' when they sign in; you may also call them.'];
+    }
+    if (!mail_ready()) {
+        return ['sent' => false, 'note' => 'no email was sent because email isn\'t set up on this computer (mail.local.php). The applicant can see the ' . $what . ' when they sign in.'];
+    }
+
+    $greetName = trim(preg_replace('/\s+/u', ' ', $a['account_firstname'] . ' ' . $a['account_lastname']) ?? '') ?: decision_person_name($a);
+    $program = $a['type_name'] ?: 'Assistance';
+    $time = date('g:i A', strtotime($a['claim_time']));
+    if ($opd) {
+        // The trip is on the check-up date the patient gave in the request
+        $day = date('l, F j, Y', strtotime($a['checkup_date']));
+        $details = [
+            'Schedule'       => $day . ' (your check-up date)',
+            'Departure time' => $time,
+            'Pick-up point'  => $a['claim_place'],
+        ];
+        if (trim((string)$a['hospital']) !== '') $details['Hospital'] = $a['hospital'];
+        $subject = 'Approved: your OPD trip on ' . $day . ' (Ref #' . $id . ')';
+        $intro = "Your $program request (Ref #$id) for " . decision_person_name($a) . " has been approved. Here is your trip schedule:";
+    } else {
+        // The amount is not put in the email: the admin enters it in the Approve dialog and it is saved
+        // with the application, but the email only says where, when and what to bring
+        $details = [
+            'Where to claim' => $a['claim_place'],
+            'Date'           => date('l, F j, Y', strtotime($a['claim_date'])),
+            'Time'           => $time,
+        ];
+        $subject = 'Approved: your ' . $program . ' application (Ref #' . $id . ')';
+        $intro = "Your $program application (Ref #$id) for " . decision_person_name($a) . " has been approved.";
+    }
+    $link = app_base_url() . '/user/view_application.php?id=' . $id;
+
+    $text = "Good day, $greetName.\n\n$intro\n\n";
+    foreach ($details as $label => $value) $text .= "$label: $value\n";
+    $text .= "\nPlease bring or submit these hard copies:\n" . $a['claim_requirements'] . "\n";
+    if (trim((string)$a['claim_note']) !== '') $text .= "\nNote from the office:\n" . $a['claim_note'] . "\n";
+    $text .= "\nYou can also see these details in your account: $link\n\n"
+        . "Social Assistance Office\nLGU General Mariano Alvarez, Cavite\n";
+
+    $h = function ($v) { return nl2br(htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8')); };
+    $rows = '';
+    foreach ($details as $label => $value) {
+        $rows .= '<tr><td style="padding:6px 16px 6px 0;color:#555;vertical-align:top;white-space:nowrap">' . $h($label) . '</td>'
+            . '<td style="padding:6px 0;font-weight:bold">' . $h($value) . '</td></tr>';
+    }
+    $html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1a1a1a;max-width:560px">'
+        . '<p>Good day, ' . $h($greetName) . '.</p>'
+        . '<p>' . $h($intro) . '</p>'
+        . '<table style="border-collapse:collapse;margin:12px 0">' . $rows . '</table>'
+        . '<p style="margin-bottom:4px"><strong>Please bring or submit these hard copies:</strong></p><p style="margin-top:0">' . $h($a['claim_requirements']) . '</p>'
+        . (trim((string)$a['claim_note']) !== '' ? '<p style="margin-bottom:4px"><strong>Note from the office:</strong></p><p style="margin-top:0">' . $h($a['claim_note']) . '</p>' : '')
+        . '<p>You can also see these details in your account: <a href="' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars($link, ENT_QUOTES, 'UTF-8') . '</a></p>'
+        . '<p style="color:#555">Social Assistance Office<br>LGU General Mariano Alvarez, Cavite</p></div>';
+
+    if (!mail_send($to, $greetName, $subject, $text, $html)) {
+        return ['sent' => false, 'note' => 'the email to ' . $to . ' could not be sent (no internet, or Gmail refused it). '
+            . 'The applicant can see the ' . $what . ' when they sign in; you may also call them.'];
+    }
+    try {
+        $pdo->prepare('UPDATE applicant SET approval_email_sent_at = NOW() WHERE id = ?')->execute([$id]);
+    } catch (Throwable $e) {
+        error_log('decision_send_approval_email sent_at #' . $id . ': ' . $e->getMessage());
+    }
+    return ['sent' => true, 'note' => 'The ' . $what . ($opd ? ' was' : ' were') . ' emailed to ' . $to . '.'];
+}
+
+/* ============================================================
    PAGES THAT SEND A DECISION
    ============================================================ */
 
@@ -376,23 +646,39 @@ function decision_run_endpoint(PDO $pdo, string $decision, array $cfg = []): voi
         $opts = ['require_amount' => !empty($cfg['require_amount'])];
         if (isset($cfg['expect_type'])) $opts['expect_type'] = (int)$cfg['expect_type'];
         if ($decision === 'approve') {
+            decision_claim_ensure($pdo);   // here, before decide_application() opens its transaction
             $opts['amount'] = is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null;
+            $opts['claim'] = decision_claim_from_post();
         } else {
             $opts['remarks'] = is_string($_POST['disapproval_remarks'] ?? null) ? $_POST['disapproval_remarks'] : '';
         }
         $result = decide_application($pdo, $_POST['applicant_id'] ?? null, $decision, $opts);
     }
 
-    $_SESSION[$result['ok'] ? 'success_message' : 'error_message'] = $result['message'];
+    decision_flash($result);
     $to = $result['ok'] && isset($cfg['on_success']) ? $cfg['on_success']($result) : decision_return_url($fallback);
     header('Location: ' . $to);
     exit();
 }
 
 /**
+ * Leave the result for the next page (admin_flash_messages()). An approval whose email was not sent
+ * is a warning that stays on the page, so the admin knows to tell the applicant another way.
+ */
+function decision_flash(array $result): void
+{
+    if (!empty($result['warning'])) {
+        $_SESSION['warning_message'] = $result['warning'];
+        return;
+    }
+    $_SESSION[$result['ok'] ? 'success_message' : 'error_message'] = $result['message'];
+}
+
+/**
  * The status/remarks form on the Update pages (update.php, Mupdate.php, Bupdate.php, Opdupdate.php).
  * A Pending application can be approved or disapproved there; a decided one only gets its remarks changed.
- * Approving Medical or Burial needs the amount, as on the Pending lists (it used to be approved without one).
+ * Approving needs the approval details (Medical/Burial: amount and claim details; OPD: the trip), as on the
+ * Pending lists, and emails the applicant the same way. A warning (email not sent) is left in $_SESSION['warning_message'] here.
  *
  * @return array{ok: bool, message: string}
  */
@@ -429,13 +715,16 @@ function decision_save_update_form(PDO $pdo, array $row): array
         if ($row['status'] !== DECISION_PENDING || !in_array($choice, [DECISION_APPROVED, DECISION_DISAPPROVED], true)) {
             return ['ok' => false, 'message' => 'This application was already processed.'];
         }
+        if ($choice === DECISION_APPROVED) decision_claim_ensure($pdo);   // before decide_application()'s transaction
         $result = $choice === DECISION_APPROVED
             ? decide_application($pdo, $row['id'], 'approve', [
                 'amount'         => is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null,
                 'require_amount' => decision_needs_amount($typeId),
+                'claim'          => decision_claim_from_post(),
             ])
             : decide_application($pdo, $row['id'], 'disapprove', ['remarks' => $remarks]);
         if (!$result['ok']) return ['ok' => false, 'message' => $result['message']];
+        if (!empty($result['warning'])) $_SESSION['warning_message'] = $result['warning'];
         if ($choice === DECISION_DISAPPROVED) {
             return ['ok' => true, 'message' => $result['message']];   // the text was saved as the reason
         }

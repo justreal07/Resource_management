@@ -29,12 +29,14 @@ $stats = $pdo->query("
     WHERE assistance_type_id = 3 AND status <> 'Disapproved'
 ")->fetch(PDO::FETCH_ASSOC);
 
-// CHECK-UPS TODAY AND TOMORROW: who the van picks up, and what each patient needs on board
+// CHECK-UPS TODAY AND TOMORROW: who the van picks up, and what each patient needs on board.
+// Departure time and pick-up point are set when the request is approved (when those columns are there).
 $today = date('Y-m-d');
 $tomorrow = date('Y-m-d', strtotime('+1 day'));
+$departureCols = decision_claim_ensure($pdo) ? ', a.claim_time, a.claim_place' : '';
 $stmt = $pdo->prepare("
     SELECT a.id, a.first_name, a.middle_name, a.last_name, a.checkup_date, a.status, a.hospital,
-           a.petitioner_name, a.relationship, a.wheelchair, a.stretcher, a.barangay
+           a.petitioner_name, a.relationship, a.wheelchair, a.stretcher, a.barangay$departureCols
     FROM applicant a
     WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved' AND a.checkup_date IN (?, ?)
     ORDER BY a.checkup_date ASC, a.last_name ASC, a.first_name ASC
@@ -72,10 +74,11 @@ $upcomingPanel = '<section class="panel" aria-labelledby="upcomingTitle"><div cl
             return ($r['checkup_date'] === $today ? 'Today' : 'Tomorrow') . ', ' . ui_date($r['checkup_date']);
         }],
         ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
+        ['label' => 'Departure', 'type' => 'text', 'value' => 'ui_opd_departure'],
         ['label' => 'Hospital', 'type' => 'text', 'key' => 'hospital'],
         ['label' => 'Transport needs', 'type' => 'text', 'value' => $needs],
         ['label' => 'Accompanied by', 'type' => 'text', 'value' => function ($r) {
-            return trim(($r['petitioner_name'] ?? '') . (($r['relationship'] ?? '') !== '' ? ' (' . $r['relationship'] . ')' : ''));
+            return ui_opd_companion($r);
         }],
         ['label' => 'Barangay', 'type' => 'text', 'key' => 'barangay'],
     ], [

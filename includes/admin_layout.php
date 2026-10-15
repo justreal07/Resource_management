@@ -20,6 +20,7 @@ require_once __DIR__ . '/admin_components.php';
 // Here, at the top of the page, so it never runs in the middle of a transaction.
 if (($GLOBALS['pdo'] ?? null) instanceof PDO) {
     admin_tools_ensure($GLOBALS['pdo']);
+    decision_claim_ensure($GLOBALS['pdo']);   // claim details of approved Medical/Burial (application_decision.php)
 }
 
 /* Every page that uses this layout needs a sign-in: an admin on admin pages, staff or an admin on
@@ -142,10 +143,14 @@ function admin_flash_messages(): string
     if (!empty($_SESSION['error_message'])) {
         $alerts[] = ['error', ui_clean_message((string)$_SESSION['error_message'])];
     }
+    // Done, but something needs the admin's attention (e.g. approved, but the email was not sent)
+    if (!empty($_SESSION['warning_message'])) {
+        $alerts[] = ['warning', ui_clean_message((string)$_SESSION['warning_message'])];
+    }
     if (!empty($_SESSION['message'])) {
         $alerts[] = [($_SESSION['message_type'] ?? '') === 'error' ? 'error' : 'success', ui_clean_message((string)$_SESSION['message'])];
     }
-    unset($_SESSION['success_message'], $_SESSION['error_message'], $_SESSION['message'], $_SESSION['message_type']);
+    unset($_SESSION['success_message'], $_SESSION['error_message'], $_SESSION['warning_message'], $_SESSION['message'], $_SESSION['message_type']);
     // Mupdate.php / Bupdate.php redirect with ?message=...; only that known text is shown
     if (($_GET['message'] ?? '') === 'Application updated successfully') {
         $alerts[] = ['success', 'Application updated successfully.'];
@@ -154,8 +159,8 @@ function admin_flash_messages(): string
     $html = '';
     foreach ($alerts as [$kind, $text]) {
         // data-toast: admin_ui.js shows a success message as a toast (SweetAlert2); errors stay on the page
-        $html .= '<div class="alert alert-' . $kind . '" role="' . ($kind === 'error' ? 'alert' : 'status') . '"' . ($kind === 'success' ? ' data-toast' : '') . '>'
-            . ui_icon($kind === 'error' ? 'alert' : 'check-circle', 'alert-icon')
+        $html .= '<div class="alert alert-' . $kind . '" role="' . ($kind === 'success' ? 'status' : 'alert') . '"' . ($kind === 'success' ? ' data-toast' : '') . '>'
+            . ui_icon($kind === 'success' ? 'check-circle' : 'alert', 'alert-icon')
             . '<div class="alert-body">' . ui_e($text) . '</div></div>';
     }
     return $html;

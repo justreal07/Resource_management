@@ -64,7 +64,7 @@ HOW TO APPLY (online):
 4. Submit and wait for evaluation.
 Earlier details (name, address, contact number) are pre-filled on later applications.
 
-STATUS: Log in and check the dashboard or the notification bell. Status is Pending, Approved or Not approved. If approved, the approved amount is shown in the notification. If not approved, the applicant may apply again right away. There are no fixed waiting periods: Medical needs the office's approval to apply again for the same patient, Burial is once per deceased person, OPD has no limit.
+STATUS: Log in and check the dashboard or the notification bell. Status is Pending, Approved or Not approved. If approved, the approved amount is shown in the notification; the office also emails the account's email address the details (also shown on the application's page): for Medical and Burial, where and when to claim it; for OPD, the trip on the patient's check-up date, the departure time (usually 4:00 AM) and the pick-up point; and the hard copies to bring. If not approved, the applicant may apply again right away. There are no fixed waiting periods: Medical needs the office's approval to apply again for the same patient, Burial is once per deceased person, OPD has no limit.
 PROCESSING TIME: Depends on completeness of requirements and evaluation; complete, clear documents speed it up. No fixed number of days.
 AMOUNTS: There is no fixed published amount; it depends on evaluation.
 

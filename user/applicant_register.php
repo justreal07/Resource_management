@@ -230,8 +230,9 @@ auth_page_start('Sign up', 'register', function () { ?>
         <div class="field">
             <label for="contact_number">Contact number</label>
             <div class="input-wrap">
-                <input type="tel" id="contact_number" name="contact_number" required maxlength="20" inputmode="numeric" autocomplete="tel"
-                       value="<?php echo $value('contact_number'); ?>" placeholder="09XX XXX XXXX">
+                <input type="tel" id="contact_number" name="contact_number" required inputmode="numeric" autocomplete="tel"
+                       minlength="11" pattern="[0-9]{11}" title="Enter exactly 11 digits, e.g. 09171234567" data-phone
+                       value="<?php echo $value('contact_number'); ?>" placeholder="09XXXXXXXXX">
                 <i class="fas fa-phone"></i>
             </div>
             <span class="field-hint">11-digit mobile number, e.g. 09171234567.</span>

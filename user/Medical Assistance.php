@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
         $errors['applying_for'] = 'Please choose who the assistance is for.';
     }
     if ($purpose_error) $errors['purpose'] = $purpose_error;
-    $prefill = ['source' => 'post'];
+    $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
 
     if (!$errors) {
         // Is the patient recorded as deceased, or do they already have a Medical application? (person_rules.php)
@@ -86,9 +86,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
         $values['applying_for'] = strcasecmp(trim($values['relationship']), 'Self') === 0 ? 'self' : 'other';
     }
 }
-// For myself there is no claimant section: don't show the patient's own details as claimant answers
+// For myself there is no claimant section: don't show the patient's own details as claimant answers.
+// The patient is the applicant, so their own birthdate (from My Account or an earlier form) fills an empty birthdate.
 if (($values['applying_for'] ?? '') === 'self') {
     foreach (CLAIMANT_FIELDS as $f) $values[$f] = '';
+    if ($prefill['source'] !== 'post' && ($values['beneficiary_birthdate'] ?? '') === '' && !empty($prefill['own']['birthdate'])) {
+        $values['beneficiary_birthdate'] = $prefill['own']['birthdate'];
+    }
 }
 $is_other = ($values['applying_for'] ?? '') === 'other';
 
@@ -114,7 +118,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
         <?php endif; ?>
 
         <form method="post" class="ap-card ap-form-card" id="applicationForm"
-              data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>">
+              data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
             <div class="ap-form-top">
                 <span class="ap-eligible-chip"><i class="fas fa-check-circle"></i> You're eligible to apply</span>
                 <p>Fields marked <span class="req">*</span> are required.</p>
@@ -207,7 +211,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
             <!-- Only shown (and sent) when the assistance is for another person -->
             <fieldset class="ap-section" id="claimantSection"<?= $is_other ? '' : ' hidden disabled' ?>>
                 <legend><span class="ap-section-num">3</span> Claimant Information</legend>
-                <p class="ap-section-hint">The person who will receive the assistance.</p>
+                <p class="ap-section-hint">You, the person filling in this form: you file for the patient and receive the assistance for them.</p>
                 <div class="ap-grid">
                     <div class="field span-4">
                         <label for="petitioner_name">Claimant's full name <span class="req">*</span></label>
@@ -217,6 +221,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     <div class="field span-2">
                         <label for="claimant_age">Claimant's age <span class="req">*</span></label>
                         <input type="number" id="claimant_age" name="claimant_age" value="<?= val('claimant_age') ?>" required min="0" max="120" inputmode="numeric" placeholder="Age"<?= invalid('claimant_age') ?>>
+                        <?= own_age_hint($prefill, 'claimant_age') ?>
                         <?= error_for('claimant_age') ?>
                     </div>
                     <div class="field span-6">

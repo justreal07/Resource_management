@@ -205,6 +205,17 @@ try {
     error_log('submit_assistance ensure_user_schema: ' . $e->getMessage());
 }
 privacy_record_consent($pdo, $account_id);
+// Medical "For myself": the patient's birthdate is the applicant's own. Keep it on the account (when none is saved
+// yet), so their age fills itself in on the other forms (get_form_prefill()). A birthdate in My Account is never replaced.
+if ($form_type === 'medical' && strcasecmp(trim((string)($form_data['relationship'] ?? '')), 'Self') === 0
+    && is_ymd((string)($form_data['beneficiary_birthdate'] ?? ''))) {
+    try {
+        $pdo->prepare('UPDATE applicant_accounts SET birthdate = ? WHERE id = ? AND birthdate IS NULL')
+            ->execute([$form_data['beneficiary_birthdate'], $account_id]);
+    } catch (PDOException $e) {
+        error_log('submit_assistance save birthdate: ' . $e->getMessage());
+    }
+}
 unset($_SESSION[$form_data_key]);
 header('Location: submission_confirmation.php?id=' . $result['id']);
 exit;

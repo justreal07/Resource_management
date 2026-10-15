@@ -56,8 +56,9 @@ $columns = [
 if ($typeId === 1) {
     array_push($columns,
         ['Patient birthdate',    function ($a) { return ui_date($a['beneficiary_birthdate'] ?? '', 'Y-m-d'); }],
-        ["Claimant's full name", function ($a) { return $a['petitioner_name'] ?? ''; }],
-        ["Claimant's age",       function ($a) { return $a['claimant_age'] ?? ''; }],
+        // "For myself" (relationship Self): the patient is the claimant, so these stay empty instead of repeating them
+        ["Claimant's full name", function ($a) { return ui_is_self_claimant($a) ? '' : ($a['petitioner_name'] ?? ''); }],
+        ["Claimant's age",       function ($a) { return ui_is_self_claimant($a) ? '' : ($a['claimant_age'] ?? ''); }],
         ['Relationship to the patient', function ($a) { return $a['relationship'] ?? ''; }],
         ['Purpose of assistance', function ($a) { return $a['purpose'] ?? ''; }],
         ['Hospital',             function ($a) { return $a['hospital'] ?? ''; }],

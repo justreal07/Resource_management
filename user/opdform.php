@@ -34,8 +34,8 @@ $fields = [
     'hospital'        => true,
     'diagnosis'       => true,
     'checkup_date'    => true,
-    'petitioner_name' => true,
-    'relationship'    => true,
+    'petitioner_name' => false,   // the companion: optional, the patient may go alone (opd_companion_errors())
+    'relationship'    => false,
 ];
 
 $errors = [];
@@ -47,8 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $values['wheelchair'] = isset($_POST['wheelchair']) ? 'Yes' : 'No';
     $values['stretcher']  = isset($_POST['stretcher']) ? 'Yes' : 'No';
     $errors = validate_application($values, array_keys(array_filter($fields)));
+    $errors += opd_companion_errors($values);
     if ($reason_error) $errors['diagnosis'] = $reason_error;
-    $prefill = ['source' => 'post'];
+    $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
 
     if (!$errors) {
         // Keep the answers in the session - saved to the database only after the photos are uploaded
@@ -80,7 +81,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
         <?php endif; ?>
 
         <form method="post" class="ap-card ap-form-card" id="applicationForm"
-              data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>">
+              data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
             <div class="ap-form-top">
                 <span class="ap-eligible-chip"><i class="fas fa-check-circle"></i> You're eligible to apply</span>
                 <p>Fields marked <span class="req">*</span> are required.</p>
@@ -108,6 +109,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     <div class="field span-2">
                         <label for="age">Age <span class="req">*</span></label>
                         <input type="number" id="age" name="age" value="<?= val('age') ?>" required min="0" max="120" inputmode="numeric" placeholder="Age"<?= invalid('age') ?>>
+                        <?= own_age_hint($prefill, 'age') ?>
                         <?= error_for('age') ?>
                     </div>
                     <div class="field span-2">
@@ -183,19 +185,19 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                 </div>
             </fieldset>
 
-            <!-- 4. Companion -->
-            <fieldset class="ap-section">
-                <legend><span class="ap-section-num">4</span> Companion</legend>
-                <p class="ap-section-hint">The person who will accompany the patient on the check-up day.</p>
+            <!-- 4. Companion (optional: both empty = the patient goes alone; js/apply-form.js asks for both once one is filled in) -->
+            <fieldset class="ap-section" data-all-or-none>
+                <legend><span class="ap-section-num">4</span> Companion <span class="optional">(optional)</span></legend>
+                <p class="ap-section-hint">Is someone going with the patient on the check-up day? Fill in their name and relationship. If the patient is going alone, leave this empty.</p>
                 <div class="ap-grid">
                     <div class="field span-4">
-                        <label for="petitioner_name">Accompanied by <span class="req">*</span></label>
-                        <input type="text" id="petitioner_name" name="petitioner_name" value="<?= val('petitioner_name') ?>" required placeholder="Full name of companion"<?= invalid('petitioner_name') ?>>
+                        <label for="petitioner_name">Accompanied by</label>
+                        <input type="text" id="petitioner_name" name="petitioner_name" value="<?= val('petitioner_name') ?>" placeholder="Full name of companion"<?= invalid('petitioner_name') ?>>
                         <?= error_for('petitioner_name') ?>
                     </div>
                     <div class="field span-2">
-                        <label for="relationship">Relationship to patient <span class="req">*</span></label>
-                        <input type="text" id="relationship" name="relationship" value="<?= val('relationship') ?>" required list="relationship_list" placeholder="e.g. Daughter"<?= invalid('relationship') ?>>
+                        <label for="relationship">Relationship to patient</label>
+                        <input type="text" id="relationship" name="relationship" value="<?= val('relationship') ?>" list="relationship_list" placeholder="e.g. Daughter"<?= invalid('relationship') ?>>
                         <datalist id="relationship_list">
                             <?php foreach (RELATIONSHIP_SUGGESTIONS['opd'] as $r): ?><option value="<?= e($r) ?>"><?php endforeach; ?>
                         </datalist>

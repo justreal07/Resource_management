@@ -1,4 +1,10 @@
 <?php
+// Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
+// It used to stop with a PHP error that showed the server's folder names.
+if (!isset($pdo) || realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    header('Location: reports.php?report=medical');
+    exit;
+}
 // Medical Assistance Detailed Report
 // Included by reports.php ($pdo, $year already checked there)
 // Form fields: patient name and address; claimant name, age and relationship; sex, contact number, purpose
@@ -29,7 +35,7 @@ $stmt = $pdo->prepare("
         a.barangay,
         a.municipality,
         a.province,
-        CONCAT(COALESCE(a.house_no, ''), ' ', COALESCE(a.street, ''), ', ', a.barangay, ', ', a.municipality, ', ', a.province) as address
+        CONCAT_WS(', ', NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(a.house_no), ''), NULLIF(TRIM(a.street), ''))), ''), NULLIF(TRIM(a.barangay), ''), NULLIF(TRIM(a.municipality), ''), NULLIF(TRIM(a.province), '')) as address
     FROM applicant a
     WHERE a.assistance_type_id = 1 AND YEAR(a.created_at) = ? AND a.status <> 'Disapproved'
     ORDER BY a.created_at DESC
@@ -106,11 +112,13 @@ echo ui_stat_cards([
 <?php
 $rows = [];
 foreach ($approved_list as $app) {
+    // The one who fills in the form is the claimant: "For myself" (relationship Self) has no separate claimant
+    $self = ui_is_self_claimant(['assistance_type_id' => 1] + $app);
     $rows[] = [
         date('M j, Y', strtotime($app['created_at'])),
         ui_person_name($app),
-        $app['claimant_name'] ?: 'Not given',
-        $app['claimant_age'] ?? 'Not given',
+        $self ? 'The patient (for themself)' : ($app['claimant_name'] ?: 'Not given'),
+        $self ? '—' : ($app['claimant_age'] ?? 'Not given'),
         $app['sex'] ?? 'Not given',
         $app['relationship'] ?: 'Not given',
         $app['contact_number'] ?: 'Not given',

@@ -1079,13 +1079,13 @@ $wiList = function (string $id, array $options): string {
         </div>
     </fieldset>
     <fieldset class="form-section">
-        <legend>Companion</legend>
-        <p class="field-help">The person who will go with the patient on the check-up day.</p>
+        <legend>Companion <span class="muted">(optional)</span></legend>
+        <p class="field-help">The person who will go with the patient on the check-up day. Leave both empty if the patient goes alone.</p>
         <div class="form-grid">
-            <div class="field"><label for="petitioner_name">Accompanied by <?= $req ?></label>
-                <input type="text" id="petitioner_name" name="petitioner_name" maxlength="150" required placeholder="Full name of the companion"></div>
-            <div class="field"><label for="relationship">Relationship to the patient <?= $req ?></label>
-                <input type="text" id="relationship" name="relationship" maxlength="100" required list="relationshipList" placeholder="e.g. Daughter">
+            <div class="field"><label for="petitioner_name">Accompanied by</label>
+                <input type="text" id="petitioner_name" name="petitioner_name" maxlength="150" placeholder="Full name of the companion"></div>
+            <div class="field"><label for="relationship">Relationship to the patient</label>
+                <input type="text" id="relationship" name="relationship" maxlength="100" list="relationshipList" placeholder="e.g. Daughter">
                 <?= $wiList('relationshipList', RELATIONSHIP_SUGGESTIONS['opd']) ?></div>
         </div>
     </fieldset>

@@ -6,8 +6,9 @@ require_once '../includes/admin_layout.php';
 // Fetch only approved burial assistance applicants
 // (name parts read separately: CONCAT() with an empty (NULL) middle name gave no name at all)
 $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name,
-    CONCAT(COALESCE(a.house_no, ''), ' ', COALESCE(a.street, ''), ', ', a.barangay, ', ', a.municipality, ', ', a.province) AS address,
+    CONCAT_WS(', ', NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(a.house_no), ''), NULLIF(TRIM(a.street), ''))), ''), NULLIF(TRIM(a.barangay), ''), NULLIF(TRIM(a.municipality), ''), NULLIF(TRIM(a.province), '')) AS address,
     a.contact_number,
+    a.petitioner_name,
     a.created_at,
     a.approved_at,
     a.amount
@@ -24,6 +25,7 @@ echo ui_type_tabs(2, 'approved');
 <section class="panel" aria-label="Approved Burial applications">
     <?= ui_table($applicants, [
         ['label' => 'Claimant', 'type' => 'person'],
+        ['label' => 'Deceased', 'type' => 'text', 'key' => 'petitioner_name'],   // who the application is for (petitioner_name = the deceased)
         ['label' => 'Amount given', 'type' => 'amount', 'key' => 'amount'],
         ['label' => 'Date approved', 'type' => 'datetime', 'value' => function ($r) { return $r['approved_at'] ?? $r['created_at']; }],
         ['label' => 'Address', 'type' => 'text', 'key' => 'address'],

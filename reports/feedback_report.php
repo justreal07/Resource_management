@@ -1,4 +1,10 @@
 <?php
+// Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
+// It used to stop with a PHP error that showed the server's folder names.
+if (!isset($pdo) || realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    header('Location: reports.php?report=feedback');
+    exit;
+}
 // Client feedback report: the satisfaction survey applicants answer after their application is decided
 // (includes/feedback.php). Counts the answers sent in $year.
 // Included by reports.php ($pdo and $year already checked there; the admin layout requires an admin).

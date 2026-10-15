@@ -1,4 +1,10 @@
 <?php
+// Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
+// It used to stop with a PHP error that showed the server's folder names.
+if (!isset($pdo) || realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    header('Location: reports.php?report=overview');
+    exit;
+}
 // Overview Report - Summary of all assistance types
 // Included by reports.php ($pdo, $year already checked there)
 

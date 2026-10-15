@@ -4,7 +4,7 @@
    - Sidebar drawer on small screens
    - confirmAction(): the confirm dialog for irreversible actions
    - Quick search on lists
-   - Approve (with amount) and Disapprove on the pending lists
+   - Approve (the Approve dialog: amount and claim details, or the OPD trip) and Disapprove on the pending lists
    - Status update and edit forms
    - "5 minutes ago" times, notice when the sign-in may have ended
    - Report print and Excel export
@@ -333,46 +333,129 @@
         if (input.value) apply();
     });
 
-    /* ---------- Approve (pending lists) ----------
-       Same endpoint and fields as before; the amount box sits in the Amount column (form="approve-ID"). */
-    document.querySelectorAll('[data-approve-form]').forEach((form) => {
-        form.addEventListener('submit', (e) => {
-            if (form.dataset.confirmed === '1') return;
-            e.preventDefault();
-            let amountText = '';
-            if (form.hasAttribute('data-needs-amount')) {
-                const amount = form.elements.amount;
-                const value = amount ? parseFloat(amount.value) : NaN;
-                if (!amount || !amount.value || isNaN(value) || value <= 0) {
-                    if (amount) {
-                        showFieldError(amount, 'Enter the amount to release (more than ₱0).');
-                        amount.focus();
-                    }
-                    return;
-                }
-                clearFieldError(amount);
-                amountText = peso(value);
+    /* ---------- Approval details (the Approve dialog and the Update page) ----------
+       ui_claim_fields() in admin_components.php. Medical / Burial: amount, where, date and time to claim.
+       OPD: departure time (4:00 AM unless changed) and pick-up point; the day is the patient's check-up date.
+       All: the hard copies to bring and a note. The server checks the same rules again
+       (decision_claim_parse() in application_decision.php). */
+
+    // The last place (and claim time) used for each program, offered for the next approval (this browser only)
+    const claimKey = (scope, what) => 'lgu.claim' + what + '.' + (scope.dataset.claimType || '');
+    function fillRememberedClaim(scope) {
+        const place = scope.querySelector('[data-claim="place"]');
+        const time = scope.querySelector('[data-claim="time"]');
+        if (place && !place.value) place.value = store.get(claimKey(scope, 'Place')) || '';
+        if (time && !time.value) time.value = store.get(claimKey(scope, 'Time')) || '';   // OPD's time starts at 4:00 AM, so it stays
+    }
+    function rememberClaim(scope) {
+        const place = scope.querySelector('[data-claim="place"]');
+        const time = scope.querySelector('[data-claim="time"]');
+        if (place && place.value.trim()) store.set(claimKey(scope, 'Place'), place.value.trim());
+        if (time && time.value && !time.defaultValue) store.set(claimKey(scope, 'Time'), time.value);
+    }
+
+    // Shows a message under each field that isn't right; returns the first such field (or null).
+    // The "empty" message of each field is its data-claim-msg.
+    function checkClaimFields(scope) {
+        const required = (v, el) => (v ? '' : el.dataset.claimMsg || 'Fill this in.');
+        const checks = [
+            ['amount', (v) => {
+                if (!/^\d+(\.\d{1,2})?$/.test(v) || Number(v) <= 0) return 'Enter the amount to release (more than ₱0, up to 2 decimal places).';
+                if (Number(v) > 99999999.99) return 'The amount is too large.';
+                return '';
+            }],
+            ['place', required],
+            ['date', (v, el) => required(v, el) || (el.min && v < el.min ? 'The claim date has already passed. Choose today or a later date.' : '')],
+            ['time', required],
+            ['requirements', required]
+        ];
+        let first = null;
+        checks.forEach(([name, check]) => {
+            const el = scope.querySelector('[data-claim="' + name + '"]');
+            if (!el) return;
+            const message = check(el.value.trim(), el);
+            if (message) {
+                showFieldError(el, message);
+                if (!first) first = el;
+            } else {
+                clearFieldError(el);
             }
-            confirmAction({
-                title: 'Approve this application?',
-                message: amountText ? 'The application moves to the approved list with this amount.' : 'The application moves to the approved list.',
-                name: form.dataset.name,
-                ref: form.dataset.ref,
-                extraLabel: amountText ? 'Amount' : '',
-                extra: amountText,
-                okLabel: 'Approve',
-                danger: false
-            }).then((ok) => {
-                if (!ok) return;
-                form.dataset.confirmed = '1';
-                setButtonBusy(form.querySelector('[type="submit"]'), true, 'Approving…');
-                form.submit();
+        });
+        return first;
+    }
+    document.querySelectorAll('[data-claim]').forEach((el) => {
+        el.addEventListener('input', () => { if (el.getAttribute('aria-invalid') === 'true') clearFieldError(el); });
+    });
+
+    /* ---------- Approve (pending lists): the Approve dialog ----------
+       ui_approve_dialog(): the approval details, then "Approve & send email". The Approve button of the
+       row (ui_approve_button) says which application, which page to post to and, for OPD, the trip day. */
+    const approveDialog = $('approveDialog');
+    if (approveDialog) {
+        const approveForm = approveDialog.querySelector('[data-approve-dialog-form]');
+        const approveSubmit = approveForm.querySelector('[type="submit"]');
+        const submitLabel = approveSubmit.innerHTML;
+        const opd = approveForm.dataset.claimType === '3';
+        let approveOpener = null;
+
+        document.querySelectorAll('[data-approve-open]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                if (approveForm.dataset.sending === '1') return;
+                approveOpener = btn;
+                approveForm.reset();
+                approveForm.querySelectorAll('[data-claim]').forEach(clearFieldError);
+                approveForm.action = btn.dataset.action;
+                approveForm.querySelector('[data-approve-id]').value = btn.dataset.approveOpen;
+                approveDialog.querySelectorAll('[data-approve-name]').forEach((el) => { el.textContent = btn.dataset.name; });
+                approveDialog.querySelector('[data-approve-ref]').textContent = btn.dataset.ref;
+
+                // Where the email goes; without an address, the button only approves
+                const email = btn.dataset.email || '';
+                approveDialog.querySelector('[data-approve-email]').textContent = btn.hasAttribute('data-walkin')
+                    ? 'No email: walk-in application. Tell the applicant the ' + (opd ? 'trip schedule' : 'claim details') + ' in person.'
+                    : (email || 'No email on the applicant\'s account. They will see the details when they sign in.');
+                approveSubmit.innerHTML = submitLabel;
+                approveSubmit.disabled = false;
+                if (!email || btn.hasAttribute('data-walkin')) approveSubmit.lastChild.textContent = 'Approve';
+
+                // OPD: the trip is on the patient's check-up date; without a usable date it can't be approved here
+                let problem = '';
+                const schedule = approveForm.querySelector('[data-claim-schedule]');
+                if (schedule) {
+                    const problemEl = approveForm.querySelector('[data-claim-schedule-problem]');
+                    problem = btn.dataset.scheduleProblem || '';
+                    schedule.textContent = btn.dataset.schedule || 'No check-up date';
+                    problemEl.textContent = problem;
+                    problemEl.hidden = !problem;
+                    approveSubmit.disabled = !!problem;
+                }
+
+                fillRememberedClaim(approveForm);
+                openDialog(approveDialog);
+                // Start at the first needed box still empty (OPD's time is already 4:00 AM; the note is optional)
+                const fields = Array.prototype.slice.call(approveForm.querySelectorAll('[data-claim]:not([data-claim="note"])'));
+                const start = problem ? approveForm.querySelector('[data-dialog-close].btn') : (fields.find((el) => !el.value) || fields[0]);
+                if (start) start.focus();
             });
         });
-    });
-    document.querySelectorAll('.amount-input').forEach((input) => {
-        input.addEventListener('input', () => { if (input.getAttribute('aria-invalid') === 'true') clearFieldError(input); });
-    });
+        approveDialog.addEventListener('close', () => {
+            document.body.classList.toggle('has-modal', !!document.querySelector('dialog[open]'));
+            if (approveOpener && approveForm.dataset.sending !== '1') approveOpener.focus();
+        });
+        approveForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (approveForm.dataset.sending === '1' || approveSubmit.disabled) return;   // a double-click sends it once
+            const wrong = checkClaimFields(approveForm);
+            if (wrong) {
+                wrong.focus();
+                return;
+            }
+            rememberClaim(approveForm);
+            approveForm.dataset.sending = '1';
+            setButtonBusy(approveSubmit, true, 'Approving…');
+            approveForm.submit();
+        });
+    }
 
     /* ---------- Disapprove (pending lists) ----------
        CHANGED: replaces Reject. Posts to Main_dashboard/disapprove_applicant.php through the
@@ -449,11 +532,19 @@
         const help = form.querySelector('[data-remarks-help]');
         const labelText = label ? label.innerHTML : '';
         const helpText = help ? help.textContent : '';
+        // The approval details are shown (and sent) only when Approve is chosen
+        const claimSection = form.querySelector('[data-claim-section]');
         const syncRemarks = () => {
             const chosen = form.querySelector('input[name="status"]:checked');
             const disapprove = !!chosen && chosen.value === 'Disapproved';
             if (label) label.innerHTML = disapprove ? 'Reason <span class="muted">(optional, the applicant sees it)</span>' : labelText;
             if (help) help.textContent = disapprove ? 'The applicant sees this reason, so they know what to fix before applying again.' : helpText;
+            if (claimSection) {
+                const approve = !!chosen && chosen.value === 'Approved';
+                claimSection.hidden = !approve;
+                claimSection.disabled = !approve;
+                if (approve) fillRememberedClaim(claimSection);
+            }
         };
         form.querySelectorAll('input[name="status"]').forEach((r) => r.addEventListener('change', syncRemarks));
         syncRemarks();
@@ -472,26 +563,41 @@
             }
             e.preventDefault();
             const disapprove = chosen.value === 'Disapproved';
-            // Medical and Burial: approving needs the amount (the box is only on those Update pages)
-            const amount = form.elements.amount;
-            let amountText = '';
-            if (!disapprove && amount) {
-                const value = parseFloat(amount.value);
-                if (!amount.value || isNaN(value) || value <= 0) {
-                    showFieldError(amount, 'Enter the amount to release (more than ₱0) before approving.');
-                    amount.focus();
+            // Approving needs the approval details (Medical/Burial: amount and claim details; OPD: the trip)
+            let extraLabel = '';
+            let extra = '';
+            if (!disapprove && claimSection) {
+                // OPD without a usable check-up date: the message is already under "Schedule date"
+                const problem = claimSection.querySelector('[data-claim-schedule-problem]');
+                if (problem && !problem.hidden) {
+                    problem.focus();
                     return;
                 }
-                clearFieldError(amount);
-                amountText = peso(value);
+                const wrong = checkClaimFields(claimSection);
+                if (wrong) {
+                    wrong.focus();
+                    return;
+                }
+                const amount = claimSection.querySelector('[data-claim="amount"]');
+                const time = claimSection.querySelector('[data-claim="time"]');
+                if (amount) {
+                    extraLabel = 'Amount';
+                    extra = peso(amount.value);
+                } else if (time) {
+                    const hm = time.value.split(':').map(Number);
+                    extraLabel = 'Departure';
+                    extra = (hm[0] % 12 || 12) + ':' + String(hm[1]).padStart(2, '0') + (hm[0] < 12 ? ' AM' : ' PM');
+                }
+                rememberClaim(claimSection);
             }
             confirmAction({
                 title: disapprove ? 'Disapprove this application for ' + (form.dataset.name || 'this applicant') + '?' : 'Approve this application?',
-                message: disapprove ? 'The applicant may apply again.' : 'The application moves to the approved list' + (amountText ? ' with this amount.' : '.'),
+                message: disapprove ? 'The applicant may apply again.' : 'The application moves to the approved list'
+                    + (claimSection ? ', and the applicant is emailed the ' + (extraLabel === 'Departure' ? 'trip schedule.' : 'claim details.') : '.'),
                 name: form.dataset.name,
                 ref: form.dataset.ref,
-                extraLabel: amountText ? 'Amount' : '',
-                extra: amountText,
+                extraLabel: extraLabel,
+                extra: extra,
                 okLabel: disapprove ? 'Disapprove' : 'Approve',
                 danger: disapprove
             }).then((ok) => {
@@ -606,6 +712,18 @@
         const sync = () => { field.hidden = field.dataset.showFor !== select.value; };
         select.addEventListener('change', sync);
         sync();
+    });
+
+    /* ---------- Contact number boxes (<input data-phone>): digits only, at most 11 ----------
+       Same rule as the online forms. Only while typing: a stored number the admin doesn't touch
+       is left as it is (older records may have another format). +63 / 63 numbers become 09... */
+    document.querySelectorAll('input[data-phone]').forEach((phone) => {
+        phone.addEventListener('input', () => {
+            let digits = phone.value.replace(/\D/g, '');
+            if (/^639\d{9}$/.test(digits)) digits = '0' + digits.slice(2);
+            digits = digits.slice(0, 11);
+            if (digits !== phone.value) phone.value = digits;   // only when it changed, so the cursor doesn't jump
+        });
     });
 
     /* ---------- Reports: print and Excel export (same export as before) ---------- */

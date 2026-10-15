@@ -11,7 +11,8 @@ require_once __DIR__ . '/assistance_config.php';
  */
 function ensure_user_schema(PDO $pdo): void {
     // v2: privacy_accepted_at / privacy_version (when the applicant last agreed to the Data Privacy Notice, includes/privacy.php)
-    if (!empty($_SESSION['user_schema_v2'])) return;
+    // v3: birthdate (the applicant's own: their age on the forms is worked out from it, see account_own_birthdate())
+    if (!empty($_SESSION['user_schema_v3'])) return;
     $pdo->exec("ALTER TABLE applicant_accounts
         ADD COLUMN IF NOT EXISTS email VARCHAR(150) NULL,
         ADD COLUMN IF NOT EXISTS phone VARCHAR(20) NULL,
@@ -24,8 +25,9 @@ function ensure_user_schema(PDO $pdo): void {
         ADD COLUMN IF NOT EXISTS autofill_enabled TINYINT(1) NOT NULL DEFAULT 1,
         ADD COLUMN IF NOT EXISTS notifications_seen_at DATETIME NULL,
         ADD COLUMN IF NOT EXISTS privacy_accepted_at DATETIME NULL,
-        ADD COLUMN IF NOT EXISTS privacy_version VARCHAR(20) NULL");
-    $_SESSION['user_schema_v2'] = true;
+        ADD COLUMN IF NOT EXISTS privacy_version VARCHAR(20) NULL,
+        ADD COLUMN IF NOT EXISTS birthdate DATE NULL");
+    $_SESSION['user_schema_v3'] = true;
 }
 
 function get_current_user_row(PDO $pdo): ?array {
@@ -155,8 +157,16 @@ function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): ar
         if ($a['status'] === 'Approved') {
             $msg = "Good news! Your $name application #$id has been approved.";
             if ((float)$a['amount'] > 0) $msg .= ' Approved amount: ₱' . number_format((float)$a['amount'], 2) . '.';
+            if (!empty($a['claim_place']) && !empty($a['claim_date'])) {
+                $msg .= ' Claim it on ' . date('M d, Y', strtotime($a['claim_date']))
+                    . (!empty($a['claim_time']) ? ', ' . date('g:i A', strtotime($a['claim_time'])) : '') . ' at ' . $a['claim_place'] . '.';
+            }
             if ((int)$a['assistance_type_id'] === 3 && $a['checkup_date']) {
                 $msg .= ' Check-up: ' . date('M d, Y', strtotime($a['checkup_date'])) . ($a['hospital'] ? ' at ' . $a['hospital'] : '') . '.';
+                // The vehicle leaves on the check-up date, at the time and place set when approving
+                if (!empty($a['claim_time'])) {
+                    $msg .= ' Departure: ' . date('g:i A', strtotime($a['claim_time'])) . (!empty($a['claim_place']) ? ' from ' . $a['claim_place'] : '') . '.';
+                }
             }
             $events[] = [
                 'kind' => 'approved', 'app_id' => $id, 'time' => $a['approved_at'] ?: $a['created_at'],

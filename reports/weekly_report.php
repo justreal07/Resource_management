@@ -1,4 +1,10 @@
 <?php
+// Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
+// It used to stop with a PHP error that showed the server's folder names.
+if (!isset($pdo) || realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    header('Location: reports.php?range=week');
+    exit;
+}
 // Weekly Report - Summary of assistance by week
 // Included by reports.php ($pdo, $year and $week already checked there: $week is a week of $year,
 // this week by default; the Week picker is in its filter bar)

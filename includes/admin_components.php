@@ -430,21 +430,129 @@ function ui_staff_update_link(array $row): string
         . ui_icon('edit') . 'Update<span class="visually-hidden"> ' . ui_e(ui_person_name($row)) . ', Ref #' . (int)$row['id'] . '</span></a>';
 }
 
+/** The patient's check-up date as the OPD trip day ("Monday, October 20, 2026"), or '' when the request has none. */
+function ui_opd_schedule_day(array $row): string
+{
+    return ui_date($row['checkup_date'] ?? '', 'l, F j, Y');
+}
+
 /**
- * Approve button for a pending row. With $amountFormId set, the amount box in the Amount column
- * belongs to this form (form="..."), so the existing endpoint receives the same fields as before.
+ * Approve button for a pending row: opens the Approve dialog (ui_approve_dialog) for this person.
+ * The row's account_email (if the list selected it) tells the dialog where the email will go;
+ * OPD: its checkup_date is the trip day, shown in the dialog (or why the trip can't be scheduled).
  */
-function ui_approve_form(array $row, string $action, array $hidden, bool $needsAmount): string
+function ui_approve_button(array $row, string $action, int $typeId): string
 {
     $id = (int)$row['id'];
-    // novalidate: admin_ui.js shows its own message under the amount instead of the browser's tooltip
-    $html = '<form id="approve-' . $id . '" class="inline-form" method="POST" action="' . ui_e($action) . '" novalidate data-approve-form'
-        . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . $id . '"' . ($needsAmount ? ' data-needs-amount' : '') . '>'
-        . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e(ui_current_page()) . '">';
-    foreach ($hidden as $name => $value) {
-        $html .= '<input type="hidden" name="' . ui_e($name) . '" value="' . ui_e($value) . '">';
+    $walkIn = array_key_exists('account_id', $row) && $row['account_id'] === null;
+    $schedule = '';
+    if ($typeId === 3) {
+        $problem = decision_opd_schedule_problem($row['checkup_date'] ?? '');
+        $schedule = ' data-schedule="' . ui_e(ui_opd_schedule_day($row)) . '"'
+            . ($problem !== null ? ' data-schedule-problem="' . ui_e($problem) . '"' : '');
     }
-    return $html . '<button type="submit" class="btn btn-primary btn-sm">' . ui_icon('check-circle') . 'Approve</button></form>';
+    return '<button type="button" class="btn btn-primary btn-sm" data-approve-open="' . $id . '" data-action="' . ui_e($action) . '"'
+        . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . $id . '"'
+        . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '"' . ($walkIn ? ' data-walkin' : '') . $schedule . '>'
+        . ui_icon('check-circle') . 'Approve</button>';
+}
+
+/**
+ * The approval details: the Approve dialog and the Update page. Saved and checked again by
+ * decide_application(); the same text goes into the approval email.
+ *   Medical / Burial: the amount (required and saved, but never put in the email), where, date and time to claim.
+ *   OPD: the trip day is the patient's check-up date (shown, not typed: it is the day on the staff schedule),
+ *        the departure time (4:00 AM unless changed) and the pick-up point.
+ *   All: the hard copies to bring (filled in from the program's required documents) and an optional note.
+ * $idPrefix keeps the ids unique on the page. $required = false on the Update page, where they are needed
+ * only when Approve is chosen. $row (Update page): the application, for the OPD trip day.
+ */
+function ui_claim_fields(int $typeId, string $idPrefix, bool $required = true, array $row = []): string
+{
+    $f = function (string $name) use ($idPrefix) { return $idPrefix . ucfirst($name); };
+    $req = '<span class="req" aria-hidden="true">*</span>';
+    $r = $required ? ' required' : '';
+    $place = function (string $label, string $placeholder, string $message) use ($f, $req, $r) {
+        return '<div class="field"><label for="' . $f('place') . '">' . $label . ' ' . $req . '</label>'
+            . '<input type="text" id="' . $f('place') . '" name="claim_place" maxlength="' . CLAIM_PLACE_MAX . '"' . $r . ' autocomplete="off"'
+            . ' placeholder="' . ui_e($placeholder) . '" data-claim="place" data-claim-msg="' . ui_e($message) . '"></div>';
+    };
+
+    if ($typeId === 3) {
+        $problem = $row ? decision_opd_schedule_problem($row['checkup_date'] ?? '') : null;
+        $html = '<div class="form-grid">'
+            . '<div class="field"><span class="label" id="' . $f('scheduleLabel') . '">Schedule date</span>'
+            . '<strong aria-labelledby="' . $f('scheduleLabel') . '" data-claim-schedule>' . ui_e($row ? ui_opd_schedule_day($row) : '') . '</strong>'
+            . '<p class="field-help">The patient\'s check-up date, from the request.</p>'
+            . '<p class="field-error" tabindex="-1" data-claim-schedule-problem' . ($problem === null ? ' hidden' : '') . '>' . ui_e((string)$problem) . '</p></div>'
+            . '<div class="field"><label for="' . $f('time') . '">Departure time ' . $req . '</label>'
+            . '<input type="time" id="' . $f('time') . '" name="claim_time" value="' . OPD_DEPARTURE_DEFAULT . '"' . $r . ' aria-describedby="' . $f('timeHelp') . '"'
+            . ' data-claim="time" data-claim-msg="Choose the departure time.">'
+            . '<p class="field-help" id="' . $f('timeHelp') . '">4:00 AM unless the vehicle leaves at another time.</p></div>'
+            . $place('Pick-up point', 'Where the patient boards the vehicle', 'Enter the pick-up point, where the patient boards the vehicle.')
+            . '</div>';
+    } else {
+        $html = '<div class="form-grid">'
+            . '<div class="field"><label for="' . $f('amount') . '">Approved amount ' . $req . '</label>'
+            . '<div class="amount-box"><span aria-hidden="true">₱</span><input type="number" id="' . $f('amount') . '" name="amount" class="amount-input"'
+            . ' min="0.01" max="99999999.99" step="0.01" inputmode="decimal" placeholder="0.00"' . $r . ' aria-describedby="' . $f('amountHelp') . '" data-claim="amount"></div>'
+            . '<p class="field-help" id="' . $f('amountHelp') . '">Saved with the application. It is not put in the email.</p></div>'
+            . $place('Where to claim', 'Office and building', 'Enter where the applicant will claim the assistance.')
+            . '<div class="field"><label for="' . $f('date') . '">Date ' . $req . '</label>'
+            . '<input type="date" id="' . $f('date') . '" name="claim_date" min="' . date('Y-m-d') . '"' . $r
+            . ' data-claim="date" data-claim-msg="Choose the date the applicant will claim the assistance."></div>'
+            . '<div class="field"><label for="' . $f('time') . '">Time ' . $req . '</label>'
+            . '<input type="time" id="' . $f('time') . '" name="claim_time"' . $r
+            . ' data-claim="time" data-claim-msg="Choose the time the applicant will claim the assistance."></div>'
+            . '</div>';
+    }
+    $requirements = ui_claim_requirements_text($typeId);
+    return $html
+        . '<div class="field"><label for="' . $f('requirements') . '">Hard copies to bring or submit ' . $req . '</label>'
+        . '<textarea id="' . $f('requirements') . '" name="claim_requirements" rows="5" maxlength="' . CLAIM_REQUIREMENTS_MAX . '"' . $r
+        . ' aria-describedby="' . $f('requirementsHelp') . '" data-claim="requirements" data-claim-msg="List the hard copies the applicant must bring or submit.">'
+        . ui_e($requirements) . '</textarea>'
+        . '<p class="field-help" id="' . $f('requirementsHelp') . '">Filled in from the program\'s required documents. Change it as needed.</p></div>'
+        . '<div class="field"><label for="' . $f('note') . '">Extra note <span class="muted">(optional)</span></label>'
+        . '<textarea id="' . $f('note') . '" name="claim_note" rows="2" maxlength="' . CLAIM_NOTE_MAX . '" data-claim="note"></textarea></div>';
+}
+
+/** The program's required documents as a list for the hard-copies box ("- Letter of Intent" ...). */
+function ui_claim_requirements_text(int $typeId): string
+{
+    require_once __DIR__ . '/../user/assistance_config.php';
+    // The file's list is global when the page loaded it first (dashboard.php); loaded here, it is local,
+    // so it is made global for the file's own functions (get_program_by_type() etc.)
+    if (!isset($GLOBALS['ASSISTANCE_PROGRAMS']) && isset($ASSISTANCE_PROGRAMS)) $GLOBALS['ASSISTANCE_PROGRAMS'] = $ASSISTANCE_PROGRAMS;
+    foreach ($GLOBALS['ASSISTANCE_PROGRAMS'] ?? [] as $p) {
+        if ((int)($p['type_id'] ?? 0) === $typeId && !empty($p['documents'])) {
+            return '- ' . implode("\n- ", array_keys($p['documents']));
+        }
+    }
+    return '';
+}
+
+/**
+ * One Approve dialog per Pending list: the approval details (ui_claim_fields), then "Approve & send email".
+ * The button that opens it sets the form's action, the applicant and, for OPD, the trip day (admin_ui.js).
+ */
+function ui_approve_dialog(int $typeId): string
+{
+    return '<dialog id="approveDialog" class="modal" aria-labelledby="approveTitle">'
+        . '<form method="POST" novalidate data-approve-dialog-form data-claim-type="' . $typeId . '">'
+        . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e(ui_current_page()) . '">'
+        . '<input type="hidden" name="applicant_id" data-approve-id>'
+        . '<div class="modal-header"><h2 id="approveTitle">Approve the ' . ($typeId === 3 ? 'OPD request' : 'application') . ' of <span data-approve-name></span></h2>'
+        . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
+        . '<div class="modal-body">'
+        . '<dl class="confirm-subject"><div><dt>Name</dt><dd data-approve-name></dd></div><div><dt>Reference</dt><dd data-approve-ref></dd></div>'
+        . '<div><dt>Email to</dt><dd data-approve-email></dd></div></dl>'
+        . ui_claim_fields($typeId, 'approve')
+        . '</div>'
+        . '<div class="modal-footer"><span class="modal-footer-space"></span>'
+        . '<button type="button" class="btn btn-secondary" data-dialog-close>Cancel</button>'
+        . '<button type="submit" class="btn btn-primary">' . ui_icon('check-circle') . 'Approve &amp; send email</button></div>'
+        . '</form></dialog>';
 }
 
 /** This page as a link from any admin or staff folder ("../medical/Mpending.php"), for coming back after an action. */
@@ -452,15 +560,6 @@ function ui_current_page(): string
 {
     $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
     return '../' . basename(dirname($script)) . '/' . basename($script);
-}
-
-/** The amount box that goes with ui_approve_form() (rendered in the Amount column). */
-function ui_amount_input(array $row): string
-{
-    $id = (int)$row['id'];
-    return '<label class="visually-hidden" for="amount-' . $id . '">Amount for ' . ui_e(ui_person_name($row)) . ', Ref #' . $id . '</label>'
-        . '<div class="amount-box"><span aria-hidden="true">₱</span><input type="number" id="amount-' . $id . '" name="amount" form="approve-' . $id . '"'
-        . ' class="amount-input" min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" required></div>';
 }
 
 /**
@@ -499,11 +598,12 @@ function ui_disapprove_dialog(): string
 /**
  * Approve + Disapprove for a Pending row, only for someone allowed to decide this program
  * (an admin; OPD staff for OPD). The server checks again (application_decision.php).
+ * Approve opens the Approve dialog (the page adds ui_approve_dialog()), which posts to $approveAction.
  */
-function ui_decision_buttons(array $row, int $typeId, string $approveAction, array $approveHidden, bool $needsAmount): string
+function ui_decision_buttons(array $row, int $typeId, string $approveAction): string
 {
     if (($row['status'] ?? '') !== 'Pending' || !decision_can(decision_user(), $typeId)) return '';
-    return ui_disapprove_button($row, $typeId) . ui_approve_form($row, $approveAction, $approveHidden, $needsAmount);
+    return ui_disapprove_button($row, $typeId) . ui_approve_button($row, $approveAction, $typeId);
 }
 
 /* ============================================================
@@ -855,6 +955,40 @@ function ui_detail(string $label, $value, bool $multiline = false): string
         . ($value === '' ? '<dd class="muted">Not given</dd>' : '<dd>' . ($multiline ? nl2br(ui_e($value)) : ui_e($value)) . '</dd>') . '</div>';
 }
 
+/**
+ * OPD companion for lists and reports: "Maria Cruz (Daughter)", or "No companion" when the patient goes alone
+ * (the companion is optional on the OPD forms).
+ */
+function ui_opd_companion(array $r): string
+{
+    $name = trim((string)($r['petitioner_name'] ?? ''));
+    $relationship = trim((string)($r['relationship'] ?? ''));
+    if ($name === '') return 'No companion';
+    return $relationship !== '' ? $name . ' (' . $relationship . ')' : $name;
+}
+
+/**
+ * OPD: when and where the vehicle leaves, set when the request was approved ("4:00 AM, Municipal Hall").
+ * The day is the check-up date. The list must select claim_time and claim_place.
+ */
+function ui_opd_departure(array $r): string
+{
+    if (($r['status'] ?? '') !== 'Approved') return 'Set when approved';
+    $time = trim((string)($r['claim_time'] ?? ''));
+    if ($time === '') return 'Not set';   // approved before departure times were recorded
+    $place = trim((string)($r['claim_place'] ?? ''));
+    return date('g:i A', strtotime($time)) . ($place !== '' ? ', ' . $place : '');
+}
+
+/**
+ * Medical: did the patient file for themself? ("For myself" on the online and walk-in forms, saved as relationship
+ * "Self".) Then they are also the claimant, and there is no separate claimant to show.
+ */
+function ui_is_self_claimant(array $a): bool
+{
+    return (int)($a['assistance_type_id'] ?? 0) === 1 && strcasecmp(trim((string)($a['relationship'] ?? '')), 'Self') === 0;
+}
+
 function ui_detail_card(string $title, string $icon, array $details): string
 {
     return '<section class="panel detail-card"><h3>' . ui_icon($icon) . ui_e($title) . '</h3><dl class="detail-list">'
@@ -893,6 +1027,23 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         if ($has('approved_by')) $app[] = ui_detail('Approved by', ui_user_name((int)$a['approved_by']));
         if ($has('amount') && (float)$a['amount'] > 0) $app[] = ui_detail('Amount released', ui_peso($a['amount']));
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date
+        // Approval details typed when approving, the same ones the approval email gave
+        // (OPD: the trip leaves on the patient's check-up date)
+        if ($has('claim_place')) {
+            if ($type === 3) {
+                $app[] = ui_detail('Trip', ui_opd_schedule_day($a) . ($has('claim_time') ? ', departure ' . date('g:i A', strtotime($a['claim_time'])) : ''));
+                $app[] = ui_detail('Pick-up point', $a['claim_place']);
+            } else {
+                $app[] = ui_detail('Where to claim', $a['claim_place']);
+                $app[] = ui_detail('Claim date and time', ui_date($a['claim_date'] ?? '', 'l, F j, Y')
+                    . ($has('claim_time') ? ', ' . date('g:i A', strtotime($a['claim_time'])) : ''));
+            }
+            $app[] = ui_detail('Hard copies to bring', $a['claim_requirements'] ?? '', true);
+            if ($has('claim_note')) $app[] = ui_detail('Note to the applicant', $a['claim_note'], true);
+            $app[] = ui_detail('Approval email', $has('approval_email_sent_at')
+                ? 'Sent ' . ui_date($a['approval_email_sent_at'], 'M j, Y, g:i A')
+                : (array_key_exists('account_id', $a) && $a['account_id'] === null ? 'Not sent (walk-in, no account)' : 'Not sent'));
+        }
     }
     if ($a['status'] === 'Disapproved') {
         $app[] = ui_detail('Date disapproved', ui_date($a['disapproved_at'] ?? '', 'F j, Y, g:i A'));
@@ -938,27 +1089,38 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
             ui_detail('Hospital or clinic', $a['hospital'] ?? ''),
             ui_detail('Check-up date', ui_date($a['checkup_date'] ?? '', 'F j, Y')),
             ui_detail('Diagnosis or complaint', $a['diagnosis'] ?? '', true),
-            ui_detail('Accompanied by', $a['petitioner_name'] ?? ''),
-            ui_detail('Relationship', $a['relationship'] ?? ''),
+            ui_detail('Accompanied by', ui_opd_companion($a)),   // optional: "No companion" when the patient goes alone
             ui_detail('Wheelchair', $a['wheelchair'] ?? 'No'),
             ui_detail('Stretcher', $a['stretcher'] ?? 'No'),
         ]);
     } else {
-        // Medical: section 1 is the patient; the claimant files for them
+        // Medical: section 1 is the patient. Whoever fills in the form is the claimant: the patient themself
+        // ("For myself", saved as relationship "Self"), or another person filing for them. Only that other person
+        // gets a Claimant card; "For myself" would only repeat the patient's own name and age.
+        $self = ui_is_self_claimant($a);
         $patient = [ui_detail('Full name', ui_full_name($a)), ui_detail('Sex', $a['sex'] ?? '')];
-        if (array_key_exists('beneficiary_birthdate', $a)) $patient[] = ui_detail('Birthdate', ui_date($a['beneficiary_birthdate'], 'F j, Y'));
+        if (array_key_exists('beneficiary_birthdate', $a)) {
+            $birth = (string)($a['beneficiary_birthdate'] ?? '');
+            $filedOn = substr((string)$a['created_at'], 0, 10);
+            $age = $birth !== '' && $birth <= $filedOn ? (new DateTime($birth))->diff(new DateTime($filedOn))->y : null;
+            $patient[] = ui_detail('Birthdate', $birth === '' ? '' : ui_date($birth, 'F j, Y')
+                . ($age !== null ? ' (' . $age . ($age === 1 ? ' year' : ' years') . ' old when filed)' : ''));
+        }
+        $patient[] = ui_detail('Filed by', $self ? 'The patient, for themself (also the claimant)' : 'A claimant, for the patient (see Claimant)');
         $who[] = ui_detail_card('Patient', 'user', $patient);
+        if (!$self) {
+            $who[] = ui_detail_card('Claimant (person applying)', 'user-plus', [
+                ui_detail('Full name', $a['petitioner_name'] ?? ''),
+                ui_detail('Age', $a['claimant_age'] ?? ''),
+                ui_detail('Relationship to the patient', $a['relationship'] ?? ''),
+            ]);
+        }
         $who[] = ui_detail_card('Address and contact', 'pin', $address);
-        $request = [
-            ui_detail("Claimant's full name", $a['petitioner_name'] ?? ''),
-            ui_detail("Claimant's age", $a['claimant_age'] ?? ''),
-            ui_detail('Relationship to the patient', $a['relationship'] ?? ''),
-            ui_detail('Purpose of assistance', $a['purpose'] ?? '', true),
-        ];
+        $request = [ui_detail('Purpose of assistance', $a['purpose'] ?? '', true)];
         if ($has('hospital')) $request[] = ui_detail('Hospital', $a['hospital']);
         if ($has('diagnosis')) $request[] = ui_detail('Diagnosis', $a['diagnosis'], true);
         if ($has('checkup_date')) $request[] = ui_detail('Check-up date', ui_date($a['checkup_date'], 'F j, Y'));
-        $what[] = ui_detail_card('Claimant and request', 'medical', $request);
+        $what[] = ui_detail_card('Request', 'medical', $request);
     }
     $what[] = $decision;
     $html .= '<div class="record-cols"><div class="record-col">' . implode('', $who) . '</div><div class="record-col">' . implode('', $what) . '</div></div>';
@@ -1118,13 +1280,14 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
                 . '<span class="status-option-text">' . ui_e($label) . '</span></span></label>';
         }
         $html .= '</div></fieldset>';
-        if (decision_needs_amount($typeId)) {
-            // Same rule as the Pending list: Medical and Burial are approved with the amount to release
-            $html .= '<div class="field"><label for="amount">Amount to release <span class="muted">(needed to approve)</span></label>'
-                . '<div class="amount-box"><span aria-hidden="true">₱</span><input type="number" id="amount" name="amount" class="amount-input"'
-                . ' min="0.01" step="0.01" inputmode="decimal" placeholder="0.00" aria-describedby="amountHelp"></div>'
-                . '<p class="field-help" id="amountHelp">Only needed when you choose Approve.</p></div>';
-        }
+        // Same rule as the Pending list: approving needs the approval details (Medical/Burial: amount and
+        // claim details; OPD: the trip), and they are emailed to the applicant (never the amount).
+        // admin_ui.js shows this part only for Approve.
+        $html .= '<fieldset class="form-section" data-claim-section data-claim-type="' . $typeId . '"><legend>Approval details</legend>'
+            . '<p class="field-help">Needed to approve. ' . ($typeId === 3 ? 'The trip schedule and what to bring are' : 'Where and when to claim and what to bring are')
+            . ' emailed to the applicant'
+            . (array_key_exists('account_id', $row) && $row['account_id'] === null ? ' (this walk-in has no account, so no email: tell them in person).' : '.') . '</p>'
+            . ui_claim_fields($typeId, 'update', false, $row) . '</fieldset>';
     } else {
         $html .= '<input type="hidden" name="status" value="' . ui_e($row['status']) . '">'
             . '<p class="alert alert-info" role="note">' . ui_icon('info', 'alert-icon') . '<span class="alert-body">This application was already '

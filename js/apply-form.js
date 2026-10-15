@@ -65,6 +65,92 @@
         syncApplyingFor();
     }
 
+    /* ---------- The applicant's own details (data-own-* on the form, from get_form_prefill()) ----------
+       Whoever fills in the form is the claimant, so their age is filled in from their birthdate:
+       Burial (section 1 is them), Medical "For another person" (the claimant section is them) and
+       OPD while the patient on the form is them. Medical "For myself": the patient is them, so
+       their birthdate goes in the patient's birthdate. A box the applicant typed in is never changed. */
+    const own = {
+        first: form.dataset.ownFirst || '', last: form.dataset.ownLast || '',
+        birthdate: form.dataset.ownBirthdate || '', age: form.dataset.ownAge || ''
+    };
+    const byId = function (id) { return document.getElementById(id); };
+    const norm = function (s) { return (s || '').trim().replace(/\s+/g, ' ').toLowerCase(); };
+    // Filled in by us (on the server or here) and not edited since, or still empty
+    const untouched = function (el) {
+        return !!el && (el.value.trim() === '' || el.dataset.autoFilled === '1' || el.classList.contains('is-prefilled'));
+    };
+    const fill = function (el, value) {
+        if (!el || el.value === value) return;
+        el.value = value;
+        el.dataset.autoFilled = '1';
+        if (value !== '') el.classList.add('is-prefilled'); else el.classList.remove('is-prefilled');
+        el.dispatchEvent(new Event('change', { bubbles: true }));   // e.g. the date-in-words line under a date box
+    };
+    function syncAgeHints() {
+        form.querySelectorAll('[data-own-age-hint]').forEach(function (hint) {
+            const box = byId(hint.dataset.ownAgeHint);
+            hint.hidden = !box || own.age === '' || box.value.trim() !== own.age;
+        });
+    }
+    form.addEventListener('input', function (e) {
+        e.target.dataset.autoFilled = '0';   // typed by the applicant: theirs from now on (fill() sends "change", never "input")
+        if (e.target.type === 'number') syncAgeHints();
+    });
+
+    const firstName = byId('first_name');
+    const lastName = byId('last_name');
+    const isOwnName = function () {
+        return own.first !== '' && own.last !== '' && !!firstName && !!lastName
+            && norm(firstName.value) === norm(own.first) && norm(lastName.value) === norm(own.last);
+    };
+
+    // OPD: the patient's age, while the patient on the form is the applicant
+    const opdAge = byId('age');
+    if (opdAge && own.age !== '' && !forRadios.length) {
+        const syncOpdAge = function () {
+            if (isOwnName()) {
+                if (untouched(opdAge)) fill(opdAge, own.age);
+            } else if (untouched(opdAge) && opdAge.value === own.age) {
+                fill(opdAge, '');   // someone else's check-up: their age is typed in
+            }
+            syncAgeHints();
+        };
+        [firstName, lastName].forEach(function (el) { if (el) el.addEventListener('input', syncOpdAge); });
+    }
+
+    // Medical: switching between "For myself" and "For another person"
+    if (forRadios.length) {
+        const birth = byId('beneficiary_birthdate');
+        const claimantName = byId('petitioner_name');
+        const claimantAge = byId('claimant_age');
+        forRadios.forEach(function (r) {
+            r.addEventListener('change', function () {
+                if (!r.checked) return;
+                if (r.value === 'self') {
+                    // The patient is the applicant: their own name and birthdate replace what an earlier application
+                    // put there (e.g. the last patient's), unless the applicant typed it
+                    if (own.first && own.last && untouched(firstName) && untouched(lastName) && !isOwnName()) {
+                        fill(firstName, own.first);
+                        fill(lastName, own.last);
+                        const middle = byId('middle_name');
+                        if (middle && untouched(middle)) fill(middle, '');
+                    }
+                    if (birth && own.birthdate && untouched(birth)) fill(birth, own.birthdate);
+                } else {
+                    // Another person is the patient: take out the applicant's own details we put there
+                    if (isOwnName() && untouched(firstName) && untouched(lastName)) { fill(firstName, ''); fill(lastName, ''); }
+                    if (birth && own.birthdate && birth.value === own.birthdate && untouched(birth)) fill(birth, '');
+                    // ...and the applicant is the claimant
+                    if (claimantName && claimantName.value.trim() === '') fill(claimantName, (own.first + ' ' + own.last).trim());
+                    if (claimantAge && own.age !== '' && untouched(claimantAge)) fill(claimantAge, own.age);
+                }
+                syncAgeHints();
+            });
+        });
+    }
+    syncAgeHints();
+
     // Choice dropdowns: the "Others" text box shows only when "Others" is picked
     form.querySelectorAll('select[data-choice-select]').forEach(function (select) {
         const other = document.getElementById(select.id + '_other');
@@ -81,6 +167,19 @@
         });
         sync();
     });
+
+    // Optional groups that go together (OPD companion: name + relationship): all empty is fine,
+    // but once one box is filled in, every box in the group is needed (the server checks the same)
+    const pairGroups = Array.from(form.querySelectorAll('[data-all-or-none]'));
+    function syncPairs() {
+        pairGroups.forEach(function (group) {
+            const boxes = Array.from(group.querySelectorAll('input[type="text"]'));
+            const any = boxes.some(function (el) { return el.value.trim() !== ''; });
+            boxes.forEach(function (el) { el.required = any; });
+        });
+    }
+    form.addEventListener('input', syncPairs);
+    syncPairs();
 
     /* ---------- The picked date in words, under each date box ----------
        "Friday, October 16, 2026 · in 6 days", and the age for a birthdate
@@ -152,7 +251,7 @@
 
     /* ---------- A section's number turns into a check once its required fields are filled in ---------- */
     const sections = Array.from(form.querySelectorAll('fieldset.ap-section')).filter(function (fs) {
-        return fs.querySelector('.ap-section-num') && fs.querySelector('[required]');
+        return fs.querySelector('.ap-section-num') && (fs.querySelector('[required]') || fs.hasAttribute('data-all-or-none'));
     });
 
     function updateSections() {
@@ -168,6 +267,7 @@
 
     function refresh() {
         dateEchoes.forEach(function (render) { render(); });
+        syncPairs();
         updateSections();
     }
     refresh();

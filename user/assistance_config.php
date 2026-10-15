@@ -57,8 +57,9 @@ $ASSISTANCE_PROGRAMS = [
             'Original copy medical certificate or certified true copy of clinical abstract' => 'Make sure the doctor\'s name and signature are readable.',
             'MSWD Case Study'                                    => 'Photo of every page of the case study.',
         ],
-        // Fields re-filled from the user's last application of this same program
-        'remember'  => ['petitioner_name', 'relationship', 'claimant_age', 'beneficiary_birthdate'],
+        // Fields re-filled from the user's last application of this same program.
+        // Ages are not: they go out of date. The claimant's age comes from their birthdate (get_form_prefill()).
+        'remember'  => ['petitioner_name', 'relationship', 'beneficiary_birthdate'],
     ],
     'burial' => [
         'type_id'   => 2,
@@ -78,7 +79,7 @@ $ASSISTANCE_PROGRAMS = [
             'Certified True Copy of Death Certificate'           => 'The whole certificate must be visible and readable.',
             'MSWD Case Study'                                    => 'Photo of every page of the case study.',
         ],
-        'remember'  => ['claimant_age'],
+        'remember'  => [],   // the claimant's age comes from their birthdate (get_form_prefill())
     ],
     'opd' => [
         'type_id'   => 3,
@@ -95,7 +96,7 @@ $ASSISTANCE_PROGRAMS = [
             'Blue Card Schedule' => 'Photo of the blue card showing your schedule.',
             'Valid ID'           => 'Front and back of a valid government ID.',
         ],
-        'remember'  => ['age', 'hospital', 'petitioner_name', 'relationship'],
+        'remember'  => ['hospital', 'petitioner_name', 'relationship'],   // the age comes from the birthdate (get_form_prefill())
     ],
 ];
 
@@ -128,8 +129,21 @@ function get_program_by_type($type_id): ?array {
 function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     $program = get_program($key);
 
+    $stmt = $pdo->prepare("SELECT * FROM applicant_accounts WHERE id = ?");
+    $stmt->execute([$account_id]);
+    $acc = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+    $autofill = !isset($acc['autofill_enabled']) || $acc['autofill_enabled'];
+
+    // The person filling in the form (they are the claimant): name, and age worked out from their birthdate,
+    // so it is right today (an age typed on an earlier form goes out of date). The forms' script uses it too.
+    $own = ['first_name' => $acc['firstname'] ?? '', 'last_name' => $acc['lastname'] ?? '', 'birthdate' => '', 'age' => ''];
+    if ($autofill) {
+        $own['birthdate'] = account_own_birthdate($pdo, $account_id, $acc);
+        $own['age'] = age_on($own['birthdate']);
+    }
+
     if (!empty($_SESSION[$key . '_form_data'])) {
-        return ['values' => $_SESSION[$key . '_form_data'], 'source' => 'session', 'date' => null];
+        return ['values' => $_SESSION[$key . '_form_data'], 'source' => 'session', 'date' => null, 'own' => $own];
     }
 
     $values = [];
@@ -137,13 +151,9 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     $date   = null;
     $defaults = ['municipality' => 'General Mariano Alvarez', 'province' => 'Cavite'];
 
-    $stmt = $pdo->prepare("SELECT * FROM applicant_accounts WHERE id = ?");
-    $stmt->execute([$account_id]);
-    $acc = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-
     // Turned off in My Account → Preferences
-    if (isset($acc['autofill_enabled']) && !$acc['autofill_enabled']) {
-        return ['values' => $defaults, 'source' => 'off', 'date' => null];
+    if (!$autofill) {
+        return ['values' => $defaults, 'source' => 'off', 'date' => null, 'own' => $own];
     }
 
     $stmt = $pdo->prepare("SELECT * FROM applicant WHERE account_id = ? AND assistance_type_id = ? ORDER BY created_at DESC LIMIT 1");
@@ -162,8 +172,18 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     }
 
     if ($last) {
+        // From another program, the name and sex are copied only when that application was about the applicant
+        // themself: a Medical application for another person names the patient (e.g. their mother), and putting
+        // that in Burial's "Your information" was wrong. The same program carries over as before (same patient).
+        $personal = ['first_name', 'middle_name', 'last_name', 'sex'];
+        $copyPersonal = $source === 'same' || application_is_about_holder($last, $own);
         foreach ($fields as $f) {
+            if (!$copyPersonal && in_array($f, $personal, true)) continue;
             if (isset($last[$f]) && $last[$f] !== '') $values[$f] = $last[$f];
+        }
+        if (!$copyPersonal) {
+            $values['first_name'] = $acc['firstname'] ?? '';
+            $values['last_name']  = $acc['lastname'] ?? '';
         }
         $date = $last['created_at'];
     } elseif ($acc) {
@@ -171,9 +191,11 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
         $values['last_name']  = $acc['lastname'];
     }
 
-    // Contact number and address saved in My Account → Profile are the most up to date
-    $profile_fields = ['phone' => 'contact_number', 'sex' => 'sex', 'house_no' => 'house_no', 'street' => 'street',
+    // Contact number and address saved in My Account → Profile are the most up to date.
+    // The sex in the profile is the applicant's: used only while the person on the form is them.
+    $profile_fields = ['phone' => 'contact_number', 'house_no' => 'house_no', 'street' => 'street',
                        'barangay' => 'barangay', 'municipality' => 'municipality', 'province' => 'province'];
+    if (same_person_name($values, $own)) $profile_fields['sex'] = 'sex';
     $used_profile = false;
     foreach ($profile_fields as $col => $field) {
         if (!empty($acc[$col])) {
@@ -186,7 +208,70 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     // Services are for GMA residents, so these are almost always the same
     $values += $defaults;
 
-    return ['values' => $values, 'source' => $source, 'date' => $date];
+    // The age of the person filling in the form, from their birthdate
+    if ($own['age'] !== '') {
+        if ($key === 'burial' || $key === 'medical') {
+            // Burial: section 1 is the claimant. Medical: the claimant section, used when filing for another person.
+            $values['claimant_age'] = $own['age'];
+        }
+        if ($key === 'opd' && same_person_name($values, $own)) {
+            $values['age'] = $own['age'];   // only when the patient on the form is the account holder
+        }
+    }
+    // Medical "for another person": the one filling in the form is the claimant
+    if ($key === 'medical' && trim((string)($values['petitioner_name'] ?? '')) === '') {
+        $values['petitioner_name'] = trim($own['first_name'] . ' ' . $own['last_name']);
+    }
+
+    return ['values' => $values, 'source' => $source, 'date' => $date, 'own' => $own];
+}
+
+/** Whole years old on $on (default today); '' when the birthdate is not a real date on or before that day. */
+function age_on(string $birthdate, string $on = ''): string {
+    $on = $on !== '' ? substr($on, 0, 10) : date('Y-m-d');
+    if (!is_ymd($birthdate) || !is_ymd($on) || $birthdate > $on) return '';
+    return (string)min(120, (new DateTime($birthdate))->diff(new DateTime($on))->y);
+}
+
+/**
+ * The applicant's own birthdate: the one saved on the account (My Account → Profile, or kept when they filed
+ * Medical "For myself"), else the patient birthdate of their latest Medical application for themself.
+ * '' when it isn't known. Never throws.
+ */
+function account_own_birthdate(PDO $pdo, int $account_id, array $acc = []): string {
+    $birth = (string)($acc['birthdate'] ?? '');
+    if (is_ymd($birth)) return $birth;
+    try {
+        $stmt = $pdo->prepare("SELECT beneficiary_birthdate FROM applicant
+                               WHERE account_id = ? AND assistance_type_id = 1 AND relationship = 'Self' AND beneficiary_birthdate IS NOT NULL
+                               ORDER BY created_at DESC, id DESC LIMIT 1");
+        $stmt->execute([$account_id]);
+        $birth = (string)$stmt->fetchColumn();
+    } catch (PDOException $e) {
+        error_log('account_own_birthdate: ' . $e->getMessage());   // e.g. before migration_person_rules.sql added the birthdate column
+        $birth = '';
+    }
+    return is_ymd($birth) ? $birth : '';
+}
+
+/**
+ * Is the person named on this application the account holder? Burial: yes (section 1 is the claimant, the one
+ * filling in the form). Medical: only "For myself" (relationship Self). OPD: when the patient's name is theirs.
+ */
+function application_is_about_holder(array $application, array $own): bool {
+    switch ((int)($application['assistance_type_id'] ?? 0)) {
+        case 2:  return true;
+        case 1:  return strcasecmp(trim((string)($application['relationship'] ?? '')), 'Self') === 0;
+        default: return same_person_name($application, $own);
+    }
+}
+
+/** Is the person on the form the account holder? (first and last name, ignoring case and extra spaces) */
+function same_person_name(array $values, array $own): bool {
+    $norm = function ($v) { return mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string)$v))); };
+    return $norm($own['first_name']) !== '' && $norm($own['last_name']) !== ''
+        && $norm($values['first_name'] ?? '') === $norm($own['first_name'])
+        && $norm($values['last_name'] ?? '') === $norm($own['last_name']);
 }
 
 /**
@@ -273,6 +358,25 @@ function validate_application(array $data, array $required): array {
     return $errors;
 }
 
+/**
+ * OPD companion (petitioner_name + relationship) is optional: a patient may go to the check-up alone.
+ * Both boxes empty = no companion. If one is filled in, the other is needed too.
+ * Used by opdform.php, the walk-in form (Main_dashboard/submit_admin_applicant.php) and edit_applicant.php.
+ *
+ * @return array field => error message (empty when fine)
+ */
+function opd_companion_errors(array $data): array {
+    $name = trim((string)($data['petitioner_name'] ?? ''));
+    $relationship = trim((string)($data['relationship'] ?? ''));
+    if ($name !== '' && $relationship === '') {
+        return ['relationship' => 'Please say how the companion is related to the patient, or leave both companion boxes empty.'];
+    }
+    if ($name === '' && $relationship !== '') {
+        return ['petitioner_name' => "Please write the companion's full name, or leave both companion boxes empty."];
+    }
+    return [];
+}
+
 /** True for a real calendar date written as YYYY-MM-DD (2026-02-30 is not). */
 function is_ymd(string $value): bool {
     $d = DateTime::createFromFormat('!Y-m-d', $value);
@@ -299,15 +403,12 @@ const CLAIMANT_FIELDS = ['petitioner_name', 'claimant_age', 'relationship'];
  *
  * @return array petitioner_name, claimant_age and relationship ('Self')
  */
-function medical_self_claimant(array $values): array {
+function medical_self_claimant(array $values, string $on = ''): array {
     $name = trim(preg_replace('/\s+/u', ' ', implode(' ', [
         $values['first_name'] ?? '', $values['middle_name'] ?? '', $values['last_name'] ?? '',
     ])));
-    $age = '';
-    $birth = $values['beneficiary_birthdate'] ?? '';
-    if (is_ymd($birth) && $birth <= date('Y-m-d')) {
-        $age = (string)min(120, (new DateTime($birth))->diff(new DateTime('today'))->y);
-    }
+    // Their age on the day the application was received ($on; today for the online form)
+    $age = age_on((string)($values['beneficiary_birthdate'] ?? ''), $on);
     return [
         'petitioner_name' => mb_substr($name, 0, FIELD_MAX_LENGTH['petitioner_name']),
         'claimant_age'    => $age,
@@ -349,7 +450,7 @@ const OPD_HOSPITALS = [
 const RELATIONSHIP_SUGGESTIONS = [
     'medical' => ['Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Grandchild', 'Guardian'],
     'burial'  => ['Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Grandchild', 'Authorized Representative'],
-    'opd'     => ['Self', 'Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Caregiver'],
+    'opd'     => ['Spouse', 'Mother', 'Father', 'Son', 'Daughter', 'Sibling', 'Caregiver'],   // no "Self": going alone = leave the companion empty
 ];
 
 /**

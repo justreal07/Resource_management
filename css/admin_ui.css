@@ -675,7 +675,7 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
 .req { color: var(--c-accent); font-weight: 700; }
 
 input[type="text"], input[type="search"], input[type="tel"], input[type="number"],
-input[type="date"], input[type="password"], select, textarea {
+input[type="date"], input[type="time"], input[type="password"], select, textarea {
     width: 100%;
     min-height: 44px;
     padding: 9px 12px;

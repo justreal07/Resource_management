@@ -66,6 +66,30 @@ function render_barangay_select(): void {
 }
 
 /** Error message under a field, plus the matching CSS hook. */
+/**
+ * Under an age box that holds the applicant's own age: where it came from, so they can check it
+ * (get_form_prefill() works it out from their birthdate). Nothing when the box holds something else.
+ */
+function own_age_hint(array $prefill, string $name): string {
+    global $values;
+    $own = $prefill['own'] ?? [];
+    if (empty($own['birthdate'])) return '';
+    // Printed even when hidden: the script shows it whenever the box holds their own age again
+    $shown = (string)($values[$name] ?? '') === (string)$own['age'];
+    return '<p class="field-help" data-own-age-hint="' . e($name) . '"' . ($shown ? '' : ' hidden') . '><i class="fas fa-magic"></i> From your birthdate ('
+        . e(date('F j, Y', strtotime($own['birthdate']))) . '). You can change it in My Account → Profile.</p>';
+}
+
+/** The applicant's own details for the form's script (js/apply-form.js): data-own-* attributes on the form. */
+function own_data_attributes(array $prefill): string {
+    $own = $prefill['own'] ?? [];
+    $out = '';
+    foreach (['first_name' => 'first', 'last_name' => 'last', 'birthdate' => 'birthdate', 'age' => 'age'] as $k => $attr) {
+        $out .= ' data-own-' . $attr . '="' . e($own[$k] ?? '') . '"';
+    }
+    return $out;
+}
+
 function error_for(string $name): string {
     global $errors;
     return isset($errors[$name]) ? '<p class="field-error"><i class="fas fa-exclamation-circle"></i> ' . e($errors[$name]) . '</p>' : '';

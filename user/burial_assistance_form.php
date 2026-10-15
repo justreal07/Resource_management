@@ -43,7 +43,7 @@ $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $values = posted_fields(array_keys($fields));
     $errors = validate_application($values, array_keys(array_filter($fields)));
-    $prefill = ['source' => 'post'];
+    $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
 
     if (!$errors) {
         // Was a Burial application already filed for this person? (person_rules.php)
@@ -85,7 +85,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
         <?php endif; ?>
 
         <form method="post" class="ap-card ap-form-card" id="applicationForm"
-              data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>">
+              data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
             <div class="ap-form-top">
                 <span class="ap-eligible-chip"><i class="fas fa-check-circle"></i> You're eligible to apply</span>
                 <p>Fields marked <span class="req">*</span> are required.</p>
@@ -113,6 +113,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     <div class="field span-2">
                         <label for="claimant_age">Age <span class="req">*</span></label>
                         <input type="number" id="claimant_age" name="claimant_age" value="<?= val('claimant_age') ?>" required min="0" max="120" inputmode="numeric" placeholder="Age"<?= invalid('claimant_age') ?>>
+                        <?= own_age_hint($prefill, 'claimant_age') ?>
                         <?= error_for('claimant_age') ?>
                     </div>
                     <div class="field span-2">

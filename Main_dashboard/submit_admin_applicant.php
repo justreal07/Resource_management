@@ -88,7 +88,7 @@ $fields = [
     'burial'  => $person + ['claimant_age' => true] + $address
                + ['petitioner_name' => true, 'relationship' => true, 'beneficiary_birthdate' => true, 'date_of_death' => true],
     'opd'     => $person + ['age' => true] + $address
-               + ['hospital' => true, 'checkup_date' => true, 'diagnosis' => true, 'petitioner_name' => true, 'relationship' => true],
+               + ['hospital' => true, 'checkup_date' => true, 'diagnosis' => true, 'petitioner_name' => false, 'relationship' => false],   // companion optional
 ][$form_type];
 
 // A list with "Others" sends the picked choice or the typed answer (resolve_choice_post), as online
@@ -106,7 +106,8 @@ if ($form_type === 'medical') {
     $applying_for = in_array($posted_for, ['self', 'other'], true) ? $posted_for : '';
     if ($applying_for === 'self') {
         $required = array_values(array_diff($required, CLAIMANT_FIELDS));
-        $values = array_merge($values, medical_self_claimant($values));
+        // Their age on the day the office received it (the walk-in can be dated back), not today
+        $values = array_merge($values, medical_self_claimant($values, $application_date));
     }
 }
 if ($form_type === 'opd') {
@@ -129,7 +130,10 @@ if ($form_type === 'medical') {
     }
     if ($choice_error) $errors['purpose'] = $choice_error;
 }
-if ($form_type === 'opd' && $choice_error) $errors['diagnosis'] = $choice_error;
+if ($form_type === 'opd') {
+    $errors += opd_companion_errors($values);   // no companion is fine; a name needs its relationship and the other way round
+    if ($choice_error) $errors['diagnosis'] = $choice_error;
+}
 
 if ($errors) {
     walkin_respond($is_ajax, 422, ['success' => false, 'safe' => true, 'errors' => $errors,

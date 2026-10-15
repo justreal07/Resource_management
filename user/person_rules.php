@@ -431,6 +431,104 @@ function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicatio
 }
 
 /* ============================================================
+   ADMIN CORRECTION (a typo in who the application is for)
+   ============================================================ */
+
+/** The locks to hold while correcting a person (see person_lock_name): the new birthdate's, and the old one's if it changes. */
+function person_correction_locks(string $formKey, array $old, array $new): array
+{
+    if ($formKey === 'burial') return ['lgu_burial_same_name'];
+    $locks = [];
+    foreach ([person_text($new, 'beneficiary_birthdate'), person_text($old, 'beneficiary_birthdate')] as $birthdate) {
+        if (is_ymd($birthdate)) $locks['lgu_person_' . $birthdate] = true;
+    }
+    $names = array_keys($locks);
+    sort($names);   // always in the same order, so two corrections can't wait on each other
+    return $names;
+}
+
+/**
+ * An admin fixes the name, birthdate or date of death of the person an application is for (Medical: the patient,
+ * Burial: the deceased). The person registry (beneficiaries) is what the rules look at, so it is corrected too,
+ * or the typo would stay there and the same person could slip past "one Burial per person" / "needs permission to apply again".
+ *
+ * It refuses what would break the rules:
+ *   - the person is also on other applications: their name and birthdate are shared with those, so one
+ *     application can't change them
+ *   - after the change the person would match someone else on file (two people would be mixed up), or, for Burial,
+ *     the name already has a Burial application or a recorded death
+ * Call it inside a transaction, with person_correction_locks() held. It does not touch the application row itself.
+ *
+ * @param array $application the stored application row
+ * @param array $new         the corrected values (first_name, middle_name, last_name, petitioner_name, beneficiary_birthdate, date_of_death)
+ * @return ?string a plain-language reason it can't be done, or null (done, or nothing to correct)
+ */
+function person_correct_identity(PDO $pdo, string $formKey, array $application, array $new): ?string
+{
+    $beneficiaryId = (int)($application['beneficiary_id'] ?? 0);
+    if ($beneficiaryId <= 0 || !person_rules_installed($pdo) || !in_array($formKey, ['medical', 'burial'], true)) {
+        return null;   // OPD, an application from before the person rules, or the rules aren't installed: nothing is linked
+    }
+    $person = person_from_form($formKey, $new);
+    if ($person === null || count($person['parts']['words']) < 2) {
+        return $formKey === 'burial' ? 'Please write the full name of the deceased (first name and last name).' : 'Please write the first name and last name of the patient.';
+    }
+
+    $stmt = $pdo->prepare('SELECT id FROM applicant WHERE beneficiary_id = ? AND id <> ? ORDER BY id');
+    $stmt->execute([$beneficiaryId, (int)$application['id']]);
+    $others = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    if ($others) {
+        $refs = implode(', ', array_map(function ($id) { return '#' . (int)$id; }, array_slice($others, 0, 5))) . (count($others) > 5 ? ' and more' : '');
+        return 'This person is also on ' . (count($others) === 1 ? 'another application' : count($others) . ' other applications') . ' (Ref ' . $refs . '), '
+            . 'so their name and birthdate are shared and can\'t be changed from this one. The other fields of this application can still be saved.';
+    }
+
+    // Would the corrected person now be somebody who is already on file?
+    $clash = array_filter(person_find($pdo, $person), function ($row) use ($beneficiaryId) { return (int)$row['id'] !== $beneficiaryId; });
+    $same = 'The corrected name and birthdate already match another person on file';
+    if ($clash) {
+        return $same . ', so saving would mix two people up. Open that person\'s record first' . person_clash_ref($pdo, array_column($clash, 'id')) . '.';
+    }
+    if ($formKey === 'burial') {
+        $byName = array_filter(person_find_by_name($pdo, $person), function ($row) use ($beneficiaryId) { return (int)$row['id'] !== $beneficiaryId; });
+        if ($byName) {
+            $ids = array_map('intval', array_column($byName, 'id'));
+            if (person_last_application($pdo, $ids, 2) || in_array(1, array_map('intval', array_column($byName, 'is_deceased')), true)) {
+                return 'A Burial application or a recorded death already exists for this name' . person_clash_ref($pdo, $ids)
+                    . '. Only one Burial application is allowed per deceased person.';
+            }
+        }
+    }
+
+    // The registry row. The death date is the one this Burial application recorded (never another's).
+    $set = 'full_name = ?, birthdate = ?';
+    $params = [$person['full_name'], $person['birthdate']];
+    $stmt = $pdo->prepare('SELECT is_deceased, deceased_application_id FROM beneficiaries WHERE id = ?');
+    $stmt->execute([$beneficiaryId]);
+    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($formKey === 'burial' && $row && (int)$row['is_deceased'] === 1 && (int)$row['deceased_application_id'] === (int)$application['id']
+        && is_ymd((string)$person['date_of_death'])) {
+        $set .= ', date_of_death = ?';
+        $params[] = $person['date_of_death'];
+    }
+    $params[] = $beneficiaryId;
+    $pdo->prepare("UPDATE beneficiaries SET $set WHERE id = ?")->execute($params);
+    return null;
+}
+
+/** " (Ref #12)" for the newest application of these people, so the admin knows where to look. */
+function person_clash_ref(PDO $pdo, array $beneficiaryIds): string
+{
+    $beneficiaryIds = array_map('intval', $beneficiaryIds);
+    if (!$beneficiaryIds) return '';
+    $in = implode(',', array_fill(0, count($beneficiaryIds), '?'));
+    $stmt = $pdo->prepare("SELECT id FROM applicant WHERE beneficiary_id IN ($in) ORDER BY id DESC LIMIT 1");
+    $stmt->execute($beneficiaryIds);
+    $id = $stmt->fetchColumn();
+    return $id ? ' (Ref #' . (int)$id . ')' : '';
+}
+
+/* ============================================================
    SMALL HELPERS
    ============================================================ */
 

@@ -9,7 +9,8 @@
    - PortalUI.confirm() / alert() / toast()
    - Forms with data-confirm, success messages as toasts (data-toast)
    - Guided tours: <body data-tour="..."> and [data-tour-start] buttons
-   - Copy buttons, Caps Lock hint, password strength and "passwords match"
+   - Copy buttons, Caps Lock hint, password strength and "passwords match",
+     mobile number boxes (data-phone: digits only, 11 at most)
    Exposed as window.PortalUI for js/account.js, js/apply-form.js and js/apply-upload.js.
    ========================================================================== */
 (function () {
@@ -275,6 +276,20 @@
             bar.style.background = level[1];
             text.textContent = pw.value ? level[2] : hint;
         });
+    });
+
+    /* ---------- Mobile number boxes (<input data-phone>): digits only, at most 11 ----------
+       Same rule as the application forms (js/apply-form.js). +63 / 63 numbers become 09...,
+       so "+63 917 123 4567" isn't cut into a wrong number. */
+    document.querySelectorAll('input[data-phone]').forEach((phone) => {
+        const digitsOnly = () => {
+            let digits = phone.value.replace(/\D/g, '');
+            if (/^639\d{9}$/.test(digits)) digits = '0' + digits.slice(2);
+            digits = digits.slice(0, 11);
+            if (digits !== phone.value) phone.value = digits;   // only when it changed, so the cursor doesn't jump
+        };
+        digitsOnly();
+        phone.addEventListener('input', digitsOnly);
     });
 
     document.querySelectorAll('input[data-match]').forEach((again) => {

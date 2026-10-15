@@ -24,9 +24,7 @@ echo ui_type_tabs(3, 'all');
         ['label' => 'Hospital', 'type' => 'text', 'key' => 'hospital'],
         ['label' => 'Diagnosis', 'type' => 'text', 'key' => 'diagnosis', 'class' => 'cell-clip'],
         ['label' => 'Age', 'type' => 'text', 'key' => 'age'],
-        ['label' => 'Accompanied by', 'type' => 'text', 'value' => function ($r) {
-            return trim(($r['petitioner_name'] ?? '') . (($r['relationship'] ?? '') !== '' ? ' (' . $r['relationship'] . ')' : ''));
-        }],
+        ['label' => 'Accompanied by', 'type' => 'text', 'value' => 'ui_opd_companion'],
         ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address(['barangay' => $r['barangay'], 'municipality' => $r['municipality']]); }],
     ], ['empty' => ['No OPD patients yet', 'Requests filed online or added as walk-ins will be listed here.']]) ?>
 </section>

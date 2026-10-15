@@ -193,6 +193,7 @@ function activity_actions(): array
         'application_approved'    => ['Approved an application',    'decisions', 'approved'],
         'application_disapproved' => ['Disapproved an application', 'decisions', 'danger'],
         'application_status'      => ['Changed a status',           'decisions', 'neutral'],
+        'application_edited'      => ['Edited an application',      'decisions', 'pending'],
         'login_success'           => ['Signed in',                  'signins',   'neutral'],
         'login_failed'            => ['Wrong password',             'signins',   'pending'],
         'login_locked'            => ['Locked for a while',         'signins',   'danger'],
@@ -211,6 +212,6 @@ function activity_actions(): array
 
 function activity_groups(): array
 {
-    return ['decisions' => 'Approvals and disapprovals', 'signins' => 'Sign-ins', 'accounts' => 'Staff accounts',
+    return ['decisions' => 'Approvals, disapprovals and edits', 'signins' => 'Sign-ins', 'accounts' => 'Staff accounts',
             'settings' => 'Own settings', 'exports' => 'Exports'];
 }

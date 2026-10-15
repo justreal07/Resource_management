@@ -1,4 +1,10 @@
 <?php
+// Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
+// It used to stop with a PHP error that showed the server's folder names.
+if (!isset($pdo) || realpath($_SERVER['SCRIPT_FILENAME'] ?? '') === __FILE__) {
+    header('Location: reports.php?report=opd');
+    exit;
+}
 // OPD (Outpatient Diagnosis) Detailed Report
 // Included by reports.php ($pdo, $year already checked there)
 // Form fields: patient name, address, age, sex, diagnosis, check-up date, accompanied by, relationship, contact, wheelchair, stretcher
@@ -27,7 +33,7 @@ $stmt = $pdo->prepare("
         a.barangay,
         a.municipality,
         a.province,
-        CONCAT(COALESCE(a.house_no, ''), ' ', COALESCE(a.street, ''), ', ', a.barangay, ', ', a.municipality, ', ', a.province) as address
+        CONCAT_WS(', ', NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(a.house_no), ''), NULLIF(TRIM(a.street), ''))), ''), NULLIF(TRIM(a.barangay), ''), NULLIF(TRIM(a.municipality), ''), NULLIF(TRIM(a.province), '')) as address
     FROM applicant a
     WHERE a.assistance_type_id = 3 AND YEAR(a.created_at) = ? AND a.status <> 'Disapproved'
     ORDER BY a.checkup_date ASC, a.created_at DESC
@@ -160,8 +166,9 @@ foreach ($approved_list as $app) {
         $app['sex'] ?? 'Not given',
         $app['diagnosis'] ?: 'Not given',
         $app['checkup_date'] ? date('M j, Y', strtotime($app['checkup_date'])) : 'Not scheduled',
-        $app['accompanied_by'] ?: 'Not given',
-        $app['relationship'] ?: 'Not given',
+        // The companion is optional: "No companion" when the patient goes alone
+        trim((string)$app['accompanied_by']) !== '' ? $app['accompanied_by'] : 'No companion',
+        trim((string)$app['accompanied_by']) !== '' ? ($app['relationship'] ?: 'Not given') : '—',
         $app['contact_number'] ?: 'Not given',
         ui_address($app, true),
     ];

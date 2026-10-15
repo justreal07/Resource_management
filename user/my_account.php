@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // ---------- Profile ----------
     if ($action === 'profile') {
         $p = [];
-        foreach (['firstname', 'lastname', 'username', 'email', 'phone', 'sex', 'house_no', 'street', 'barangay', 'municipality', 'province'] as $f) {
+        foreach (['firstname', 'lastname', 'username', 'email', 'phone', 'sex', 'birthdate', 'house_no', 'street', 'barangay', 'municipality', 'province'] as $f) {
             $p[$f] = trim((string)($_POST[$f] ?? ''));
         }
         if ($google) $p['username'] = $user['username'];   // Google accounts sign in with their email
@@ -40,6 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($p['phone'] !== '' && !preg_match('/^[0-9]{11}$/', $p['phone'])) $errors[] = 'The mobile number must be exactly 11 digits, e.g. 09171234567.';
         if ($p['barangay'] !== '' && !in_array($p['barangay'], BARANGAYS, true)) $errors[] = 'Please choose your barangay from the list.';
         if ($p['sex'] !== '' && !in_array($p['sex'], ['Male', 'Female'], true)) $errors[] = 'Please choose a valid sex.';
+        // Their own birthdate: the application forms work out their age from it
+        if ($p['birthdate'] !== '' && (!is_ymd($p['birthdate']) || $p['birthdate'] > date('Y-m-d') || $p['birthdate'] < OLDEST_DATE)) {
+            $errors[] = 'Please enter a valid birthdate (not in the future).';
+        }
 
         if (!$errors && $p['username'] !== $user['username']) {
             $stmt = $pdo->prepare("SELECT 1 FROM applicant_accounts WHERE username = ? AND id <> ?");
@@ -58,10 +62,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($errors as $err) flash('error', $err);
             $_SESSION['profile_old'] = $p;     // keep what they typed
         } else {
-            $stmt = $pdo->prepare("UPDATE applicant_accounts SET firstname = ?, lastname = ?, username = ?, email = ?, phone = ?, sex = ?,
+            $stmt = $pdo->prepare("UPDATE applicant_accounts SET firstname = ?, lastname = ?, username = ?, email = ?, phone = ?, sex = ?, birthdate = ?,
                                    house_no = ?, street = ?, barangay = ?, municipality = ?, province = ? WHERE id = ?");
             $stmt->execute([
-                $p['firstname'], $p['lastname'], $p['username'], $p['email'] ?: null, $p['phone'] ?: null, $p['sex'] ?: null,
+                $p['firstname'], $p['lastname'], $p['username'], $p['email'] ?: null, $p['phone'] ?: null, $p['sex'] ?: null, $p['birthdate'] ?: null,
                 $p['house_no'] ?: null, $p['street'] ?: null, $p['barangay'] ?: null, $p['municipality'] ?: null, $p['province'] ?: null,
                 $account_id,
             ]);
@@ -286,7 +290,10 @@ account_page_start($ctx, 'My Account', 'account', [
             <?php foreach ($applications as $a):
                 $p = get_program_by_type($a['assistance_type_id']);
                 $pname = $p['name'] ?? ($a['type_name'] ?: 'Assistance');
-                $person = trim($a['first_name'] . ' ' . $a['last_name']); ?>
+                // Who the application is for: Burial is filed by the applicant (the claimant), for the deceased
+                $person = (int)$a['assistance_type_id'] === 2 && trim((string)$a['petitioner_name']) !== ''
+                    ? 'For ' . trim((string)$a['petitioner_name']) . ' (deceased)'
+                    : trim($a['first_name'] . ' ' . $a['last_name']); ?>
             <li class="acc-app status-<?= strtolower($a['status']) ?>"
                 data-status="<?= e($a['status']) ?>" data-type="<?= (int)$a['assistance_type_id'] ?>"
                 data-date="<?= e($a['created_at']) ?>"
@@ -376,7 +383,8 @@ account_page_start($ctx, 'My Account', 'account', [
                 </div>
                 <div class="field span-3">
                     <label for="phone">Mobile number <span class="optional">(optional)</span></label>
-                    <input type="tel" id="phone" name="phone" value="<?= e($profile['phone'] ?? '') ?>" inputmode="tel" autocomplete="tel" placeholder="09XX XXX XXXX">
+                    <input type="tel" id="phone" name="phone" value="<?= e($profile['phone'] ?? '') ?>" inputmode="numeric" autocomplete="tel"
+                           minlength="11" pattern="[0-9]{11}" title="Enter exactly 11 digits, e.g. 09171234567" data-phone placeholder="09XXXXXXXXX">
                 </div>
                 <div class="field span-3">
                     <label>Sex <span class="optional">(optional)</span></label>
@@ -384,6 +392,12 @@ account_page_start($ctx, 'My Account', 'account', [
                         <label class="ap-choice"><input type="radio" name="sex" value="Male"<?= ($profile['sex'] ?? '') === 'Male' ? ' checked' : '' ?>><span><i class="fas fa-mars"></i> Male</span></label>
                         <label class="ap-choice"><input type="radio" name="sex" value="Female"<?= ($profile['sex'] ?? '') === 'Female' ? ' checked' : '' ?>><span><i class="fas fa-venus"></i> Female</span></label>
                     </div>
+                </div>
+                <?php $myBirth = (string)($profile['birthdate'] ?? ''); $myAge = age_on($myBirth); ?>
+                <div class="field span-3">
+                    <label for="birthdate">Birthdate <span class="optional">(optional)</span></label>
+                    <input type="date" id="birthdate" name="birthdate" value="<?= e($myBirth) ?>" min="<?= OLDEST_DATE ?>" max="<?= date('Y-m-d') ?>" autocomplete="bday">
+                    <p class="field-help">Your age on the application forms is worked out from this<?= $myAge !== '' ? ' (you are ' . e($myAge) . ' today)' : '' ?>.</p>
                 </div>
             </div>
 

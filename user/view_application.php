@@ -128,6 +128,30 @@ account_page_start($ctx, "Application #$app_id", 'account', [
         </li>
     </ol>
 
+    <?php if ($status === 'Approved' && !empty($app['claim_place'])):
+        // Details typed by the office when approving; the approval email has the same ones.
+        // OPD: the trip is on the patient's check-up date, with the departure time and pick-up point. ?>
+        <div class="acc-note"><i class="fas <?= $type === 3 ? 'fa-shuttle-van' : 'fa-map-marker-alt' ?>"></i><div>
+            <strong><?= $type === 3 ? 'Your trip schedule' : 'How to claim' ?></strong>
+            <dl class="acc-dl">
+                <?php
+                if ($type === 3) {
+                    detail_row('Schedule', $app['checkup_date'] ? date('l, F d, Y', strtotime($app['checkup_date'])) . ' (your check-up date)' : '');
+                    detail_row('Departure time', $app['claim_time'] ? date('g:i A', strtotime($app['claim_time'])) : '');
+                    detail_row('Pick-up point', $app['claim_place']);
+                } else {
+                    detail_row('Where', $app['claim_place']);
+                    detail_row('Date', $app['claim_date'] ? date('l, F d, Y', strtotime($app['claim_date'])) : '');
+                    detail_row('Time', $app['claim_time'] ? date('g:i A', strtotime($app['claim_time'])) : '');
+                }
+                ?>
+            </dl>
+            <p><strong>Please bring or submit these hard copies:</strong><br><?= nl2br(e($app['claim_requirements'] ?? '')) ?></p>
+            <?php if (!empty($app['claim_note'])): ?>
+                <p><strong>Note from the office:</strong><br><?= nl2br(e($app['claim_note'])) ?></p>
+            <?php endif; ?>
+        </div></div>
+    <?php endif; ?>
     <?php if ($status === 'Disapproved' && $disapproval_reason !== ''): ?>
         <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong>Reason:</strong> <?= e($disapproval_reason) ?></div></div>
     <?php elseif ($status !== 'Disapproved' && !empty($app['remarks'])): ?>
@@ -174,9 +198,15 @@ account_page_start($ctx, "Application #$app_id", 'account', [
             <?php
             detail_row('Program', $pname);
             if ($type === 1) {
-                detail_row('Claimant', $app['petitioner_name']);
-                detail_row("Claimant's age", $app['claimant_age'] !== null && $app['claimant_age'] !== '' ? $app['claimant_age'] . ' years old' : '');
-                detail_row('Relationship to patient', $app['relationship']);
+                // Whoever fills in the form is the claimant. "For myself" (relationship Self): the patient is the
+                // claimant, so the claimant rows would only repeat the patient's details above.
+                if (strcasecmp(trim((string)$app['relationship']), 'Self') === 0) {
+                    detail_row('Applied for', 'Yourself (you are the patient and the claimant)');
+                } else {
+                    detail_row('Claimant', $app['petitioner_name']);
+                    detail_row("Claimant's age", $app['claimant_age'] !== null && $app['claimant_age'] !== '' ? $app['claimant_age'] . ' years old' : '');
+                    detail_row('Relationship to patient', $app['relationship']);
+                }
                 detail_row('Purpose', $app['purpose']);
             } elseif ($type === 2) {
                 detail_row('Name of the deceased', $app['petitioner_name']);
@@ -187,8 +217,10 @@ account_page_start($ctx, "Application #$app_id", 'account', [
                 detail_row('Preferred hospital', $app['hospital']);
                 detail_row('Check-up date', $app['checkup_date'] ? date('l, F d, Y', strtotime($app['checkup_date'])) : '');
                 detail_row('Diagnosis / reason', $app['diagnosis']);
-                detail_row('Accompanied by', $app['petitioner_name']);
-                detail_row('Relationship', $app['relationship']);
+                // The companion is optional: the patient may go to the check-up alone
+                $companion = trim((string)$app['petitioner_name']);
+                detail_row('Accompanied by', $companion !== '' ? $companion : 'No companion');
+                if ($companion !== '') detail_row('Relationship', $app['relationship']);
                 $needs = array_filter([$app['wheelchair'] === 'Yes' ? 'Wheelchair' : '', $app['stretcher'] === 'Yes' ? 'Stretcher' : '']);
                 detail_row('Special assistance', $needs ? implode(', ', $needs) : 'None');
             }

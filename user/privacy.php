@@ -160,7 +160,9 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                     <li>To evaluate and decide on your request, and to release the assistance or arrange your OPD schedule and transport.</li>
                     <li>To make sure assistance is given fairly: for example, one Burial Assistance per deceased person, and
                         office approval before a patient receives Medical Assistance again. For this we compare names and birthdates across applications.</li>
-                    <li>To tell you about your request through your dashboard and notifications.</li>
+                    <li>To tell you about your request through your dashboard and notifications and, when it is approved,
+                        by email to the address on your account (where and when to claim the assistance, or the day, departure time
+                        and pick-up point of your OPD trip, and what to bring).</li>
                     <li>To prepare reports with <strong>totals only</strong> (for example, how many families were helped per barangay), which never name you.</li>
                     <li>To improve our service, using the satisfaction survey.</li>
                     <li>To meet government auditing and record-keeping rules.</li>
@@ -184,7 +186,8 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                         Their actions are recorded in an activity log.</li>
                     <li><strong>Others, only when needed</strong> to give the assistance you asked for (for example, the hospital for your OPD referral),
                         or when the law requires it (for example, a Commission on Audit review or a court order).</li>
-                    <li><strong>Service providers we use:</strong> Google, if you choose to sign in with Google, and Google's Gemini service,
+                    <li><strong>Service providers we use:</strong> Google, if you choose to sign in with Google; Google's Gmail service,
+                        which delivers the approval email; and Google's Gemini service,
                         which answers the questions you type into the chat assistant. Please do not type personal or medical details in the chat.</li>
                 </ul>
                 <p>We never sell or rent your information.</p>
