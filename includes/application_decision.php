@@ -656,7 +656,10 @@ function decision_run_endpoint(PDO $pdo, string $decision, array $cfg = []): voi
     }
 
     decision_flash($result);
-    $to = $result['ok'] && isset($cfg['on_success']) ? $cfg['on_success']($result) : decision_return_url($fallback);
+    // The side-by-side review page asks to come back to itself, whatever the result: it then moves on to the next
+    // waiting application (or stays on this one when the decision failed), so the approved list is not shown
+    $backToReview = is_string($_POST['return'] ?? null) && preg_match('#^\.\./(Main_dashboard|staff)/review\.php\?#', $_POST['return']) === 1;
+    $to = $result['ok'] && !$backToReview && isset($cfg['on_success']) ? $cfg['on_success']($result) : decision_return_url($fallback);
     header('Location: ' . $to);
     exit();
 }

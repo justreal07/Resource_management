@@ -34,7 +34,7 @@ echo ui_type_tabs(2, 'pending');
     ], [
         'empty' => ['No Burial applications to review', 'New applications will appear here.'],
         'actions' => function ($row) {
-            return ui_row_links(2, $row, true, '../burial/Bpending.php')
+            return ui_row_links(2, $row, true, '../burial/Bpending.php', true)
                 . ui_decision_buttons($row, 2, 'All_approved.php');
         },
     ]) ?>

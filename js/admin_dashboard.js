@@ -90,6 +90,49 @@
         render();
     }
 
+    /* ---------- Barangay heat map: the details of the tile under the pointer or in focus ----------
+       The same words are in each tile's accessible name (aria-label), so this box only adds a sighted shortcut. */
+    const mapTiles = document.querySelectorAll('.hm-tile[data-tile]');
+    if (mapTiles.length) {
+        let box = null;
+        const hide = () => { if (box) box.hidden = true; };
+        const show = (tile) => {
+            let info;
+            try { info = JSON.parse(tile.dataset.tile); } catch (e) { return; }
+            if (!box) {
+                box = document.createElement('div');
+                box.className = 'spark-tip hm-tip no-print';
+                box.setAttribute('role', 'tooltip');
+                document.body.appendChild(box);
+            }
+            box.textContent = '';
+            const title = document.createElement('strong');
+            title.textContent = info.name;
+            const line = document.createElement('span');
+            line.textContent = info.n === 0 ? 'No applications' : info.n.toLocaleString('en-US') + (info.n === 1 ? ' application' : ' applications') + ' · ' + info.share + '% of the total';
+            box.append(title, line);
+            if (info.n > 0) {
+                const split = document.createElement('span');
+                split.textContent = info.parts.filter((p) => p[1] > 0).map((p) => p[0] + ' ' + p[1]).join(' · ');
+                box.appendChild(split);
+            }
+            box.hidden = false;
+            const r = tile.getBoundingClientRect();
+            const left = Math.max(8, Math.min(window.innerWidth - box.offsetWidth - 8, r.left + r.width / 2 - box.offsetWidth / 2));
+            const above = r.top - box.offsetHeight - 8;
+            box.style.left = left + 'px';
+            box.style.top = (above > 8 ? above : r.bottom + 8) + 'px';
+        };
+        mapTiles.forEach((tile) => {
+            tile.addEventListener('mouseenter', () => show(tile));
+            tile.addEventListener('mouseleave', hide);
+            tile.addEventListener('focus', () => show(tile));
+            tile.addEventListener('blur', hide);
+        });
+        window.addEventListener('scroll', hide, { passive: true });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+    }
+
     /* ==========================================================================
        ADD WALK-IN APPLICANT
        Posts form_type, application_date, the chosen template's fields and source=modal to
@@ -378,6 +421,11 @@
     }
 
     document.querySelectorAll('[data-open-add]').forEach((b) => b.addEventListener('click', openModal));
+    // "Add walk-in applicant" from the command bar (Ctrl+K) on another page opens dashboard.php#add
+    if (window.location.hash === '#add') {
+        if (window.history && history.replaceState) history.replaceState(null, '', window.location.pathname + window.location.search);
+        openModal();
+    }
     btn.close.addEventListener('click', requestClose);
     btn.cancel.addEventListener('click', requestClose);
     modal.addEventListener('cancel', (e) => {   // Esc key

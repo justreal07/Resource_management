@@ -9,6 +9,7 @@
  */
 require_once '../config.php';
 require_once '../includes/application_decision.php';
+require_once '../includes/trend.php';
 
 $user = decision_user();
 // Let other pages of this session load while this answers (a poll every few seconds must never hold the session lock).
@@ -48,6 +49,8 @@ try {
     $stmt->execute($typeIds);
     $today = (int)$stmt->fetchColumn();
 
+    $trend = trend_daily_new($pdo, $typeIds);
+
     echo json_encode([
         'ok'           => true,
         'pending'      => $pending,                      // {"1": n, "2": n, "3": n}
@@ -56,6 +59,8 @@ try {
         'approved'     => $approved,
         'today'        => $today,
         'newest'       => $newest,                       // when the newest application was filed: a rise means a new one arrived
+        'days'         => $trend['labels'],               // the last 14 days (Y-m-d), oldest first ...
+        'daily'        => $trend['series'],               // ... and how many applications were filed on each, per program: the trend lines
     ]);
 } catch (PDOException $e) {
     error_log('live_counts: ' . $e->getMessage());

@@ -328,14 +328,15 @@
     display: flex; align-items: center; gap: 10px;
     min-height: 52px; padding: 8px 16px;
     border: 2px solid #8792a2; border-radius: 8px; background: #fff;
+    color: #1b2333;   /* its own ink: the white box must not take the dark theme's light text */
 }
 .ann-choice > span > span { display: grid; line-height: 1.3; }
 .ann-choice small { color: #4b5565; font-size: 0.875rem; }
 .ann-choice > input:checked + span { border-color: #1e5a8a; background: #e8f0f7; box-shadow: inset 0 0 0 1px #1e5a8a; }
 .ann-choice > input:focus-visible + span { outline: 3px solid #1e5a8a; outline-offset: 2px; }
 
-/* The rich-text editor box */
-.ann-quill { background: #fff; }
+/* The rich-text editor box: white paper with its own dark ink, also in the admin's dark theme */
+.ann-quill { background: #fff; color: #1b2333; }
 .ann-quill .ql-editor { min-height: 220px; font-size: 1rem; line-height: 1.6; }
 .ann-quill.ql-container { border-radius: 0 0 6px 6px; border-color: #8792a2; }
 .ann-quill-toolbar.ql-toolbar { border-radius: 6px 6px 0 0; border-color: #8792a2; background: #f6f8fa; }

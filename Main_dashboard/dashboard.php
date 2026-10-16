@@ -2,6 +2,8 @@
 require_once '../config.php';
 require_once '../includes/admin_layout.php';
 require_once '../user/assistance_config.php';   // the walk-in form uses the online forms' lists (barangays, purposes, documents)
+require_once '../includes/trend.php';           // new applications per day, for the trend lines on the cards
+require_once '../includes/barangay_map.php';    // the barangay heat map (and the Barangay filter that its tiles open)
 
 // Security Check - Verify if user is logged in as admin
 if(!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
@@ -160,6 +162,15 @@ try {
 $queueTotal = 0;
 foreach ($typeInfo as $id => $t) $queueTotal += (int)($queue[$id]['n'] ?? 0);
 
+// New applications per day, the last 14 days, for the small trend lines on the cards (admin_live.js keeps them current).
+// Without it the cards simply have no line.
+$trend = null;
+try {
+    $trend = trend_daily_new($pdo, array_keys($typeInfo));
+} catch (PDOException $e) {
+    error_log('dashboard.php trend: ' . $e->getMessage());
+}
+
 // The selected year, per type and status (overview cards and the status chart)
 $yearStart = $year . '-01-01 00:00:00';
 $yearEnd = ($year + 1) . '-01-01 00:00:00';
@@ -199,6 +210,15 @@ try {
 } catch (PDOException $e) {
     error_log('dashboard.php barangays: ' . $e->getMessage());
     $loadFailed['barangays'] = true;
+}
+
+// Every barangay of the official list with its applications for the selected year (the heat map)
+$brgyMap = null;
+try {
+    $brgyMap = barangay_counts($pdo, $yearStart, $yearEnd);
+} catch (PDOException $e) {
+    error_log('dashboard.php barangay map: ' . $e->getMessage());
+    $loadFailed['barangaymap'] = true;
 }
 
 // Recent activity: new applications and approvals, newest first (disapproved applications are discarded and left out)
@@ -242,6 +262,7 @@ $filters = [
     'q'      => isset($_GET['q']) && is_string($_GET['q']) ? mb_substr(trim($_GET['q']), 0, 100) : '',
     'type'   => isset($_GET['type']) && is_string($_GET['type']) && isset($typeInfo[(int)$_GET['type']]) ? (int)$_GET['type'] : 0,
     'status' => isset($_GET['status']) && is_string($_GET['status']) && isset($statusInfo[$_GET['status']]) ? $_GET['status'] : '',
+    'barangay' => isset($_GET['barangay']) && is_string($_GET['barangay']) && in_array($_GET['barangay'], BARANGAYS, true) ? $_GET['barangay'] : '',   // from the heat map
     'from'   => ui_ymd($_GET['from'] ?? ''),
     'to'     => ui_ymd($_GET['to'] ?? ''),
     'sort'   => isset($_GET['sort']) && is_string($_GET['sort']) && isset($sorts[$_GET['sort']]) ? $_GET['sort'] : 'newest',
@@ -252,7 +273,7 @@ $filterErrors = [];
 if ($filters['from'] !== '' && $filters['to'] !== '' && $filters['from'] > $filters['to']) {
     $filterErrors['to'] = '"Filed to" must be the same day as "Filed from" or later.';
 }
-$filtersActive = $filters['q'] !== '' || $filters['type'] || $filters['status'] !== '' || $filters['from'] !== '' || $filters['to'] !== '';
+$filtersActive = $filters['q'] !== '' || $filters['type'] || $filters['status'] !== '' || $filters['barangay'] !== '' || $filters['from'] !== '' || $filters['to'] !== '';
 
 // Current state of the page, used to build links that change one thing and keep the rest
 $state = [
@@ -260,6 +281,7 @@ $state = [
     'q'      => $filters['q'],
     'type'   => $filters['type'] ?: '',
     'status' => $filters['status'],
+    'barangay' => $filters['barangay'],
     'from'   => $filters['from'],
     'to'     => $filters['to'],
     'sort'   => $filters['sort'] === 'newest' ? '' : $filters['sort'],
@@ -278,7 +300,13 @@ $hiddenInputs = function (array $keys) use ($state): string {
     }
     return $html;
 };
-$clearFiltersUrl = $url(['q' => '', 'type' => '', 'status' => '', 'from' => '', 'to' => '', 'page' => ''], 'applications');
+$clearFiltersUrl = $url(['q' => '', 'type' => '', 'status' => '', 'barangay' => '', 'from' => '', 'to' => '', 'page' => ''], 'applications');
+
+// A tile opens the applications list for that barangay and year (the filter below the charts)
+$mapTo = min($year . '-12-31', date('Y-m-d'));
+$mapLink = function (string $name) use ($url, $year, $mapTo): string {
+    return $url(['q' => '', 'type' => '', 'status' => '', 'barangay' => $name, 'from' => $year . '-01-01', 'to' => $mapTo, 'page' => ''], 'applications');
+};
 
 $where = ["a.status <> 'Disapproved'"];   // discarded applications are only on each program's Disapproved tab
 $params = [];
@@ -300,6 +328,17 @@ if ($filters['type']) {
 if ($filters['status'] !== '') {
     $where[] = 'a.status = ?';
     $params[] = $filters['status'];
+}
+if ($filters['barangay'] !== '') {
+    // "San Jose", "san jose" and "Brgy. San Jose" are one barangay: the same matching the heat map counts with
+    try {
+        $variants = barangay_variants($pdo, $filters['barangay']);
+    } catch (PDOException $e) {
+        error_log('dashboard.php barangay filter: ' . $e->getMessage());
+        $variants = [$filters['barangay']];
+    }
+    $where[] = 'TRIM(a.barangay) IN (' . implode(',', array_fill(0, count($variants), '?')) . ')';
+    array_push($params, ...$variants);
 }
 if ($filters['from'] !== '') {
     $where[] = 'a.created_at >= ?';
@@ -399,7 +438,7 @@ admin_layout_start([
                 <div class="panel-head">
                     <h2 id="actionTitle">Needs your action</h2>
                     <?php if (empty($loadFailed['queue'])): ?>
-                        <p class="panel-sub" aria-live="polite">
+                        <p class="panel-sub">
                             <?php /* Both versions are printed; admin_live.js shows the one that fits as the numbers change */ ?>
                             <span data-live-when="none"<?= $queueTotal === 0 ? '' : ' hidden' ?>><?= ui_icon('check-circle') ?> All caught up: no applications are waiting for review.</span>
                             <span data-live-when="some"<?= $queueTotal === 0 ? ' hidden' : '' ?>>
@@ -409,6 +448,8 @@ admin_layout_start([
                             <?php if (empty($loadFailed['stats'])): ?>
                                 · <span data-live="today"><?= number_format((int)$today) ?></span> new today
                             <?php endif; ?>
+                            <?php /* One calm sentence for screen readers when the numbers change (the visible numbers count up, which a live region would read step by step) */ ?>
+                            <span class="visually-hidden" role="status" data-live-announce></span>
                         </p>
                     <?php endif; ?>
                 </div>
@@ -447,9 +488,11 @@ admin_layout_start([
                                                 <span class="queue-warn"><?= ui_icon('alert') ?>Waiting over a week</span>
                                             <?php endif; ?>
                                         <?php endif; ?>
+                                        <?php if ($trend): ?><?= ui_sparkline($trend['series'][$id], $trend['labels'], $t['short'] . ' applications', ' data-live-spark="' . (int)$id . '"') ?><?php endif; ?>
                                     </span>
                                     <span class="queue-go"><span data-live-card-go><?= $n === 0 ? 'Open list' : 'Review' ?></span><?= ui_icon('chevron-right') ?></span>
                                 </a>
+                                <?php if ($trend): ?><?= ui_sparkline_text($trend['series'][$id], $trend['labels'], $t['short'] . ' applications', (string)$id) ?><?php endif; ?>
                             </li>
                         <?php endforeach; ?>
                     </ul>
@@ -463,6 +506,7 @@ admin_layout_start([
 
             <div class="dash-grid">
 
+              <div class="dash-col">
                 <!-- ============ 2. OVERVIEW FOR THE SELECTED YEAR ============ -->
                 <section class="panel" id="overview" aria-labelledby="overviewTitle">
                     <div class="panel-head panel-head-row">
@@ -471,7 +515,7 @@ admin_layout_start([
                             <p class="panel-sub">Applications filed <strong><?= ui_e($rangeText) ?></strong></p>
                         </div>
                         <form class="year-form" method="GET" action="dashboard.php#overview" data-busy>
-                            <?= $hiddenInputs(['q', 'type', 'status', 'from', 'to', 'sort', 'per']) ?>
+                            <?= $hiddenInputs(['q', 'type', 'status', 'barangay', 'from', 'to', 'sort', 'per']) ?>
                             <label for="yearSelect">Year</label>
                             <select name="year" id="yearSelect">
                                 <?php
@@ -528,6 +572,32 @@ admin_layout_start([
                         </p>
                     <?php endif; ?>
                 </section>
+
+                <!-- ============ 2b. BARANGAY HEAT MAP (selected year; tiles: includes/barangay_map.php) ============ -->
+                <section class="panel" id="barangays" aria-labelledby="barangaysTitle">
+                    <div class="panel-head">
+                        <h2 id="barangaysTitle">Applications by barangay</h2>
+                        <p class="panel-sub">Applications filed <strong><?= ui_e($rangeText) ?></strong>, every program. Darker means more, and the number is on each tile. Select a barangay to see its applications.</p>
+                    </div>
+                    <?php if (!empty($loadFailed['barangaymap'])): ?>
+                        <?= ui_load_error('the barangay map', $url([], 'barangays')) ?>
+                    <?php elseif (!$brgyMap || $brgyMap['total'] === 0): ?>
+                        <?= ui_state('inbox', 'No applications in ' . $year, 'The map fills in as applications come in.') ?>
+                    <?php else: ?>
+                        <?php
+                        $mapTypes = [];
+                        foreach ($typeInfo as $id => $info) $mapTypes[$id] = $info['short'];
+                        $tableRows = [];
+                        $sorted = $brgyMap['official'];
+                        uasort($sorted, function ($a, $b) { return $b['total'] <=> $a['total']; });
+                        foreach ($sorted as $name => $row) $tableRows[] = [$name, number_format($row['total']), round($row['total'] / $brgyMap['total'] * 100) . '%'];
+                        if ($brgyMap['other']['total'] > 0) $tableRows[] = ['Not on the official list', number_format($brgyMap['other']['total']), round($brgyMap['other']['total'] / $brgyMap['total'] * 100) . '%'];
+                        ?>
+                        <?= ui_barangay_map($brgyMap, $mapTypes, $mapLink) ?>
+                        <?= ui_table_view(['Barangay', 'Applications', 'Share'], $tableRows) ?>
+                    <?php endif; ?>
+                </section>
+              </div>
 
                 <!-- ============ 3. RECENT ACTIVITY (unread state: admin_dashboard.js) ============ -->
                 <section class="panel activity" id="activity" aria-labelledby="activityTitle" data-activity>
@@ -612,6 +682,15 @@ admin_layout_start([
                         </select>
                     </div>
                     <div class="field">
+                        <label for="fBarangay">Barangay</label>
+                        <select id="fBarangay" name="barangay">
+                            <option value="">All barangays</option>
+                            <?php foreach (BARANGAYS as $b): ?>
+                                <option value="<?= ui_e($b) ?>"<?= $filters['barangay'] === $b ? ' selected' : '' ?>><?= ui_e($b) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="field">
                         <label for="fFrom">Filed from</label>
                         <input type="date" id="fFrom" name="from" value="<?= ui_e($filters['from']) ?>" max="<?= date('Y-m-d') ?>">
                     </div>
@@ -661,6 +740,7 @@ admin_layout_start([
                     if ($filters['q'] !== '') $activeLabels[] = '"' . $filters['q'] . '"';
                     if ($filters['type']) $activeLabels[] = $typeInfo[$filters['type']]['name'];
                     if ($filters['status'] !== '') $activeLabels[] = $statusInfo[$filters['status']]['label'];
+                    if ($filters['barangay'] !== '') $activeLabels[] = $filters['barangay'];
                     if ($filters['from'] !== '') $activeLabels[] = 'from ' . date('M j, Y', strtotime($filters['from']));
                     if ($filters['to'] !== '' && !isset($filterErrors['to'])) $activeLabels[] = 'to ' . date('M j, Y', strtotime($filters['to']));
                     ?>

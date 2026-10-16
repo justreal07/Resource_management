@@ -3,6 +3,7 @@ require_once '../config.php';
 require_once 'application_eligibility.php';
 require_once 'account_layout.php';
 require_once '../includes/feedback.php';
+require_once '../includes/documents.php';
 
 $ctx = account_context($pdo);
 $account_id = (int)$ctx['user']['id'];
@@ -235,7 +236,7 @@ account_page_start($ctx, "Application #$app_id", 'account', [
         <?php if ($documents): ?>
             <div class="acc-gallery" data-gallery>
                 <?php foreach ($documents as $d):
-                    $url = '../documents/' . rawurlencode(basename($d['file_path']));
+                    $url = document_url((int)$d['id'], false, '');   // opened through document.php (checks it is yours)
                     $is_img = preg_match('/\.(jpe?g|png|webp|gif)$/i', $d['file_path']); ?>
                     <?php if ($is_img): ?>
                         <a href="<?= e($url) ?>" class="acc-shot" data-lightbox data-caption="<?= e($d['document_name']) ?>">

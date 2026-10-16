@@ -32,7 +32,7 @@ echo ui_type_tabs(1, 'pending');
     ], [
         'empty' => ['No Medical applications to review', 'New applications will appear here.'],
         'actions' => function ($row) {
-            return ui_row_links(1, $row, true, '../medical/Mpending.php')
+            return ui_row_links(1, $row, true, '../medical/Mpending.php', true)
                 . ui_decision_buttons($row, 1, 'Approved_ALL.php');
         },
     ]) ?>

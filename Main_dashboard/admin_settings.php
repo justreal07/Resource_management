@@ -452,8 +452,8 @@ $tabs = [
                border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--c-text); font: inherit; cursor: pointer; }
     .iis-tab .icon { color: var(--c-primary); flex: none; }
     .iis-tab:hover { background: var(--c-primary-soft); }
-    .iis-tab[aria-selected="true"] { background: var(--c-primary); color: #fff; font-weight: 600; }
-    .iis-tab[aria-selected="true"] .icon { color: #fff; }
+    .iis-tab[aria-selected="true"] { background: var(--c-primary); color: var(--c-on-primary); font-weight: 600; }
+    .iis-tab[aria-selected="true"] .icon { color: var(--c-on-primary); }
     .iis-main { padding: 20px 24px 24px; }
     .iis-feature { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-border); }
     .iis-feature h2 { font-size: var(--fs-lg); line-height: 1.3; }

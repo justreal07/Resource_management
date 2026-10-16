@@ -41,7 +41,7 @@ echo ui_type_tabs(3, 'pending');
     ], [
         'empty' => ['No OPD requests waiting', 'New requests will appear here.'],
         'actions' => function ($row) {
-            return ui_row_links(3, $row, false)
+            return ui_row_links(3, $row, false, '', true)
                 . ui_staff_update_link($row)
                 . ui_decision_buttons($row, 3, 'approve_opd.php');
         },

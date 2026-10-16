@@ -855,15 +855,61 @@
         return texts.reduce((w, t) => Math.max(w, t ? ctx.measureText(t).width : 0), 0);
     }
 
-    function buildChart(host) {
-        let spec;
-        try { spec = JSON.parse(host.dataset.chart); } catch (e) { return; }
-        const font = cssVar('--font') || 'sans-serif';
+    // Every colour of a chart comes from the page's theme (light or dark): paintChart() puts them into the chart's settings,
+    // when it is drawn and again when the theme changes, so a chart never has to be rebuilt (the staff page's "top 10" cut stays)
+    function paintChart(spec, config) {
         const c = {
             series: cssVar('--viz-series'), hover: cssVar('--viz-series-hover'), other: cssVar('--viz-other'),
             grid: cssVar('--viz-grid'), text: cssVar('--c-text'), muted: cssVar('--c-text-muted'), surface: cssVar('--c-surface')
         };
         const statusColors = { approved: cssVar('--viz-approved'), pending: cssVar('--viz-pending') };
+        const o = config.options;
+        const sets = config.data.datasets;
+
+        // The hover box is the page's text colour with the card colour as its text (inverts by itself in dark mode)
+        o.plugins.tooltip.backgroundColor = c.text;
+        o.plugins.tooltip.titleColor = c.surface;
+        o.plugins.tooltip.bodyColor = c.surface;
+        o.plugins.lguValueLabels.color = c.text;
+
+        if (spec.type === 'column') {
+            sets[0].backgroundColor = c.series;
+            sets[0].hoverBackgroundColor = c.hover;
+            o.scales.x.border.color = c.grid;
+            o.scales.x.ticks.color = c.muted;
+            o.scales.y.grid.color = c.grid;
+            o.scales.y.ticks.color = c.muted;
+        } else if (spec.type === 'hbar') {
+            sets[0].backgroundColor = spec.other.map((other) => (other ? c.other : c.series));
+            sets[0].hoverBackgroundColor = spec.other.map((other) => (other ? c.muted : c.hover));
+            o.scales.y.ticks.color = c.text;
+        } else {
+            sets.forEach((set, i) => {
+                set.backgroundColor = statusColors[spec.series[i].class] || c.series;
+                set.borderColor = c.surface;   // the 2px gap between segments
+            });
+            o.scales.y.ticks.color = c.text;
+            o.plugins.legend.labels.color = c.text;
+        }
+    }
+
+    const drawnCharts = [];   // { chart, spec, config } of every Chart.js chart on this page
+
+    // The light/dark button (js/admin_theme.js) or the computer's setting changed: the charts take the new colours in place
+    function repaintCharts() {
+        if (!drawnCharts.length || !window.Chart) return;
+        window.Chart.defaults.color = cssVar('--c-text-muted');
+        drawnCharts.forEach((d) => {
+            paintChart(d.spec, d.config);
+            d.chart.update('none');
+        });
+    }
+    document.addEventListener('themechange', repaintCharts);
+
+    function buildChart(host) {
+        let spec;
+        try { spec = JSON.parse(host.dataset.chart); } catch (e) { return; }
+        const font = cssVar('--font') || 'sans-serif';
         const rows = spec.labels.length;
 
         const box = document.createElement('div');
@@ -881,7 +927,7 @@
         box.appendChild(canvas);
 
         const tooltip = {
-            backgroundColor: c.text, titleColor: '#fff', bodyColor: '#fff', padding: 10, cornerRadius: 6, boxPadding: 4,
+            padding: 10, cornerRadius: 6, boxPadding: 4,
             displayColors: spec.type === 'stack',
             titleFont: { family: font, size: 14, weight: '600' }, bodyFont: { family: font, size: 14 },
             callbacks: {
@@ -895,14 +941,14 @@
         if (spec.type === 'column') {
             config = {
                 data: { labels: spec.labels, datasets: [{
-                    data: spec.values, backgroundColor: c.series, hoverBackgroundColor: c.hover,
+                    data: spec.values,
                     borderRadius: { topLeft: 4, topRight: 4 }, borderSkipped: 'bottom', maxBarThickness: 24
                 }] },
                 options: {
                     layout: { padding: { top: 24 } },
                     scales: {
-                        x: { grid: { display: false }, border: { color: c.grid }, ticks: { maxRotation: 0, autoSkipPadding: 8 } },
-                        y: { beginAtZero: true, max: spec.max, border: { display: false }, grid: { color: c.grid },
+                        x: { grid: { display: false }, border: {}, ticks: { maxRotation: 0, autoSkipPadding: 8 } },
+                        y: { beginAtZero: true, max: spec.max, border: { display: false }, grid: {},
                              ticks: { stepSize: spec.max / 2, callback: (v) => shortNumber(v, spec.unit) } }
                     },
                     plugins: { tooltip: tooltip }
@@ -912,8 +958,6 @@
             config = {
                 data: { labels: spec.labels, datasets: [{
                     data: spec.values,
-                    backgroundColor: spec.other.map((o) => (o ? c.other : c.series)),
-                    hoverBackgroundColor: spec.other.map((o) => (o ? c.muted : c.hover)),
                     borderRadius: { topRight: 4, bottomRight: 4 }, borderSkipped: 'start', maxBarThickness: 18
                 }] },
                 options: {
@@ -922,7 +966,7 @@
                     scales: {
                         x: { display: false, beginAtZero: true },
                         y: { grid: { display: false }, border: { display: false },
-                             ticks: { color: c.text, callback(v) { const l = this.getLabelForValue(v); return l.length > 24 ? l.slice(0, 23) + '…' : l; } } }
+                             ticks: { callback(v) { const l = this.getLabelForValue(v); return l.length > 24 ? l.slice(0, 23) + '…' : l; } } }
                     },
                     plugins: { tooltip: tooltip }
                 }
@@ -931,19 +975,19 @@
             const totals = spec.labels.map((l, i) => spec.series.reduce((sum, s) => sum + s.values[i], 0));
             config = {
                 data: { labels: spec.labels, datasets: spec.series.map((s) => ({
-                    label: s.label, data: s.values, backgroundColor: statusColors[s.class] || c.series,
-                    borderColor: c.surface, borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 20   // 2px gap between segments
+                    label: s.label, data: s.values,
+                    borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 20   // 2px gap between segments
                 })) },
                 options: {
                     indexAxis: 'y',
                     layout: { padding: { right: endLabelRoom } },
                     scales: {
                         x: { stacked: true, display: false, beginAtZero: true },
-                        y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { color: c.text, font: { weight: '600' } } }
+                        y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { font: { weight: '600' } } }
                     },
                     plugins: {
                         legend: { display: true, position: 'top', align: 'start', onClick: () => {},
-                                  labels: { color: c.text, boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 3, padding: 14 } },
+                                  labels: { boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 3, padding: 14 } },
                         tooltip: Object.assign({}, tooltip, { callbacks: {
                             title: (items) => items[0].label,
                             label: (item) => ' ' + item.dataset.label + ': ' + item.raw.toLocaleString('en-US') + ' (' + Math.round(item.raw / (totals[item.dataIndex] || 1) * 100) + '%)'
@@ -959,11 +1003,12 @@
         config.options.maintainAspectRatio = false;
         config.options.animation = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? false : { duration: 500 };
         config.options.plugins.legend = config.options.plugins.legend || { display: false };
-        config.options.plugins.lguValueLabels = { texts: spec.texts, font: font, color: c.text };
+        config.options.plugins.lguValueLabels = { texts: spec.texts, font: font, color: '' };
+        paintChart(spec, config);   // every colour, from the page's theme
 
         host.appendChild(box);
         try {
-            new window.Chart(canvas, config);
+            drawnCharts.push({ chart: new window.Chart(canvas, config), spec: spec, config: config });
             host.classList.add('is-enhanced');   // hides the HTML version (CSS)
         } catch (e) {
             box.remove();

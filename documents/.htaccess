@@ -1,14 +1,17 @@
-# Uploaded applicant photos - files here must never run as code
-Options -Indexes -ExecCGI
-
-<FilesMatch "(?i)\.(php\d?|phtml|phar|pl|py|cgi|sh|asp|aspx|jsp|sql|htaccess)$">
+# Uploaded applicant photos (IDs, certificates: personal data).
+# Apache no longer serves anything in this folder by its own address.
+# The photos are opened through user/document.php, which checks who is asking first
+# (the applicant who sent them, an admin, or OPD staff for OPD requests) and reads the file itself.
+<IfModule mod_authz_core.c>
     Require all denied
-</FilesMatch>
-
-<IfModule mod_php.c>
-    php_flag engine off
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
 </IfModule>
 
-<IfModule mod_headers.c>
-    Header set X-Content-Type-Options "nosniff"
+# Whatever else happens, files here must never run as code
+Options -Indexes -ExecCGI
+<IfModule mod_php.c>
+    php_flag engine off
 </IfModule>

@@ -20,7 +20,7 @@ $id = intval($_GET['id']);
 // Where to go after saving or Cancel. Only a page of this system is accepted (e.g. ../medical/Mpending.php),
 // so a link can't send the user to another website.
 $redirect = isset($_GET['redirect']) && is_string($_GET['redirect'])
-    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/)?[A-Za-z_]+\.php$#', $_GET['redirect'])
+    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/)?[A-Za-z_]+\.php(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
     ? $_GET['redirect'] : 'applicants.php';
 
 // Fetch applicant data

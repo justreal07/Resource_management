@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once 'account_layout.php';
+require_once '../includes/documents.php';
 
 $ctx = account_context($pdo);
 $account_id = (int)$ctx['user']['id'];
@@ -64,7 +65,7 @@ account_page_start($ctx, 'My Documents', 'documents', [
         </header>
         <div class="acc-gallery">
             <?php foreach ($g['docs'] as $d):
-                $url = '../documents/' . rawurlencode(basename($d['file_path']));
+                $url = document_url((int)$d['id'], false, '');   // opened through document.php (checks it is yours)
                 $is_img = preg_match('/\.(jpe?g|png|webp|gif)$/i', $d['file_path']); ?>
             <figure class="acc-doc" data-doc data-name="<?= e(strtolower($d['document_name'])) ?>">
                 <?php if ($is_img): ?>
@@ -77,7 +78,7 @@ account_page_start($ctx, 'My Documents', 'documents', [
                 <figcaption>
                     <strong><?= e($d['document_name']) ?></strong>
                     <small class="ap-muted"><?= e(date('M d, Y', strtotime($d['uploaded_at']))) ?></small>
-                    <a href="<?= e($url) ?>" download class="ap-link-btn acc-small"><i class="fas fa-download"></i> Download</a>
+                    <a href="<?= e(document_url((int)$d['id'], true, '')) ?>" download class="ap-link-btn acc-small"><i class="fas fa-download"></i> Download</a>
                 </figcaption>
             </figure>
             <?php endforeach; ?>

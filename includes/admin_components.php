@@ -6,6 +6,7 @@
  *
  * Every value printed through these helpers is escaped with ui_e().
  */
+require_once __DIR__ . '/documents.php';   // document_url() / document_file_path(): the submitted-documents list
 
 /* ============================================================
    ASSISTANCE TYPES AND STATUSES
@@ -408,12 +409,35 @@ function ui_back_link(string $fallbackHref, string $fallbackLabel): array
     return [$fallbackHref, $fallbackLabel];
 }
 
-/** The common action links for a row: View and, where the page had it, Edit. */
-function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPage = ''): string
+/**
+ * The side-by-side review page for an application: its photos next to its details, with Approve / Disapprove below
+ * (includes/review_page.php). Admin: Main_dashboard/review.php (any program); staff side: staff/review.php (OPD).
+ * Without $id it opens the first application waiting in program $typeId. $advance: come back here after a decision,
+ * and move on to the next waiting application.
+ */
+function ui_review_url(int $id = 0, int $typeId = 0, bool $advance = false): string
+{
+    $q = [];
+    if ($id > 0) $q['id'] = $id; elseif ($typeId > 0) $q['type'] = $typeId;
+    if ($advance) $q['advance'] = 1;
+    return (ui_area() === 'staff' ? '../staff/review.php' : '../Main_dashboard/review.php') . ($q ? '?' . http_build_query($q) : '');
+}
+
+/**
+ * The common action links for a row: View and, where the page had it, Edit.
+ * $review = true on the Pending lists: a waiting application opens in the review page (photos and details side by
+ * side, Approve / Disapprove) instead of the plain record, for someone who may decide it. The record is one click away from there.
+ */
+function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPage = '', bool $review = false): string
 {
     $name = ui_person_name($row);
-    $html = '<a class="btn btn-secondary btn-sm" href="' . ui_e(ui_type_url($typeId, 'view', ['id' => (int)$row['id']])) . '">'
-        . ui_icon('file') . 'View<span class="visually-hidden"> ' . ui_e($name) . ', Ref #' . (int)$row['id'] . '</span></a>';
+    if ($review && ($row['status'] ?? '') === 'Pending' && decision_can(decision_user(), $typeId)) {
+        $html = '<a class="btn btn-secondary btn-sm" href="' . ui_e(ui_review_url((int)$row['id'])) . '">'
+            . ui_icon('search') . 'Review<span class="visually-hidden"> ' . ui_e($name) . ', Ref #' . (int)$row['id'] . '</span></a>';
+    } else {
+        $html = '<a class="btn btn-secondary btn-sm" href="' . ui_e(ui_type_url($typeId, 'view', ['id' => (int)$row['id']])) . '">'
+            . ui_icon('file') . 'View<span class="visually-hidden"> ' . ui_e($name) . ', Ref #' . (int)$row['id'] . '</span></a>';
+    }
     if ($withEdit) {
         $q = ['id' => (int)$row['id']];
         if ($returnPage !== '') $q['redirect'] = $returnPage;
@@ -441,7 +465,7 @@ function ui_opd_schedule_day(array $row): string
  * The row's account_email (if the list selected it) tells the dialog where the email will go;
  * OPD: its checkup_date is the trip day, shown in the dialog (or why the trip can't be scheduled).
  */
-function ui_approve_button(array $row, string $action, int $typeId): string
+function ui_approve_button(array $row, string $action, int $typeId, array $opts = []): string
 {
     $id = (int)$row['id'];
     $walkIn = array_key_exists('account_id', $row) && $row['account_id'] === null;
@@ -451,10 +475,10 @@ function ui_approve_button(array $row, string $action, int $typeId): string
         $schedule = ' data-schedule="' . ui_e(ui_opd_schedule_day($row)) . '"'
             . ($problem !== null ? ' data-schedule-problem="' . ui_e($problem) . '"' : '');
     }
-    return '<button type="button" class="btn btn-primary btn-sm" data-approve-open="' . $id . '" data-action="' . ui_e($action) . '"'
+    return '<button type="button" class="' . ui_e($opts['class'] ?? 'btn btn-primary btn-sm') . '" data-approve-open="' . $id . '" data-action="' . ui_e($action) . '"'
         . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . $id . '"'
         . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '"' . ($walkIn ? ' data-walkin' : '') . $schedule . '>'
-        . ui_icon('check-circle') . 'Approve</button>';
+        . ui_icon('check-circle') . 'Approve' . (isset($opts['hint']) ? ' <kbd>' . ui_e($opts['hint']) . '</kbd>' : '') . '</button>';
 }
 
 /**
@@ -536,11 +560,11 @@ function ui_claim_requirements_text(int $typeId): string
  * One Approve dialog per Pending list: the approval details (ui_claim_fields), then "Approve & send email".
  * The button that opens it sets the form's action, the applicant and, for OPD, the trip day (admin_ui.js).
  */
-function ui_approve_dialog(int $typeId): string
+function ui_approve_dialog(int $typeId, string $return = ''): string
 {
     return '<dialog id="approveDialog" class="modal" aria-labelledby="approveTitle">'
         . '<form method="POST" novalidate data-approve-dialog-form data-claim-type="' . $typeId . '">'
-        . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e(ui_current_page()) . '">'
+        . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e($return !== '' ? $return : ui_current_page()) . '">'
         . '<input type="hidden" name="applicant_id" data-approve-id>'
         . '<div class="modal-header"><h2 id="approveTitle">Approve the ' . ($typeId === 3 ? 'OPD request' : 'application') . ' of <span data-approve-name></span></h2>'
         . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
@@ -566,19 +590,20 @@ function ui_current_page(): string
  * Disapprove button for a Pending row: opens the disapprove dialog (ui_disapprove_dialog) with this
  * person's name and reference. Shown only to someone allowed to decide (the server checks again).
  */
-function ui_disapprove_button(array $row, int $typeId): string
+function ui_disapprove_button(array $row, int $typeId, array $opts = []): string
 {
     if (($row['status'] ?? 'Pending') !== 'Pending' || !decision_can(decision_user(), $typeId)) return '';
-    return '<button type="button" class="btn btn-danger btn-sm" data-disapprove="' . (int)$row['id'] . '"'
-        . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '">' . ui_icon('x-circle') . 'Disapprove</button>';
+    return '<button type="button" class="' . ui_e($opts['class'] ?? 'btn btn-danger btn-sm') . '" data-disapprove="' . (int)$row['id'] . '"'
+        . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '">' . ui_icon('x-circle') . 'Disapprove'
+        . (isset($opts['hint']) ? ' <kbd>' . ui_e($opts['hint']) . '</kbd>' : '') . '</button>';
 }
 
 /** One disapprove dialog per page (used when SweetAlert2 hasn't loaded). Posts to Main_dashboard/disapprove_applicant.php. */
-function ui_disapprove_dialog(): string
+function ui_disapprove_dialog(string $return = ''): string
 {
     return '<dialog id="disapproveDialog" class="modal modal-sm" aria-labelledby="disapproveTitle">'
         . '<form method="POST" action="../Main_dashboard/disapprove_applicant.php" data-disapprove-form>'
-        . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e(ui_current_page()) . '">'
+        . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e($return !== '' ? $return : ui_current_page()) . '">'
         . '<div class="modal-header"><h2 id="disapproveTitle">Disapprove this application for <span data-disapprove-name></span>?</h2>'
         . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
         . '<div class="modal-body">'
@@ -604,6 +629,63 @@ function ui_decision_buttons(array $row, int $typeId, string $approveAction): st
 {
     if (($row['status'] ?? '') !== 'Pending' || !decision_can(decision_user(), $typeId)) return '';
     return ui_disapprove_button($row, $typeId) . ui_approve_button($row, $approveAction, $typeId);
+}
+
+/* ============================================================
+   TREND LINES (stat-tile style: a number with a small line under it)
+   ============================================================ */
+
+/** The two lines and the end dot of a trend line, as SVG point lists. Same arithmetic as sparkGeometry() in js/admin_live.js. */
+function ui_spark_geometry(array $values): array
+{
+    $n = count($values);
+    $w = 132; $h = 36; $padX = 6; $padY = 6;   // room for the 8px end dot and its ring
+    $max = max(1, max($values));
+    $pts = [];
+    foreach ($values as $i => $v) {
+        $pts[] = [number_format($padX + $i * ($w - 2 * $padX) / ($n - 1), 1, '.', ''), number_format($h - $padY - $v / $max * ($h - 2 * $padY), 1, '.', '')];
+    }
+    $split = max(1, $n - 7);   // the latest week is drawn in the accent colour, what came before in a quiet grey
+    $join = function (array $slice) { return implode(' ', array_map(function ($p) { return $p[0] . ',' . $p[1]; }, $slice)); };
+    return ['old' => $join(array_slice($pts, 0, $split + 1)), 'new' => $join(array_slice($pts, $split)), 'dot' => end($pts), 'base' => $h - $padY];
+}
+
+/**
+ * A small trend line for a number: the last days as a thin line (grey, with the latest week in the accent colour and a
+ * dot on today), and under it the figure in words. Drawn here so it shows at once; js/admin_live.js redraws it with the
+ * same geometry when the numbers change and shows the day under the pointer. $attrs: extra attributes for the wrapper.
+ */
+function ui_sparkline(array $values, array $labels, string $what, string $attrs = ''): string
+{
+    $values = array_map('intval', array_values($values));
+    if (count($values) < 2) return '';
+    $g = ui_spark_geometry($values);
+    $total = array_sum($values);
+    return '<span class="spark" data-spark="' . ui_e(json_encode($values)) . '" data-spark-labels="' . ui_e(json_encode(array_values($labels))) . '" data-spark-what="' . ui_e($what) . '"' . $attrs . '>'
+        . '<svg class="spark-svg" width="132" height="36" viewBox="0 0 132 36" aria-hidden="true" focusable="false">'
+        . '<line class="spark-base" x1="6" x2="126" y1="' . $g['base'] . '" y2="' . $g['base'] . '"/>'
+        . '<polyline class="spark-old" points="' . $g['old'] . '"/><polyline class="spark-new" points="' . $g['new'] . '"/>'
+        . '<circle class="spark-dot" cx="' . $g['dot'][0] . '" cy="' . $g['dot'][1] . '" r="4"/>'
+        . '<circle class="spark-hover" r="4" cx="0" cy="0" style="display:none"/></svg>'
+        . '<span class="spark-note" data-spark-note>' . ui_spark_note($total, count($values)) . '</span></span>';
+}
+
+/** "5 new in 14 days" / "No new applications in 14 days" (same words in js/admin_live.js). */
+function ui_spark_note(int $total, int $days): string
+{
+    return $total === 0 ? 'No new applications in ' . $days . ' days' : '<strong>' . number_format($total) . '</strong> new in ' . $days . ' days';
+}
+
+/**
+ * The same figures as words, for a screen reader (the line only shows the shape): put it beside the card, not inside
+ * a link. $key lets js/admin_live.js find it again.
+ */
+function ui_sparkline_text(array $values, array $labels, string $what, string $key): string
+{
+    $parts = [];
+    foreach (array_values($values) as $i => $v) $parts[] = date('M j', strtotime($labels[$i])) . ': ' . (int)$v;
+    return '<p class="visually-hidden" data-live-spark-text="' . ui_e($key) . '" data-spark-what="' . ui_e($what) . '">'
+        . ui_e($what) . ' filed per day, oldest first. ' . ui_e(implode(', ', $parts)) . '.</p>';
 }
 
 /* ============================================================
@@ -903,29 +985,15 @@ function ui_type_overview(int $typeId, array $stats, array $recent, array $month
    ============================================================ */
 
 /**
- * Where an uploaded document is and whether the file is really there.
- * Same lookup as the old view pages: documents/ at the project root, then a match on the file's id.
+ * Where an uploaded document opens and whether the file is really there.
+ * The photos are not served from documents/ directly (personal data): the address is user/document.php,
+ * which checks who is asking. includes/documents.php does the file lookup (stored name, then the file's id).
  *
  * @return array{0: string, 1: bool} [url, exists]
  */
 function ui_document_link(array $doc): array
 {
-    $clean = basename(str_replace('documents/', '', (string)$doc['file_path']));
-    // rawurlencode: a space in a file name must become %20 ("+" only means a space in a query string)
-    $url = '../documents/' . rawurlencode($clean);
-    $exists = $clean !== '' && file_exists(__DIR__ . '/../documents/' . $clean);
-    // The file's id is the long hex prefix of its name (uniqid). A short match like "e" would open
-    // another applicant's document, so at least 8 hex characters are needed.
-    if (!$exists && preg_match('/([a-f0-9]{8,})/', $clean, $m) && is_dir(__DIR__ . '/../documents/')) {
-        foreach (scandir(__DIR__ . '/../documents/') as $file) {
-            if ($file !== '.' && $file !== '..' && strpos($file, $m[1]) !== false) {
-                $url = '../documents/' . rawurlencode($file);
-                $exists = true;
-                break;
-            }
-        }
-    }
-    return [$url, $exists];
+    return [document_url((int)($doc['id'] ?? 0)), document_file_path($doc) !== null];
 }
 
 /** A staff/admin user's name for "Approved by" / "Disapproved by" ("User #12" if the account is gone). */
@@ -996,29 +1064,16 @@ function ui_detail_card(string $title, string $icon, array $details): string
 }
 
 /**
- * The full record of one application, laid out the same way for every program.
- * Labels follow what each online form asks (user/Medical Assistance.php, burial_assistance_form.php, opdform.php).
+ * The detail cards of one application, in two groups: [who => who and where (patient / claimant / address),
+ * what => what is asked and how it was decided (request, then the status card)]. Shared by the record view
+ * (ui_applicant_record) and the side-by-side review page (includes/review_page.php), so both always agree.
+ *
+ * @return array{who: string[], what: string[]}
  */
-function ui_applicant_record(array $a, array $documents, string $backHref, string $backLabel): string
+function ui_record_cards(array $a): array
 {
     $type = (int)$a['assistance_type_id'];
-    $typeName = $a['assistance_type'] ?? (ui_types()[$type]['name'] ?? 'Assistance');
-    $filed = strtotime($a['created_at']);
     $has = function (string $k) use ($a) { return array_key_exists($k, $a) && $a[$k] !== null && $a[$k] !== ''; };
-
-    $html = '<div class="record-head panel">'
-        . '<a class="back-link" href="' . ui_e($backHref) . '">' . ui_icon('chevron-left') . ui_e($backLabel) . '</a>'
-        . '<div class="record-title"><div>'
-        . '<h2>' . ui_e(ui_full_name($a)) . '</h2>'
-        . '<p class="panel-sub">Ref #' . (int)$a['id'] . ' · ' . ui_e($typeName) . ' · Filed ' . ui_e(date('M j, Y, g:i A', $filed)) . '</p>'
-        . '</div>' . ui_badge($a['status']) . '</div>'
-        // At a glance: what the office looks at first
-        . '<dl class="record-facts">'
-        . ui_detail('Filed on', date('M j, Y, g:i A', $filed))
-        . ui_detail('Filed by', array_key_exists('account_id', $a) ? ($a['account_id'] === null ? 'Walk-in, added by the office' : 'Applicant, online') : '')
-        . ui_detail('Contact number', $a['contact_number'] ?? '')
-        . ui_detail('Documents', count($documents) === 1 ? '1 uploaded' : count($documents) . ' uploaded')
-        . '</dl></div>';
 
     // Application and decision
     $app = [ui_detail('Status', $a['status'])];
@@ -1123,6 +1178,39 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         $what[] = ui_detail_card('Request', 'medical', $request);
     }
     $what[] = $decision;
+
+    return ['who' => $who, 'what' => $what];
+}
+/**
+ * The full record of one application, laid out the same way for every program.
+ * Labels follow what each online form asks (user/Medical Assistance.php, burial_assistance_form.php, opdform.php).
+ */
+function ui_applicant_record(array $a, array $documents, string $backHref, string $backLabel): string
+{
+    $type = (int)$a['assistance_type_id'];
+    $typeName = $a['assistance_type'] ?? (ui_types()[$type]['name'] ?? 'Assistance');
+    $filed = strtotime($a['created_at']);
+    $has = function (string $k) use ($a) { return array_key_exists($k, $a) && $a[$k] !== null && $a[$k] !== ''; };
+
+    // A waiting application: for someone who may decide it, one click opens the side-by-side review (photos, details, Approve / Disapprove)
+    $review = ($a['status'] ?? '') === 'Pending' && decision_can(decision_user(), $type)
+        ? '<a class="btn btn-primary btn-sm" href="' . ui_e(ui_review_url((int)$a['id'])) . '">' . ui_icon('search') . 'Review</a>' : '';
+
+    $html = '<div class="record-head panel">'
+        . '<a class="back-link" href="' . ui_e($backHref) . '">' . ui_icon('chevron-left') . ui_e($backLabel) . '</a>'
+        . '<div class="record-title"><div>'
+        . '<h2>' . ui_e(ui_full_name($a)) . '</h2>'
+        . '<p class="panel-sub">Ref #' . (int)$a['id'] . ' · ' . ui_e($typeName) . ' · Filed ' . ui_e(date('M j, Y, g:i A', $filed)) . '</p>'
+        . '</div>' . ($review !== '' ? '<div class="record-title-side">' . ui_badge($a['status']) . $review . '</div>' : ui_badge($a['status'])) . '</div>'
+        // At a glance: what the office looks at first
+        . '<dl class="record-facts">'
+        . ui_detail('Filed on', date('M j, Y, g:i A', $filed))
+        . ui_detail('Filed by', array_key_exists('account_id', $a) ? ($a['account_id'] === null ? 'Walk-in, added by the office' : 'Applicant, online') : '')
+        . ui_detail('Contact number', $a['contact_number'] ?? '')
+        . ui_detail('Documents', count($documents) === 1 ? '1 uploaded' : count($documents) . ' uploaded')
+        . '</dl></div>';
+
+    ['who' => $who, 'what' => $what] = ui_record_cards($a);
     $html .= '<div class="record-cols"><div class="record-col">' . implode('', $who) . '</div><div class="record-col">' . implode('', $what) . '</div></div>';
     if ($has('remarks')) {
         $html .= '<section class="panel detail-card"><h3>' . ui_icon('info') . 'Remarks</h3><p class="remarks">' . nl2br(ui_e($a['remarks'])) . '</p></section>';

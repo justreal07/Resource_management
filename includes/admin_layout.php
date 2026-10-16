@@ -14,6 +14,7 @@
  */
 require_once __DIR__ . '/application_decision.php';
 require_once __DIR__ . '/admin_security.php';
+require_once __DIR__ . '/documents.php';
 require_once __DIR__ . '/admin_components.php';
 
 // Activity log, "turned off" staff accounts: create their tables/columns the first time (does nothing once done).
@@ -72,6 +73,46 @@ function staff_nav(): array
         'pending' => ['href' => ui_type_url(3, 'pending'), 'label' => 'To review', 'icon' => 'clock', 'roles' => ['staff', 'admin'], 'type' => 3],
         'reports' => ['href' => '../staff/opd_staff_report.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
     ];
+}
+
+/**
+ * What the Ctrl+K command bar can open: the menu of this side, every list of every program this person handles,
+ * "review" for each program, and a few actions. Built from the same pieces as the menu and the program tabs
+ * (admin_nav(), staff_nav(), ui_types(), ui_type_url()), so there is nothing extra to keep up to date.
+ * Each: label, href, icon, group, words (more words that find it, e.g. "pending" finds "Waiting for review").
+ * People are found by search.php, not listed here.
+ */
+function admin_commands(): array
+{
+    $user = decision_user();
+    $role = $user['role'] ?? '';
+    $staffSide = ui_area() === 'staff';
+    $cmds = [];
+    foreach ($staffSide ? staff_nav() : admin_nav() as $item) {
+        if ($role !== '' && !in_array($role, $item['roles'], true)) continue;
+        $cmds[] = ['label' => $item['label'], 'href' => $item['href'], 'icon' => $item['icon'], 'group' => 'Go to', 'words' => ''];
+    }
+    $pages = ['all' => ['All applications', 'all list'], 'pending' => ['Waiting for review', 'pending to review queue'],
+              'approved' => ['Approved', 'approved done'], 'disapproved' => ['Disapproved', 'disapproved rejected not approved']];
+    foreach (ui_types() as $id => $t) {
+        if (!decision_can($user, $id) || ($staffSide && $id !== 3)) continue;
+        foreach ($pages as $page => [$label, $words]) {
+            $cmds[] = ['label' => $t['short'] . ' · ' . $label, 'href' => ui_type_url($id, $page), 'icon' => $t['icon'], 'group' => 'Lists', 'words' => $t['name'] . ' ' . $words];
+        }
+        $cmds[] = ['label' => 'Review ' . $t['short'] . ' applications', 'href' => ui_review_url(0, $id), 'icon' => 'search', 'group' => 'Actions',
+                   'words' => $t['name'] . ' start reviewing side by side approve disapprove'];
+    }
+    if (!$staffSide && $role === 'admin') {
+        $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../Main_dashboard/dashboard.php#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant'];
+        $cmds[] = ['label' => 'Add staff account', 'href' => '../login/register.php', 'icon' => 'user-plus', 'group' => 'Actions', 'words' => 'new staff admin user account register'];
+    }
+    // The look of the pages: not a page but something the command bar does itself (js/admin_theme.js); 'theme' stands in for 'href'
+    // (few extra words on purpose: every word is searched as a part of a word, so a long list would show these rows for unrelated names)
+    $cmds[] = ['label' => 'Dark theme', 'href' => '', 'theme' => 'dark', 'icon' => 'moon', 'group' => 'Actions', 'words' => 'dark mode night'];
+    $cmds[] = ['label' => 'Light theme', 'href' => '', 'theme' => 'light', 'icon' => 'sun', 'group' => 'Actions', 'words' => 'light mode day'];
+    $cmds[] = ['label' => 'Match this computer’s theme', 'href' => '', 'theme' => 'auto', 'icon' => 'settings', 'group' => 'Actions', 'words' => 'automatic auto system device follow'];
+    $cmds[] = ['label' => 'Log out', 'href' => '../login/admin_logout.php', 'icon' => 'logout', 'group' => 'Actions', 'words' => 'sign out logout exit'];
+    return $cmds;
 }
 
 /**
@@ -195,6 +236,8 @@ function admin_layout_start(array $page): void
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <!-- Hidden sidebar (menu button on desktop) is applied before the page draws, so it doesn't flash open -->
     <script>try { if (localStorage.getItem('lgu.sidebarCollapsed') === '1') document.documentElement.classList.add('sidebar-collapsed'); } catch (e) {}</script>
+    <!-- Same for the light/dark choice made with the top bar's moon button (js/admin_theme.js); nothing chosen = the computer's setting -->
+    <script>try { const t = localStorage.getItem('lgu.theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
 </head>
 <body>
 
@@ -235,6 +278,8 @@ function admin_layout_start(array $page): void
     <symbol id="i-archive" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4"/></symbol>
     <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="M3 10v4h4l8 5V5L7 10H3zM18 9a4 4 0 0 1 0 6M7 14l1.5 6h3L10 15"/></symbol>
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
 </svg>
 
 <div class="app">
@@ -264,6 +309,12 @@ function admin_layout_start(array $page): void
                 <?php endforeach; ?>
             </ul>
         </nav>
+        <!-- Light / dark for narrow screens (600px and under), where the top bar has no room for its own button; CSS shows one or the other -->
+        <div class="sidebar-theme">
+            <button type="button" class="nav-link" data-theme-toggle title="Switch to dark theme">
+                <?= ui_icon('moon', 'theme-moon') ?><?= ui_icon('sun', 'theme-sun') ?><span class="nav-text" data-theme-label>Switch to dark theme</span>
+            </button>
+        </div>
         <?php if ($user): ?>
             <div class="sidebar-user">
                 <span class="avatar" aria-hidden="true"><?= ui_e($initials ?: 'A') ?></span>
@@ -283,6 +334,16 @@ function admin_layout_start(array $page): void
                 <p><?= ui_e(date('l, F j, Y')) ?></p>
             </div>
             <?= $page['topbar_extra'] ?? '' ?>
+            <?php if ($user): ?>
+                <button type="button" class="cmdk-btn" data-command-open aria-haspopup="dialog" aria-controls="commandBar">
+                    <?= ui_icon('search') ?><span class="cmdk-btn-text">Search</span><kbd class="cmdk-btn-kbd" data-command-kbd>Ctrl K</kbd>
+                    <span class="visually-hidden">Search a name or reference number, or jump to a page</span>
+                </button>
+            <?php endif; ?>
+            <!-- Light / dark: shows the moon in light mode and the sun in dark mode (CSS); its label follows the theme in use (js/admin_theme.js) -->
+            <button type="button" class="icon-btn theme-btn" data-theme-toggle title="Switch to dark theme">
+                <?= ui_icon('moon', 'theme-moon') ?><?= ui_icon('sun', 'theme-sun') ?><span class="visually-hidden" data-theme-label>Switch to dark theme</span>
+            </button>
             <?php if ($user): ?>
                 <div class="user-chip">
                     <span class="avatar" aria-hidden="true"><?= ui_e($initials ?: 'A') ?></span>
@@ -341,6 +402,7 @@ function admin_layout_end(array $opts = []): void
         'sessionLifetime' => (int)ini_get('session.gc_maxlifetime'),
         'loginUrl'        => ui_login_url(),
         'vendor'          => ui_vendor_libs(),
+        'commands'        => decision_user() !== null ? admin_commands() : [],   // the Ctrl+K command bar (js/admin_command.js)
     ], $opts['config'] ?? []);
     // Staff pages: the form token for staff tools that send data with fetch (see staff_widgets())
     $staffTools = ui_area() === 'staff' && decision_user() !== null;
@@ -373,6 +435,25 @@ function admin_layout_end(array $opts = []): void
 
 <?= $opts['after'] ?? '' ?>
 
+<?php if (decision_user() !== null): ?>
+<!-- Ctrl+K command bar: type a name or Ref # to jump to it, or the name of a page ("pending burial"). js/admin_command.js -->
+<dialog id="commandBar" class="modal cmdk" aria-label="Search and commands">
+    <div class="cmdk-box">
+        <div class="cmdk-input">
+            <?= ui_icon('search') ?>
+            <input type="text" id="cmdkInput" role="combobox" aria-expanded="true" aria-controls="cmdkList" aria-autocomplete="list"
+                   autocomplete="off" spellcheck="false" maxlength="60"
+                   placeholder="Type a name or Ref #, or a page like “pending burial”" aria-label="Search applications and pages">
+            <kbd>Esc</kbd>
+        </div>
+        <ul id="cmdkList" class="cmdk-list" role="listbox" aria-label="Results"></ul>
+        <p class="cmdk-empty" id="cmdkEmpty" hidden></p>
+        <p class="cmdk-foot" aria-hidden="true"><span><kbd>↑</kbd> <kbd>↓</kbd> move</span><span><kbd>Enter</kbd> open</span><span><kbd>Esc</kbd> close</span></p>
+        <p class="visually-hidden" id="cmdkStatus" role="status" aria-live="polite"></p>
+    </div>
+</dialog>
+<?php endif; ?>
+
 <?php if ($widgets !== ''): ?>
 <!-- Staff tools (staff_widgets()): bottom-right corner, every staff page -->
 <div class="staff-widgets no-print" id="staffWidgets"><?= $widgets ?></div>
@@ -380,7 +461,9 @@ function admin_layout_end(array $opts = []): void
 
 <script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="../js/admin_ui.js"></script>
+<script src="../js/admin_theme.js"></script>
 <script src="../js/admin_live.js"></script>
+<script src="../js/admin_command.js"></script>
 <?php foreach ($opts['scripts'] ?? [] as $src): ?>
 <script src="<?= ui_e($src) ?>"></script>
 <?php endforeach; ?>
