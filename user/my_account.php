@@ -2,6 +2,8 @@
 require_once '../config.php';
 require_once 'application_eligibility.php';
 require_once 'account_layout.php';
+require_once '../includes/email_verify.php';
+password_reset_ensure($pdo);   // the must_change_password column used by the password form below
 
 $ctx = account_context($pdo);
 $user = $ctx['user'];
@@ -34,6 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($p['firstname'] === '' || $p['lastname'] === '') $errors[] = 'First name and last name are required.';
         if (!preg_match('/^[A-Za-z0-9._@-]{3,100}$/', $p['username'])) $errors[] = 'Username must be 3 or more characters (letters, numbers, . _ - @ only).';
         if ($p['email'] !== '' && !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
+        // An email already on the account can be changed but not removed: it is how a forgotten password is reset
+        if ($p['email'] === '' && trim((string)($user['email'] ?? '')) !== '') $errors[] = 'Your email can be changed but not removed: it is needed to reset your password if you forget it.';
         // Same format the application forms accept, since the forms are filled in from these values
         $p['phone'] = preg_replace('/[\s-]+/', '', $p['phone']);
         if (preg_match('/^\+?63(9\d{9})$/', $p['phone'], $m)) $p['phone'] = '0' . $m[1];
@@ -62,8 +66,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($errors as $err) flash('error', $err);
             $_SESSION['profile_old'] = $p;     // keep what they typed
         } else {
+            // A different email is not confirmed until its owner opens the link we send to it
+            $emailChanged = strcasecmp((string)$p['email'], (string)($user['email'] ?? '')) !== 0;
             $stmt = $pdo->prepare("UPDATE applicant_accounts SET firstname = ?, lastname = ?, username = ?, email = ?, phone = ?, sex = ?, birthdate = ?,
-                                   house_no = ?, street = ?, barangay = ?, municipality = ?, province = ? WHERE id = ?");
+                                   house_no = ?, street = ?, barangay = ?, municipality = ?, province = ?"
+                                   . ($emailChanged ? ", email_verified_at = NULL" : "") . " WHERE id = ?");
             $stmt->execute([
                 $p['firstname'], $p['lastname'], $p['username'], $p['email'] ?: null, $p['phone'] ?: null, $p['sex'] ?: null, $p['birthdate'] ?: null,
                 $p['house_no'] ?: null, $p['street'] ?: null, $p['barangay'] ?: null, $p['municipality'] ?: null, $p['province'] ?: null,
@@ -72,7 +79,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION['applicant']['firstname'] = $p['firstname'];
             $_SESSION['applicant']['lastname'] = $p['lastname'];
             $_SESSION['applicant']['username'] = $p['username'];
-            flash('success', 'Your profile was saved.');
+            if ($emailChanged && $p['email'] !== '') {
+                $sentTo = email_verify_send($pdo, $account_id);
+                flash('success', $sentTo ? 'Your profile was saved. We sent a confirmation link to ' . $p['email'] . '. Open it to confirm this address.'
+                                         : 'Your profile was saved. Your new email is not confirmed yet: choose "Send confirmation email" under the Email box.');
+            } else {
+                flash('success', 'Your profile was saved.');
+            }
+        }
+    }
+
+    // ---------- Send the email confirmation link again ----------
+    if ($action === 'send_verify') {
+        if (email_is_verified($user)) {
+            flash('success', 'Your email is already confirmed.');
+        } elseif (trim((string)$user['email']) === '') {
+            flash('error', 'Add your email address first, then save your profile.');
+        } elseif (email_verify_send($pdo, $account_id)) {
+            flash('success', 'We sent a confirmation link to ' . $user['email'] . '. It can take a minute; check Spam or Junk too.');
+        } else {
+            flash('error', 'We could not send the email right now. You can only ask for ' . EMAIL_VERIFY_PER_ACCOUNT . ' per hour; please try again later.');
         }
     }
 
@@ -126,7 +152,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (password_verify($new, $user['password'])) {
             flash('error', 'Your new password must be different from your current password.');
         } else {
-            $pdo->prepare("UPDATE applicant_accounts SET password = ? WHERE id = ?")->execute([password_hash($new, PASSWORD_DEFAULT), $account_id]);
+            // must_change_password: set when the office gave a temporary password (includes/password_reset.php)
+            $pdo->prepare("UPDATE applicant_accounts SET password = ?, must_change_password = 0 WHERE id = ?")->execute([password_hash($new, PASSWORD_DEFAULT), $account_id]);
             session_regenerate_id(true);
             flash('success', 'Your password was changed.');
         }
@@ -378,8 +405,19 @@ account_page_start($ctx, 'My Account', 'account', [
                     <p class="field-help"><?= $google ? 'You sign in with Google, so your username is your Google email.' : 'Used to log in.' ?></p>
                 </div>
                 <div class="field span-3">
-                    <label for="email">Email <span class="optional">(optional)</span></label>
-                    <input type="email" id="email" name="email" value="<?= e($profile['email'] ?? '') ?>" autocomplete="email" placeholder="you@example.com">
+                    <label for="email">Email<?= $google ? '' : ' <span class="req">*</span>' ?></label>
+                    <input type="email" id="email" name="email" value="<?= e($profile['email'] ?? '') ?>" autocomplete="email" placeholder="you@example.com"<?= trim((string)$user['email']) !== '' ? ' required' : '' ?>>
+                    <?php if (trim((string)$user['email']) === ''): ?>
+                        <p class="field-help acc-email-warn"><i class="fas fa-triangle-exclamation"></i> Add your email so you can reset your password if you forget it.</p>
+                    <?php endif; ?>
+                    <?php if (trim((string)$user['email']) !== ''): ?>
+                        <?php if (email_is_verified($user)): ?>
+                            <p class="field-help acc-email-ok"><i class="fas fa-circle-check"></i> Confirmed. You can reset your password by email.</p>
+                        <?php else: ?>
+                            <p class="field-help acc-email-warn"><i class="fas fa-triangle-exclamation"></i> Not confirmed yet. Confirm it to be able to reset your password by email.
+                                <button type="submit" form="verifyForm" class="ap-link-btn">Send confirmation email</button></p>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </div>
                 <div class="field span-3">
                     <label for="phone">Mobile number <span class="optional">(optional)</span></label>
@@ -435,6 +473,11 @@ account_page_start($ctx, 'My Account', 'account', [
                 <span class="ap-actions-note" data-dirty-note>All changes saved.</span>
                 <button type="submit" class="ap-btn ap-btn-primary"><i class="fas fa-save"></i> Save changes</button>
             </div>
+        </form>
+        <?php /* the "Send confirmation email" button in the Email field points here (a form can't sit inside another form) */ ?>
+        <form method="post" id="verifyForm" hidden>
+            <?= csrf_field() ?>
+            <input type="hidden" name="action" value="send_verify">
         </form>
     </div>
 </section>

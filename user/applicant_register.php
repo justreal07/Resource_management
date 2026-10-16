@@ -2,6 +2,7 @@
 require_once '../config.php';
 require_once 'account_helpers.php';
 require_once 'auth_layout.php';
+require_once '../includes/email_verify.php';
 require_once '../includes/privacy.php';
 
 if (isset($_SESSION['applicant'])) {
@@ -38,7 +39,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Your session expired. Please try again.';
     } else {
         $contact_errors = validate_application($contact, ['contact_number', 'barangay']);
-        if ($old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $password === '' || $confirm_password === ''
+        // The email is required: it is how a forgotten password is reset (includes/password_reset.php)
+        if ($old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $old['email'] === '' || $password === '' || $confirm_password === ''
             || in_array('This field is required.', $contact_errors, true)) {
             $errors[] = 'Please fill in all required fields.';
         }
@@ -112,7 +114,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'lastname' => $old['lastname'],
                 'email' => $old['email'] !== '' ? $old['email'] : null,
             ]);
-            // Next: choose the assistance for the first application (or skip to the home page from there)
+            // Next: choose the assistance for the first application (or skip to the home page from there).
+            // If they gave an email, the confirmation link is sent after they have been sent on.
+            if ($old['email'] !== '') {
+                password_reset_finish_response('choose_assistance.php');
+                try {
+                    email_verify_send($pdo, (int)$pdo->lastInsertId());
+                } catch (Throwable $e) {
+                    error_log('registration email confirmation: ' . $e->getMessage());
+                }
+                exit;
+            }
             header('Location: choose_assistance.php');
             exit;
         } catch (PDOException $e) {
@@ -190,12 +202,12 @@ auth_page_start('Sign up', 'register', function () { ?>
         </div>
 
         <div class="field">
-            <label for="email">Email <span class="optional">Optional</span></label>
+            <label for="email">Email</label>
             <div class="input-wrap">
-                <input type="email" id="email" name="email" maxlength="150" autocomplete="email" value="<?php echo $value('email'); ?>" placeholder="you@example.com">
+                <input type="email" id="email" name="email" required maxlength="150" autocomplete="email" value="<?php echo $value('email'); ?>" placeholder="you@example.com">
                 <i class="fas fa-envelope"></i>
             </div>
-            <span class="field-hint">You can also log in with this email.</span>
+            <span class="field-hint">Needed to reset your password if you forget it. We'll email a link to confirm it.</span>
         </div>
 
         <div class="field-row">

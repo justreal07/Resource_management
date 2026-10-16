@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once 'account_helpers.php';
+require_once '../includes/password_reset.php';
 
 $returnPage = $_SESSION['oauth_return'] ?? 'applicant_login.php';
 
@@ -49,25 +50,34 @@ try {
 
     $email = strtolower($userInfo->email);
     ensure_user_schema($pdo);
+    password_reset_ensure($pdo);   // adds email_verified_at if missing
 
-    // Match an account created with Google (username = email) or a regular account that saved this email
-    $stmt = $pdo->prepare('SELECT * FROM applicant_accounts WHERE username = ? OR email = ? ORDER BY (username = ?) DESC LIMIT 1');
+    // Match an account created with Google (username = email), or a regular account whose email was CONFIRMED.
+    // An email that was only typed at sign-up proves nothing: anyone can type someone else's address, and Google
+    // sign-in must never log the real owner into an account a stranger prepared.
+    $stmt = $pdo->prepare('SELECT * FROM applicant_accounts WHERE username = ? OR (email = ? AND email_verified_at IS NOT NULL)
+                           ORDER BY (username = ?) DESC LIMIT 1');
     $stmt->execute([$email, $email, $email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
     $isNewAccount = !$user;   // first Google sign-in: the account is created below
 
-    // A regular username/password account that saved this email is signed in as-is and keeps its password
+    // A regular username/password account with this confirmed email is signed in as-is and keeps its password
     $isGoogleAccount = !$user || strcasecmp($user['username'], $email) === 0;
 
     if ($user && $isGoogleAccount) {
-        $stmt = $pdo->prepare('UPDATE applicant_accounts SET google_token = ?, email = COALESCE(NULLIF(email, \'\'), ?), updated_at = NOW() WHERE id = ?');
+        // Google has checked this address, so it counts as confirmed
+        $stmt = $pdo->prepare('UPDATE applicant_accounts SET google_token = ?, email = COALESCE(NULLIF(email, \'\'), ?),
+                               email_verified_at = COALESCE(email_verified_at, NOW()), updated_at = NOW() WHERE id = ?');
         $stmt->execute([json_encode($token), $email, $user['id']]);
     } elseif (!$user) {
         $firstname = !empty($userInfo->given_name) ? $userInfo->given_name : (!empty($userInfo->name) ? $userInfo->name : 'User');
         $lastname = !empty($userInfo->family_name) ? $userInfo->family_name : '';
         $hashedPassword = password_hash(bin2hex(random_bytes(16)), PASSWORD_DEFAULT);
 
-        $stmt = $pdo->prepare('INSERT INTO applicant_accounts (firstname, lastname, username, email, password, google_token, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())');
+        // Google just proved who owns this address: an unconfirmed account that only typed it gives it up
+        $pdo->prepare('UPDATE applicant_accounts SET email = NULL WHERE email = ? AND email_verified_at IS NULL')->execute([$email]);
+
+        $stmt = $pdo->prepare('INSERT INTO applicant_accounts (firstname, lastname, username, email, email_verified_at, password, google_token, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), ?, ?, NOW(), NOW())');
         $stmt->execute([$firstname, $lastname, $email, $email, $hashedPassword, json_encode($token)]);
 
         $user = ['id' => $pdo->lastInsertId(), 'username' => $email, 'firstname' => $firstname, 'lastname' => $lastname];

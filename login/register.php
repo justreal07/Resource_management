@@ -86,72 +86,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 if (!in_array($role, ['admin', 'staff'], true) || ($role === 'admin' && !$canMakeAdmin)) {
     $role = 'staff';
 }
+require_once '../includes/auth_layout.php';
+
+auth_page_start('Register');
+auth_side(
+    'Create an account for the assistance records system.',
+    '<div class="side-roles">'
+    . '<div class="side-card side-role ' . ($role === 'staff' ? 'is-active' : '') . '" data-role-panel="staff" aria-hidden="' . ($role === 'staff' ? 'false' : 'true') . '">'
+    .   '<span class="side-icon">' . auth_icon('user') . '</span>'
+    .   '<div><strong>Staff account</strong><span>For office personnel who handle OPD applicants: pending requests, schedules and reports.</span></div></div>'
+    . '<div class="side-card side-role ' . ($role === 'admin' ? 'is-active' : '') . '" data-role-panel="admin" aria-hidden="' . ($role === 'admin' ? 'false' : 'true') . '">'
+    .   '<span class="side-icon">' . auth_icon('user-shield') . '</span>'
+    .   '<div><strong>Admin account</strong><span>Oversees Medical, Burial and OPD assistance, approves requests, views reports and manages accounts.</span></div></div>'
+    . '</div>'
+    . '<p class="side-note">' . auth_icon('user-shield') . ' Admin accounts are made by an existing admin. Not sure which one you need? Ask your admin.</p>'
+);
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register | LGU Assistance Records</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="../css/admin_login.css">
-</head>
-<body>
-
-<main class="login-page">
-    <div class="login-card" data-role="<?php echo $role; ?>">
-
-        <!-- Left: office info (hidden on small screens) -->
-        <aside class="login-side d-none d-lg-flex">
-            <div>
-                <div class="side-logos">
-                    <img src="../asset/ACCESS.jpg" alt="Community Affairs Office logo">
-                    <img src="../asset/logo.jpg" alt="EC Access logo">
-                </div>
-
-                <p class="side-place">Municipality of General Mariano Alvarez, Cavite</p>
-                <h1 class="side-title">Community Affairs Office</h1>
-                <p class="side-text">
-                    Create an account for the assistance records system.
-                </p>
-
-                <!-- Changes when Staff / Admin is picked -->
-                <div class="side-roles">
-                    <div class="side-role <?php echo $role === 'staff' ? 'is-active' : ''; ?>" data-role-panel="staff">
-                        <span class="side-role-icon"><i class="fas fa-user"></i></span>
-                        <div>
-                            <strong>Staff account</strong>
-                            <p>For office personnel who handle OPD applicants: pending requests, schedules and reports.</p>
-                        </div>
-                    </div>
-                    <div class="side-role <?php echo $role === 'admin' ? 'is-active' : ''; ?>" data-role-panel="admin">
-                        <span class="side-role-icon"><i class="fas fa-user-shield"></i></span>
-                        <div>
-                            <strong>Admin account</strong>
-                            <p>Oversees Medical, Burial and OPD assistance, approves requests, views reports and manages accounts.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <ul class="side-list">
-                    <li><i class="fas fa-user-shield"></i> Admin accounts are made by an existing admin</li>
-                    <li><i class="far fa-circle-question"></i> Not sure which one you need? Ask your admin</li>
-                </ul>
-            </div>
-
-            <small class="side-footer">&copy; <?php echo date('Y'); ?> LGU General Mariano Alvarez</small>
-        </aside>
 
         <!-- Right: the form -->
         <section class="login-main">
-            <div class="mobile-brand d-lg-none">
-                <img src="../asset/ACCESS.jpg" alt="Community Affairs Office logo">
-                <div>
-                    <strong>Community Affairs Office</strong>
-                    <small>LGU General Mariano Alvarez</small>
-                </div>
-            </div>
+            <?= auth_mobile_brand() ?>
 
             <h2 class="login-title">Create an account</h2>
             <p class="login-sub">
@@ -162,95 +116,78 @@ if (!in_array($role, ['admin', 'staff'], true) || ($role === 'admin' && !$canMak
             </p>
 
             <?php if (!$canRegister): ?>
-                <div class="alert alert-secondary d-flex gap-2 align-items-start" role="status">
-                    <i class="fas fa-user-shield mt-1"></i>
-                    <div>Staff and admin accounts are given by the office. Please ask your admin to create one for you;
-                        an admin can do it with "Add staff account" on the dashboard.</div>
-                </div>
-                <a class="btn btn-signin w-100 mt-2" href="login.php">Go to sign in</a>
+                <?= auth_alert('info', 'user-shield', 'Staff and admin accounts are given by the office. Please ask your admin to create one for you; an admin can do it with "Add staff account" on the dashboard.') ?>
+                <a class="btn btn-primary btn-block" href="login.php">Go to sign in</a>
             <?php else: ?>
 
             <?php if (!empty($errors)): ?>
-                <div class="alert alert-danger d-flex gap-2 align-items-start" role="alert">
-                    <i class="fas fa-circle-exclamation mt-1"></i>
-                    <div>
-                        <?php foreach ($errors as $error): ?>
-                            <div><?php echo htmlspecialchars($error); ?></div>
-                        <?php endforeach; ?>
-                    </div>
-                </div>
+                <?= auth_alert('error', 'alert', implode('', array_map(fn($e) => '<div>' . auth_e($e) . '</div>', $errors))) ?>
             <?php elseif ($created): ?>
-                <div class="alert alert-success d-flex gap-2 align-items-start" role="status">
-                    <i class="fas fa-circle-check mt-1"></i>
-                    <div>
-                        <?php echo ucfirst(htmlspecialchars($created['role'])); ?> account
-                        <strong><?php echo htmlspecialchars($created['username']); ?></strong> was created.
-                    </div>
-                </div>
+                <?= auth_alert('success', 'check-circle', auth_e(ucfirst($created['role'])) . ' account <strong>' . auth_e($created['username']) . '</strong> was created.') ?>
             <?php endif; ?>
 
-            <form method="POST" action="" data-loading-text="Creating account…">
+            <form method="POST" action="" class="auth-form" data-loading-text="Creating account…">
                 <?php echo decision_csrf_field(); ?>
-                <div class="mb-3">
-                    <span class="form-label d-block" id="roleLabel">Account type</span>
+                <div class="field">
+                    <span class="label" id="roleLabel">Account type</span>
                     <div class="role-switch" role="radiogroup" aria-labelledby="roleLabel">
-                        <span class="role-pill" aria-hidden="true"></span>
+                        <input type="radio" name="role" id="roleStaff" value="staff" autocomplete="off" <?= $role === 'staff' ? 'checked' : '' ?>>
+                        <label class="role-option" for="roleStaff"><?= auth_icon('user') ?> Staff</label>
 
-                        <input type="radio" class="btn-check" name="role" id="roleStaff" value="staff" autocomplete="off" <?php echo $role === 'staff' ? 'checked' : ''; ?>>
-                        <label class="role-option" for="roleStaff"><i class="fas fa-user"></i> Staff</label>
-
-                        <input type="radio" class="btn-check" name="role" id="roleAdmin" value="admin" autocomplete="off"
-                               <?php echo $role === 'admin' ? 'checked' : ''; ?> <?php echo $canMakeAdmin ? '' : 'disabled'; ?>>
-                        <label class="role-option" for="roleAdmin"><i class="fas fa-user-shield"></i> Admin</label>
+                        <input type="radio" name="role" id="roleAdmin" value="admin" autocomplete="off"
+                               <?= $role === 'admin' ? 'checked' : '' ?> <?= $canMakeAdmin ? '' : 'disabled' ?>>
+                        <label class="role-option" for="roleAdmin"><?= auth_icon('user-shield') ?> Admin</label>
                     </div>
                     <?php if (!$canMakeAdmin): ?>
-                        <div class="form-text">Admin accounts can only be created by a signed-in admin.</div>
+                        <div class="field-help">Admin accounts can only be created by a signed-in admin.</div>
                     <?php endif; ?>
                 </div>
 
-                <div class="mb-3">
-                    <label for="fullname" class="form-label">Full name</label>
-                    <input type="text" class="form-control" id="fullname" name="fullname"
-                           value="<?php echo htmlspecialchars($fullname); ?>"
+                <div class="field">
+                    <label for="fullname">Full name</label>
+                    <input type="text" id="fullname" name="fullname"
+                           value="<?= auth_e($fullname) ?>"
                            maxlength="100" autocomplete="name" placeholder="e.g. Juan D. Dela Cruz" required autofocus>
                 </div>
 
-                <div class="mb-3">
-                    <label for="username" class="form-label">Username</label>
-                    <input type="text" class="form-control" id="username" name="username"
-                           value="<?php echo htmlspecialchars($username); ?>"
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username"
+                           value="<?= auth_e($username) ?>"
                            minlength="3" maxlength="50" pattern="[A-Za-z0-9._\-]+"
                            autocomplete="username" aria-describedby="usernameHelp" required>
-                    <div class="form-text" id="usernameHelp">Letters, numbers, dot, dash or underscore. No spaces.</div>
+                    <div class="field-help" id="usernameHelp">Letters, numbers, dot, dash or underscore. No spaces.</div>
                 </div>
 
-                <div class="row g-3">
-                    <div class="col-sm-6">
-                        <label for="password" class="form-label">Password</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="password" name="password"
+                <div class="auth-grid">
+                    <div class="field">
+                        <label for="password">Password</label>
+                        <div class="auth-input has-toggle">
+                            <?= auth_icon('lock') ?>
+                            <input type="password" id="password" name="password"
                                    minlength="6" autocomplete="new-password" aria-describedby="passwordHelp" required>
-                            <button type="button" class="btn btn-toggle-pass" data-toggle-password="password" aria-label="Show password" aria-pressed="false">
-                                <i class="fas fa-eye"></i>
+                            <button type="button" class="toggle-pass" data-toggle-password="password" aria-label="Show password" aria-pressed="false">
+                                <?= auth_icon('eye') ?>
                             </button>
                         </div>
-                        <div class="form-text" id="passwordHelp">At least 6 characters.</div>
+                        <div class="field-help" id="passwordHelp">At least 6 characters.</div>
                     </div>
 
-                    <div class="col-sm-6">
-                        <label for="confirm_password" class="form-label">Confirm password</label>
-                        <div class="input-group">
-                            <input type="password" class="form-control" id="confirm_password" name="confirm_password"
+                    <div class="field">
+                        <label for="confirm_password">Confirm password</label>
+                        <div class="auth-input has-toggle">
+                            <?= auth_icon('lock') ?>
+                            <input type="password" id="confirm_password" name="confirm_password"
                                    minlength="6" autocomplete="new-password" data-match="password" data-match-note="matchNote" required>
-                            <button type="button" class="btn btn-toggle-pass" data-toggle-password="confirm_password" aria-label="Show password" aria-pressed="false">
-                                <i class="fas fa-eye"></i>
+                            <button type="button" class="toggle-pass" data-toggle-password="confirm_password" aria-label="Show password" aria-pressed="false">
+                                <?= auth_icon('eye') ?>
                             </button>
                         </div>
-                        <div class="form-text match-note d-none" id="matchNote">Passwords don't match yet.</div>
+                        <div class="match-note" id="matchNote" hidden><?= auth_icon('alert') ?> Passwords don't match yet.</div>
                     </div>
                 </div>
 
-                <button type="submit" class="btn btn-signin w-100 mt-4">Create account</button>
+                <button type="submit" class="btn btn-primary btn-block">Create account</button>
             </form>
             <?php endif; ?>
 
@@ -263,10 +200,4 @@ if (!in_array($role, ['admin', 'staff'], true) || ($role === 'admin' && !$canMak
             </p>
         </section>
 
-    </div>
-</main>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="../js/admin_auth.js"></script>
-</body>
-</html>
+<?php auth_page_end(); ?>

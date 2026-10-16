@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once '../includes/admin_layout.php';
+require_once '../includes/password_reset.php';
 
 // Check if user is admin
 if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
@@ -180,7 +181,77 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+    elseif ($action === 'reset_applicant_password') {
+        // For an applicant who forgot theirs and has no email on the account: they come to the office with a valid ID,
+        // the admin sets a temporary password and tells them in person; they must choose their own at their next sign-in.
+        $applicant_id = (int)($_POST['applicant_id'] ?? 0);
+        $temporary = trim($_POST['applicant_new_password'] ?? '');
+        $confirm_password = trim($_POST['applicant_confirm_password'] ?? '');
+        $stmt = $pdo->prepare("SELECT id, firstname, lastname, username FROM applicant_accounts WHERE id = ?");
+        $stmt->execute([$applicant_id]);
+        $applicantRow = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$applicantRow) {
+            $errors[] = "Choose the applicant whose password you want to reset.";
+        } elseif (empty($_POST['id_checked'])) {
+            $errors[] = "Tick the box to confirm you checked the person's valid ID.";
+        } elseif ($temporary === '' || $confirm_password === '') {
+            $errors[] = "Type the temporary password twice.";
+        } elseif ($temporary !== $confirm_password) {
+            $errors[] = "The two passwords don't match.";
+        } else {
+            try {
+                $problem = password_reset_office($pdo, $applicant_id, $temporary);
+                if ($problem !== null) {
+                    $errors[] = $problem;
+                } else {
+                    $name = trim($applicantRow['firstname'] . ' ' . $applicantRow['lastname']);
+                    activity_log('applicant_password_reset', 'Temporary password set for applicant ' . $name . ' (@' . $applicantRow['username'] . '); ID checked at the office.');
+                    $_SESSION['applicant_flash'] = "Temporary password saved for " . $name . ". Tell them in person; it is not shown or sent anywhere. They will be asked to choose their own when they log in.";
+                    header("Location: admin_settings.php?tab=applicants&q=" . rawurlencode($applicantRow['username']));
+                    exit;
+                }
+            } catch (PDOException $e) {
+                error_log('admin_settings reset_applicant_password: ' . $e->getMessage());
+                $errors[] = "The password could not be changed. Nothing was changed.";
+            }
+        }
+    }
 }
+
+// Applicant accounts (for the office reset): search, then pick one
+$applicantFlash = (string)($_SESSION['applicant_flash'] ?? '');
+unset($_SESSION['applicant_flash']);
+$applicantQuery = trim((string)($_GET['q'] ?? ''));
+$applicantPick = (int)($_GET['pick'] ?? ($_POST['applicant_id'] ?? 0));
+$applicantResults = [];
+$applicantLoadError = false;
+$applicantPicked = null;
+if ($applicantQuery !== '' || $applicantPick > 0) {
+    try {
+        password_reset_ensure($pdo);
+        $cols = "id, firstname, lastname, username, email, email_verified_at, phone, barangay, created_at, google_token, must_change_password";
+        if ($applicantQuery !== '') {
+            $like = '%' . addcslashes(mb_substr($applicantQuery, 0, 100), '%_\\') . '%';
+            $stmt = $pdo->prepare("SELECT $cols FROM applicant_accounts
+                WHERE username LIKE ? OR email LIKE ? OR phone LIKE ? OR CONCAT(firstname, ' ', lastname) LIKE ?
+                ORDER BY lastname, firstname LIMIT 21");
+            $stmt->execute([$like, $like, $like, $like]);
+            $applicantResults = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        }
+        if ($applicantPick > 0) {
+            $stmt = $pdo->prepare("SELECT $cols FROM applicant_accounts WHERE id = ?");
+            $stmt->execute([$applicantPick]);
+            $applicantPicked = $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+    } catch (PDOException $e) {
+        error_log('admin_settings applicant search: ' . $e->getMessage());
+        $applicantLoadError = true;
+    }
+}
+$isGoogleApplicant = function (array $a): bool {
+    return !empty($a['google_token']) && strpos((string)$a['username'], '@') !== false;
+};
 
 // Staff accounts: they can sign in and handle OPD requests (and nothing else)
 $staffFlash = (string)($_SESSION['staff_flash'] ?? '');
@@ -231,11 +302,13 @@ $fullnameVal  = $profileSent ? ($_POST['new_fullname'] ?? '') : ($admin['full_na
 $usernameVal  = $profileSent ? ($_POST['new_username'] ?? '') : $admin['username'];
 $staffActions = ['delete_staff', 'toggle_staff', 'reset_staff_password'];
 $active       = ($_POST['action'] ?? '') === 'change_password' ? 'security'
-              : ((in_array($_POST['action'] ?? '', $staffActions, true) || ($_GET['tab'] ?? '') === 'staff') ? 'staff' : 'profile');
+              : (($_POST['action'] ?? '') === 'reset_applicant_password' || ($_GET['tab'] ?? '') === 'applicants' ? 'applicants'
+              : ((in_array($_POST['action'] ?? '', $staffActions, true) || ($_GET['tab'] ?? '') === 'staff') ? 'staff' : 'profile'));
 $tabs = [
-    'profile'  => ['Profile',   'user', 'Your name and the username you sign in with.'],
-    'security' => ['Password',  'lock', 'Choose a new password for your account.'],
-    'staff'    => ['OPD staff', 'van',  'Who can sign in as staff and handle OPD requests. Turn an account off, reset a password, or remove it.'],
+    'profile'    => ['Profile',    'user',   'Your name and the username you sign in with.'],
+    'security'   => ['Password',   'lock',   'Choose a new password for your account.'],
+    'staff'      => ['OPD staff',  'van',    'Who can sign in as staff and handle OPD requests. Turn an account off, reset a password, or remove it.'],
+    'applicants' => ['Applicants', 'search', 'Help an applicant who forgot their password and has no email on the account.'],
 ];
 ?>
 <div class="iis" data-settings data-active="<?= ui_e($active) ?>">
@@ -413,6 +486,100 @@ $tabs = [
                     </div>
                 </form>            <?php endif; ?>
         </section>
+
+        <section role="tabpanel" id="panel-applicants" aria-labelledby="tab-applicants"<?= $active === 'applicants' ? '' : ' hidden' ?>>
+            <header class="iis-feature">
+                <?= ui_icon('search', 'iis-feature-icon') ?>
+                <div><h2>Applicant accounts</h2><p><?= ui_e($tabs['applicants'][2]) ?></p></div>
+            </header>
+            <p class="field-help applicant-note">Applicants with a <strong>confirmed</strong> email can reset their own password from the log-in page ("Forgot password?").
+                Use this only for an applicant who has <strong>no email, or one they never confirmed</strong>, and comes to the office: check their valid ID first.</p>
+            <?php if ($applicantFlash !== ''): ?>
+                <div class="alert alert-success" role="status"><?= ui_icon('check-circle', 'alert-icon') ?><div class="alert-body"><?= ui_e($applicantFlash) ?></div></div>
+            <?php endif; ?>
+            <?= $messageFor('reset_applicant_password') ?>
+
+            <form class="applicant-search" method="GET" action="admin_settings.php" role="search">
+                <input type="hidden" name="tab" value="applicants">
+                <label for="applicant_q" class="visually-hidden">Find an applicant</label>
+                <input type="search" id="applicant_q" name="q" value="<?= ui_e($applicantQuery) ?>" maxlength="100" placeholder="Name, username, email or mobile number" autocomplete="off">
+                <button type="submit" class="btn btn-secondary btn-sm"><?= ui_icon('search') ?>Find</button>
+            </form>
+
+            <?php if ($applicantLoadError): ?>
+                <?= ui_state('alert', 'The applicant list could not be loaded', 'Please reload the page. If it keeps happening, tell the system administrator.') ?>
+            <?php elseif ($applicantQuery === ''): ?>
+                <p class="muted">Type part of a name, username, email or mobile number, then choose Find.</p>
+            <?php elseif (!$applicantResults): ?>
+                <?= ui_state('inbox', 'No applicant found', 'Check the spelling, or try the mobile number or part of the name.') ?>
+            <?php else: ?>
+                <?php if (count($applicantResults) > 20): ?>
+                    <p class="muted">Showing the first 20. Type more of the name or username to narrow it down.</p>
+                <?php endif; ?>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th scope="col">Applicant</th>
+                            <th scope="col">Email</th>
+                            <th scope="col">Mobile</th>
+                            <th scope="col"><span class="visually-hidden">Action</span></th>
+                        </tr></thead>
+                        <tbody>
+                        <?php foreach (array_slice($applicantResults, 0, 20) as $a): ?>
+                            <tr>
+                                <td class="cell-main" data-label="Applicant">
+                                    <strong class="row-name"><?= ui_e(trim($a['firstname'] . ' ' . $a['lastname'])) ?></strong>
+                                    <span class="muted">@<?= ui_e($a['username']) ?> · joined <?= ui_e(ui_date($a['created_at'], 'M j, Y')) ?><?= $a['barangay'] ? ' · ' . ui_e($a['barangay']) : '' ?></span>
+                                    <?php if ($isGoogleApplicant($a)): ?><span class="badge badge-neutral">Signs in with Google</span><?php endif; ?>
+                                    <?php if (!empty($a['must_change_password'])): ?><span class="badge badge-pending">Temporary password</span><?php endif; ?>
+                                </td>
+                                <td data-label="Email">
+                                    <?php if (trim((string)$a['email']) === ''): ?>
+                                        <span class="muted">None: office reset needed</span>
+                                    <?php else: ?>
+                                        <?= ui_e($a['email']) ?>
+                                        <?php if (!empty($a['email_verified_at'])): ?>
+                                            <span class="badge badge-approved"><?= ui_icon('check-circle') ?>Confirmed</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-pending">Not confirmed: office reset needed</span>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
+                                <td data-label="Mobile"><?= trim((string)$a['phone']) !== '' ? ui_e($a['phone']) : '<span class="muted">Not given</span>' ?></td>
+                                <td class="cell-action">
+                                    <?php if ($isGoogleApplicant($a)): ?>
+                                        <span class="muted">Not needed</span>
+                                    <?php else: ?>
+                                        <a class="btn btn-secondary btn-sm" href="admin_settings.php?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>&amp;pick=<?= (int)$a['id'] ?>#applicantResetTitle">Reset password<span class="visually-hidden"> for <?= ui_e($a['username']) ?></span></a>
+                                    <?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+
+            <?php if ($applicantPicked && !$isGoogleApplicant($applicantPicked)): ?>
+                <form id="applicantResetForm" class="iis-form staff-reset" method="POST" action="admin_settings.php?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>" novalidate data-busy="Saving…" aria-labelledby="applicantResetTitle">
+                    <h3 id="applicantResetTitle">Set a temporary password for <?= ui_e(trim($applicantPicked['firstname'] . ' ' . $applicantPicked['lastname'])) ?> (@<?= ui_e($applicantPicked['username']) ?>)</h3>
+                    <p class="field-help">Choose a temporary password and tell the person in person. It is not shown or sent anywhere. They will be asked to choose their own the next time they log in.</p>
+                    <?= decision_csrf_field() ?>
+                    <input type="hidden" name="action" value="reset_applicant_password">
+                    <input type="hidden" name="applicant_id" value="<?= (int)$applicantPicked['id'] ?>">
+                    <div class="field">
+                        <label for="applicant_new_password">Temporary password <span class="req" aria-hidden="true">*</span></label>
+                        <input type="password" id="applicant_new_password" name="applicant_new_password" autocomplete="new-password" minlength="8" required data-message="Enter a temporary password of at least 8 characters, with letters and numbers." aria-describedby="applicantPwHelp">
+                        <p class="field-help" id="applicantPwHelp">At least 8 characters, with letters and numbers.</p>
+                    </div>
+                    <div class="field">
+                        <label for="applicant_confirm_password">Type it again <span class="req" aria-hidden="true">*</span></label>
+                        <input type="password" id="applicant_confirm_password" name="applicant_confirm_password" autocomplete="new-password" required data-message="Type the temporary password again.">
+                    </div>
+                    <label class="applicant-check"><input type="checkbox" name="id_checked" value="1" required data-message="Confirm that you checked the person's valid ID."> I checked the person's valid ID and it matches this account.</label>
+                </form>
+            <?php endif; ?>
+        </section>
     </div>
 
     <!-- Right: what you can do with it -->
@@ -433,6 +600,13 @@ $tabs = [
             <?php endif; ?>
             <a class="iis-action" href="activity_log.php?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
             <a class="iis-action" href="admin_settings.php?tab=staff"><?= ui_icon('refresh') ?>Refresh list</a>
+        </div>
+        <div class="iis-action-group" data-actions="applicants"<?= $active === 'applicants' ? '' : ' hidden' ?>>
+            <?php if ($applicantPicked && !$isGoogleApplicant($applicantPicked)): ?>
+                <button type="submit" form="applicantResetForm" class="iis-action"><?= ui_icon('lock') ?>Save temporary password</button>
+            <?php endif; ?>
+            <a class="iis-action" href="activity_log.php?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
+            <a class="iis-action" href="admin_settings.php?tab=applicants"><?= ui_icon('refresh') ?>New search</a>
         </div>
         <div class="iis-action-group iis-action-group-last">
             <a class="iis-action" href="dashboard.php"><?= ui_icon('chevron-left') ?>Back to dashboard</a>
@@ -470,6 +644,11 @@ $tabs = [
     .iis-action:disabled { color: var(--c-text-muted); opacity: .6; cursor: not-allowed; }
     .iis-action .icon { flex: none; }
     .iis-main .alert { margin-bottom: 16px; }
+    .applicant-note { margin-bottom: 14px; max-width: 60ch; }
+    .applicant-search { display: flex; gap: 8px; margin-bottom: 16px; max-width: 520px; }
+    .applicant-search input[type="search"] { flex: 1; min-width: 0; }
+    .applicant-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+    .applicant-check input { margin-top: 4px; flex: none; }
     .staff-count { margin-bottom: 14px; }
     .staff-count .muted { display: block; font-size: var(--fs-sm); }
     .staff-reset { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--c-border); }

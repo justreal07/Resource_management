@@ -2,6 +2,8 @@
 require_once '../config.php';
 require_once 'account_helpers.php';
 require_once 'auth_layout.php';
+require_once '../includes/password_reset.php';
+require_once '../includes/admin_security.php';
 
 if (isset($_SESSION['applicant'])) {
     header('Location: landingpage.php');
@@ -31,23 +33,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Please enter your username and password.';
     } else {
         ensure_user_schema($pdo);
+        password_reset_ensure($pdo);   // adds must_change_password if missing
+        admin_tools_ensure($pdo);      // the wrong-password limit's table
+        // The wrong-password limit is shared with the office sign-in; "app:" keeps applicants' tries apart from staff names
+        $limitKey = 'app:' . $username;
+        $ip = admin_client_ip();
+
         // Log in with the username, or with the email saved on the account
         $stmt = $pdo->prepare('SELECT * FROM applicant_accounts WHERE username = ? OR email = ? ORDER BY (username = ?) DESC LIMIT 1');
         $stmt->execute([$username, $username, $username]);
         $applicant = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($applicant && password_verify($password, $applicant['password'])) {
+        if (($waitSeconds = login_wait_seconds($pdo, $limitKey, $ip)) > 0) {
+            // Too many wrong passwords from this computer for this username: no password is checked until the wait is over
+            $minutes = (int)ceil($waitSeconds / 60);
+            $errors[] = 'Too many wrong passwords. For safety, please wait ' . $minutes . ' minute' . ($minutes === 1 ? '' : 's')
+                . ' before trying again, or use "Forgot password?" to choose a new one.';
+        } elseif ($applicant && password_verify($password, $applicant['password'])) {
+            login_clear_failures($pdo, $limitKey, $ip);
             if (password_needs_rehash($applicant['password'], PASSWORD_DEFAULT)) {
                 $pdo->prepare('UPDATE applicant_accounts SET password = ? WHERE id = ?')
                     ->execute([password_hash($password, PASSWORD_DEFAULT), $applicant['id']]);
             }
             start_applicant_session($applicant);
+            if (!empty($applicant['must_change_password'])) {
+                // The office set a temporary password: ask for their own right away
+                flash('info', 'The office gave you a temporary password. Please choose your own now: type the temporary password as "Current password", then your new one.');
+                header('Location: my_account.php#security');
+                exit;
+            }
             header('Location: ' . take_after_login());   // the account page they were trying to open, or home
             exit;
-        } elseif ($applicant && !empty($applicant['google_token'])) {
-            $errors[] = 'This account was created with Google. Please use "Continue with Google" above.';
         } else {
-            $errors[] = 'Invalid username or password.';
+            // A wrong password, or a username that doesn't exist: counted the same, so the page gives nothing away
+            $fails = login_record_failure($pdo, $limitKey, $ip);
+            if ($fails >= LOGIN_MAX_FAILS) {
+                $errors[] = 'Too many wrong passwords. For safety, please wait ' . LOGIN_WINDOW_MINUTES . ' minutes before trying again, or use "Forgot password?" to choose a new one.';
+            } elseif ($applicant && !empty($applicant['google_token']) && strcasecmp($applicant['username'], (string)$applicant['email']) === 0) {
+                $errors[] = 'This account was created with Google. Please use "Continue with Google" above.';
+            } else {
+                $left = LOGIN_MAX_FAILS - $fails;
+                $errors[] = 'Invalid username or password.' . ($left <= 2 ? ' You have ' . $left . ' more ' . ($left === 1 ? 'try' : 'tries') . ' before a ' . LOGIN_WINDOW_MINUTES . ' minute wait.' : '');
+            }
         }
     }
 }
@@ -88,7 +115,7 @@ auth_page_start('Log in', 'login', function () { ?>
         </div>
 
         <div class="field">
-            <label for="password">Password</label>
+            <label for="password">Password <a href="forgot_password.php" class="field-link">Forgot password?</a></label>
             <div class="input-wrap has-toggle">
                 <input type="password" id="password" name="password" required autocomplete="current-password"
                        placeholder="Enter your password" <?php echo $username !== '' ? 'autofocus' : ''; ?>>

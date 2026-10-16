@@ -464,3 +464,9 @@
 @media (max-width: 480px) {
     .acc-body .ap-brand-text { display: none; }   /* logos only, so the menu fits */
 }
+
+/* Email confirmation status under the Email box (My Account > Profile) */
+.acc-email-ok { color: var(--green, #1e9e5a); }
+.acc-email-warn { color: var(--amber, #b7791f); }
+.acc-email-ok i, .acc-email-warn i { margin-right: 4px; }
+.acc-email-warn .ap-link-btn { display: inline; padding: 0; margin-left: 4px; font-weight: 700; text-decoration: underline; }

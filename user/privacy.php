@@ -163,6 +163,8 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                     <li>To tell you about your request through your dashboard and notifications and, when it is approved,
                         by email to the address on your account (where and when to claim the assistance, or the day, departure time
                         and pick-up point of your OPD trip, and what to bring).</li>
+                    <li>To help you get back into your account if you forget your password: we email a one-time reset link to the email address on your account
+                        (or, if there is no email, the office resets it after checking your valid ID).</li>
                     <li>To prepare reports with <strong>totals only</strong> (for example, how many families were helped per barangay), which never name you.</li>
                     <li>To improve our service, using the satisfaction survey.</li>
                     <li>To meet government auditing and record-keeping rules.</li>
@@ -187,7 +189,7 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                     <li><strong>Others, only when needed</strong> to give the assistance you asked for (for example, the hospital for your OPD referral),
                         or when the law requires it (for example, a Commission on Audit review or a court order).</li>
                     <li><strong>Service providers we use:</strong> Google, if you choose to sign in with Google; Google's Gmail service,
-                        which delivers the approval email; and Google's Gemini service,
+                        which delivers the approval and password-reset emails; and Google's Gemini service,
                         which answers the questions you type into the chat assistant. Please do not type personal or medical details in the chat.</li>
                 </ul>
                 <p>We never sell or rent your information.</p>
@@ -197,7 +199,8 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                 <h2>6. How we protect it</h2>
                 <ul>
                     <li>Your applications are listed only in your own account, and to signed-in office staff.</li>
-                    <li>Passwords are stored hashed; repeated wrong passwords on staff accounts lock the sign-in for a while; an administrator can turn off a staff account at once.</li>
+                    <li>Passwords are stored hashed; repeated wrong passwords lock the sign-in for a while; an administrator can turn off a staff account at once.</li>
+                    <li>Password-reset links work once, expire after an hour, and are stored only in scrambled form. The office never asks you for one.</li>
                     <li>Uploaded photos are checked to be real images, saved under long random file names that can't be guessed,
                         and kept in a folder that can't be browsed. Please don't share the link to a photo.</li>
                     <li>Forms are protected against requests sent from other websites.</li>

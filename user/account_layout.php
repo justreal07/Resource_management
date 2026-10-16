@@ -187,8 +187,9 @@ function account_page_start(array $ctx, string $title, string $active, array $he
     <div class="ap-container">
         <?php foreach (take_flashes() as $f): ?>
             <?php /* data-toast: js/portal-ui.js shows a success message as a toast; errors stay on the page */ ?>
-            <div class="ap-notice ap-notice-<?= $f['type'] === 'success' ? 'success' : 'error' ?> acc-flash" role="status"<?= $f['type'] === 'success' ? ' data-toast' : '' ?>>
-                <i class="fas <?= $f['type'] === 'success' ? 'fa-check-circle' : 'fa-exclamation-triangle' ?>"></i>
+            <?php /* 'info' = a notice that stays on the page and is not an error (e.g. "choose your own password") */ ?>
+            <div class="ap-notice ap-notice-<?= $f['type'] === 'success' ? 'success' : ($f['type'] === 'info' ? 'info' : 'error') ?> acc-flash" role="status"<?= $f['type'] === 'success' ? ' data-toast' : '' ?>>
+                <i class="fas <?= $f['type'] === 'success' ? 'fa-check-circle' : ($f['type'] === 'info' ? 'fa-info-circle' : 'fa-exclamation-triangle') ?>"></i>
                 <div><?= e($f['message']) ?></div>
                 <button type="button" class="ap-link-btn" data-dismiss aria-label="Dismiss"><i class="fas fa-times"></i></button>
             </div>

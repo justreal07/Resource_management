@@ -204,6 +204,7 @@ function activity_actions(): array
         'staff_disabled'          => ['Access turned off',          'accounts',  'pending'],
         'staff_enabled'           => ['Access turned on',           'accounts',  'approved'],
         'staff_password_reset'    => ['Password reset',             'accounts',  'pending'],
+        'applicant_password_reset' => ['Applicant password reset',  'accounts',  'pending'],
         'profile_updated'         => ['Profile changed',            'settings',  'neutral'],
         'password_changed'        => ['Password changed',           'settings',  'neutral'],
         'export_csv'              => ['Exported a list',            'exports',   'neutral'],
