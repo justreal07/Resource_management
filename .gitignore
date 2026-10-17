@@ -10,3 +10,6 @@
 !/documents/.htaccess
 /avatars/*
 !/avatars/.htaccess
+
+# Old copy of the upload folder (the app now saves to /documents/ only)
+/user/documents/
