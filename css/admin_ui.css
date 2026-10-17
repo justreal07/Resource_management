@@ -81,7 +81,7 @@
     --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
     --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.22);
     --sidebar-w: 256px;
-    --topbar-h: 64px;   /* the top bar's height: bigger on a large screen (see the end of the top bar rules); the review page subtracts it */
+    --topbar-h: 64px;   /* the top bar's height; the review page subtracts it */
 
     /* Which of the top bar's two theme icons shows (the moon in light mode, the sun in dark mode) */
     --theme-moon-display: inline-block;
@@ -1784,38 +1784,6 @@ kbd {
     .content { padding: 16px; }
 }
 
-/* A larger top bar on desktop screens, in step with the page below it: 1024px and up a step bigger, 1280px and up the full size.
-   (Phones and tablets keep the compact bar: it has to fit the title, bell, buttons and Log out on one line.) */
-@media (min-width: 1024px) {
-    :root { --topbar-h: 76px; }
-    .topbar { padding: 10px 28px; gap: 14px; }
-    .topbar-title h1 { font-size: 1.375rem; }
-    .topbar-title p { font-size: var(--fs-sm); }
-    .topbar .icon-btn { width: 48px; height: 48px; }
-    .topbar .icon-btn .icon { width: 26px; height: 26px; }
-    .cmdk-btn { min-height: 48px; font-size: var(--fs-base); }
-    .cmdk-btn .icon { width: 22px; height: 22px; }
-    .topbar .user-chip .avatar { width: 48px; height: 48px; font-size: var(--fs-base); }
-    .user-chip { gap: 12px; }
-    .user-chip-text strong { font-size: var(--fs-base); }
-    .topbar .btn-logout { min-height: 48px; font-size: var(--fs-base); padding: 10px 20px; }
-}
-@media (min-width: 1024px) and (max-width: 1200px) {
-    .cmdk-btn { width: 48px; min-width: 48px; height: 48px; }   /* still just the icon here, to leave room for the title */
-}
-@media (min-width: 1280px) {
-    :root { --topbar-h: 92px; }
-    .topbar { padding: 12px 36px; gap: 18px; }
-    .topbar-title h1 { font-size: 1.75rem; }
-    .topbar-title p { font-size: var(--fs-base); }
-    .topbar .icon-btn { width: 54px; height: 54px; }
-    .topbar .icon-btn .icon { width: 28px; height: 28px; }
-    .cmdk-btn { min-width: 250px; min-height: 54px; padding: 8px 18px; }
-    .topbar .user-chip .avatar { width: 58px; height: 58px; font-size: var(--fs-md); }
-    .user-chip-text strong { font-size: var(--fs-md); }
-    .topbar .role-badge { font-size: var(--fs-base); padding: 1px 12px; }
-    .topbar .btn-logout { min-height: 54px; padding: 10px 24px; font-size: var(--fs-md); }
-}
 /* Desktop: the menu button hides the sidebar so the content uses the full width (remembered in this browser) */
 @media (min-width: 1024px) {
     .sidebar { transition: transform 0.2s ease, visibility 0s linear 0s; }
