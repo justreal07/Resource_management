@@ -109,6 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "That staff account no longer exists. The list below is up to date.";
         } else {
             try {
+                avatar_remove($pdo, $staff_id);   // their picture goes with the account
                 $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'staff'")->execute([$staff_id]);
                 activity_log('staff_removed', 'Removed staff account: ' . ($staff['full_name'] ?: $staff['username']) . ' (@' . $staff['username'] . ').');
                 // Their past approvals stay on the applications; only the name is no longer linked (the database sets it to empty).
@@ -119,6 +120,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 error_log('admin_settings delete_staff: ' . $e->getMessage());
                 $errors[] = "This account could not be removed because the system still has records linked to it. Nothing was changed.";
             }
+        }
+    }
+    elseif ($action === 'remove_staff_avatar') {
+        // A picture that should not be there: the admin removes it (staff upload their own; nobody uploads for someone else)
+        $staff_id = (int)($_POST['staff_id'] ?? 0);
+        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = 'staff'");
+        $stmt->execute([$staff_id]);
+        $staff = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$staff) {
+            $errors[] = "That staff account no longer exists. The list below is up to date.";
+        } elseif (avatar_remove($pdo, $staff_id)) {
+            $name = $staff['full_name'] ?: $staff['username'];
+            activity_log('avatar_changed', 'Removed the profile picture of ' . $name . ' (@' . $staff['username'] . ').');
+            $_SESSION['staff_flash'] = "The picture of " . $name . " was removed. Their initials show instead; they can upload another.";
+            header("Location: admin_settings.php?tab=staff");
+            exit;
+        } else {
+            $errors[] = "There was no picture to remove.";
         }
     }
     elseif ($action === 'toggle_staff') {
@@ -300,7 +319,7 @@ echo ui_page_head('Admin settings', 'Your own account, and the staff accounts th
 $profileSent  = ($_POST['action'] ?? '') === 'update_profile';
 $fullnameVal  = $profileSent ? ($_POST['new_fullname'] ?? '') : ($admin['full_name'] ?? '');
 $usernameVal  = $profileSent ? ($_POST['new_username'] ?? '') : $admin['username'];
-$staffActions = ['delete_staff', 'toggle_staff', 'reset_staff_password'];
+$staffActions = ['delete_staff', 'toggle_staff', 'reset_staff_password', 'remove_staff_avatar'];
 $active       = ($_POST['action'] ?? '') === 'change_password' ? 'security'
               : (($_POST['action'] ?? '') === 'reset_applicant_password' || ($_GET['tab'] ?? '') === 'applicants' ? 'applicants'
               : ((in_array($_POST['action'] ?? '', $staffActions, true) || ($_GET['tab'] ?? '') === 'staff') ? 'staff' : 'profile'));
@@ -331,6 +350,8 @@ $tabs = [
                 <?= ui_icon('user', 'iis-feature-icon') ?>
                 <div><h2><?= ui_e($tabs['profile'][0]) ?></h2><p><?= ui_e($tabs['profile'][2]) ?></p></div>
             </header>
+            <?= ui_avatar_flash() ?>
+            <?= ui_avatar_form((int)$admin_id, (string)($admin['full_name'] ?: $admin['username'])) ?>
             <form id="profileForm" class="iis-form" method="POST" novalidate data-busy="Saving…" data-profile-form>
                 <?= $messageFor('update_profile') ?>
                 <?= decision_csrf_field() ?>
@@ -388,6 +409,7 @@ $tabs = [
             <?= $messageFor('toggle_staff') ?>
             <?= $messageFor('delete_staff') ?>
             <?= $messageFor('reset_staff_password') ?>
+            <?= $messageFor('remove_staff_avatar') ?>
             <?php if ($staffLoadError): ?>
                 <?= ui_state('alert', 'The staff list could not be loaded', 'Please reload the page. If it keeps happening, tell the system administrator.') ?>
             <?php elseif (!$staffList): ?>
@@ -415,9 +437,14 @@ $tabs = [
                         ?>
                             <tr>
                                 <td class="cell-main" data-label="Staff member">
-                                    <strong class="row-name"><?= ui_e($sname) ?></strong>
-                                    <span class="muted">@<?= ui_e($s['username']) ?> · added <?= ui_e(ui_date($s['created_at'], 'M j, Y')) ?></span>
-                                    <?php if (!$isOn): ?><span class="badge badge-disapproved"><?= ui_icon('x-circle') ?>Turned off</span><?php endif; ?>
+                                    <div class="person-cell">
+                                        <?= ui_avatar((int)$s['id'], (string)$sname) ?>
+                                        <div>
+                                            <strong class="row-name"><?= ui_e($sname) ?></strong>
+                                            <span class="muted">@<?= ui_e($s['username']) ?> · added <?= ui_e(ui_date($s['created_at'], 'M j, Y')) ?></span>
+                                            <?php if (!$isOn): ?><span class="badge badge-disapproved"><?= ui_icon('x-circle') ?>Turned off</span><?php endif; ?>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td data-label="Last signed in"><?= !empty($s['last_login_at']) ? ui_e(ui_ago(strtotime($s['last_login_at']), $nowTs)) : '<span class="muted">Never</span>' ?></td>
                                 <td data-label="Approved"><?= (int)$s['approved_count'] ?></td>
@@ -442,6 +469,19 @@ $tabs = [
                                                     <button type="submit" class="btn btn-link btn-sm">Turn access back on</button>
                                                 <?php endif; ?>
                                             </form>
+                                            <?php if (staff_avatar_url((int)$s['id']) !== ''): ?>
+                                            <form method="POST">
+                                                <?= decision_csrf_field() ?>
+                                                <input type="hidden" name="action" value="remove_staff_avatar">
+                                                <input type="hidden" name="staff_id" value="<?= (int)$s['id'] ?>">
+                                                <button type="submit" class="btn btn-link btn-sm"
+                                                    data-confirm="Remove this picture?"
+                                                    data-confirm-message="Their initials show instead. They can upload another picture themselves."
+                                                    data-confirm-name="<?= ui_e($sname) ?>"
+                                                    data-confirm-ref="<?= ui_e('@' . $s['username']) ?>"
+                                                    data-confirm-ok="Remove picture">Remove picture</button>
+                                            </form>
+                                            <?php endif; ?>
                                             <form method="POST">
                                                 <?= decision_csrf_field() ?>
                                                 <input type="hidden" name="action" value="delete_staff">

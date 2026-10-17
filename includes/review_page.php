@@ -138,6 +138,10 @@ function review_page_run(): void
         <div class="review-docs-head">
             <h2 id="reviewDocsTitle">Photos</h2>
             <p class="muted" data-doc-title><?= $photos ? ui_e($photos[0]['document_name']) : '' ?></p>
+            <?php /* What the applicant's device said about each photo (clarity check); only the one on show is visible (js/admin_review.js) */ ?>
+            <?php foreach ($photos as $i => $d): $badge = ui_photo_quality_badge($d); ?>
+                <?php if ($badge !== ''): ?><span class="review-quality" data-quality-for="<?= $i ?>"<?= $i === 0 ? '' : ' hidden' ?>><?= $badge ?></span><?php endif; ?>
+            <?php endforeach; ?>
             <?php if (count($photos) > 1): ?><p class="muted" data-doc-count>1 of <?= count($photos) ?></p><?php endif; ?>
         </div>
 
@@ -161,16 +165,18 @@ function review_page_run(): void
                 <a class="btn btn-secondary btn-sm" data-doc-download href="#"><?= ui_icon('download') ?>Save<span class="visually-hidden"> the photo</span></a>
             </div>
             <ul class="review-thumbs" aria-label="Photos of this application">
-                <?php foreach ($photos as $i => $d): ?>
+                <?php foreach ($photos as $i => $d): $q = photo_quality_info($d); $warned = $q['state'] === 'warn'; ?>
                     <li>
                         <button type="button" class="review-thumb" data-doc
                                 data-src="<?= ui_e(document_url((int)$d['id'])) ?>"
                                 data-download="<?= ui_e(document_url((int)$d['id'], true)) ?>"
                                 data-name="<?= ui_e($d['document_name']) ?>"
+                                <?= $warned ? 'data-quality-text="' . ui_e($q['text']) . '"' : '' ?>
                                 aria-pressed="<?= $i === 0 ? 'true' : 'false' ?>"
-                                aria-label="<?= ui_e($d['document_name']) ?>, photo <?= $i + 1 ?> of <?= count($photos) ?>">
+                                aria-label="<?= ui_e($d['document_name']) ?>, photo <?= $i + 1 ?> of <?= count($photos) ?><?= $warned ? ', ' . ui_e(mb_strtolower($q['text'])) : '' ?>">
                             <img src="<?= ui_e(document_url((int)$d['id'])) ?>" alt="" loading="lazy" decoding="async">
                             <span><?= ui_e($d['document_name']) ?></span>
+                            <?php if ($warned): ?><em class="review-thumb-flag" title="<?= ui_e($q['title']) ?>" aria-hidden="true"><?= ui_icon('alert') ?></em><?php endif; ?>
                         </button>
                     </li>
                 <?php endforeach; ?>

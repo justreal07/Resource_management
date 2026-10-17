@@ -56,7 +56,7 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
 <div class="ap-tips">
     <div class="ap-tip"><i class="fas fa-sun"></i> Take the photo in a bright place, without flash glare.</div>
     <div class="ap-tip"><i class="fas fa-expand"></i> Fit the whole document, with all 4 corners visible.</div>
-    <div class="ap-tip"><i class="fas fa-glasses"></i> Make sure all text is sharp and readable.</div>
+    <div class="ap-tip"><i class="fas fa-glasses"></i> Make sure all text is sharp and readable. We check each photo and tell you if it looks blurry or dark.</div>
 </div>
 
 <?php if ($upload_errors): ?>
@@ -102,17 +102,29 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
                     <span class="ap-status" data-status><i class="far fa-clock"></i> Needed</span>
                 </div>
 
+                <?php /* Phones and tablets only (js/apply-upload.js shows it): one tap opens the back camera.
+                         A separate input, because "capture" would take the gallery choice away from the box below. */ ?>
+                <div class="ap-doc-actions" data-camera-row hidden>
+                    <button type="button" class="ap-btn ap-btn-primary ap-camera-btn" data-camera>
+                        <i class="fas fa-camera" aria-hidden="true"></i> Take a photo
+                    </button>
+                    <input type="file" class="ap-sr-input" accept="image/jpeg,image/png,image/webp" capture="environment"
+                           tabindex="-1" aria-hidden="true" data-camera-input>
+                </div>
+
                 <label class="ap-dropzone" data-dropzone>
                     <input type="file" name="documents[<?= $i ?>][]" accept="image/jpeg,image/png,image/webp" multiple required data-input
                            aria-label="Photo of <?= e($doc_name) ?>">
                     <span class="ap-dz-icon"><i class="fas fa-camera"></i></span>
                     <span class="ap-dz-text">
-                        <strong>Tap to take or choose a photo</strong>
-                        <small>or drag it here · JPG, PNG or WEBP · up to <?= PHOTOS_PER_DOCUMENT ?> photos</small>
+                        <strong data-dz-title>Tap to take or choose a photo</strong>
+                        <small data-dz-hint>or drag it here · JPG, PNG or WEBP · up to <?= PHOTOS_PER_DOCUMENT ?> photos</small>
                     </span>
                 </label>
 
                 <div class="ap-thumbs" data-thumbs></div>
+                <?php /* One note for every photo that may be hard to read, with Retake / Use anyway (js/apply-upload.js) */ ?>
+                <div class="ap-quality-notes" data-notes aria-live="polite"></div>
                 <p class="ap-doc-error" data-error role="alert"></p>
             </li>
             <?php $i++; endforeach; ?>
@@ -142,7 +154,7 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
         </div>
         <div class="ap-card ap-side-card ap-side-help">
             <h3><i class="fas fa-mobile-alt"></i> Using a phone?</h3>
-            <p>Tap a box above and choose <strong>Camera</strong> to take the photo right away, or <strong>Gallery</strong> to pick one you already took.</p>
+            <p>Tap <strong>Take a photo</strong> to open your camera right away, or choose one you already took from your <strong>gallery</strong>. If a photo looks blurry or dark, you can retake it before you send.</p>
         </div>
     </aside>
 </div>
@@ -156,4 +168,4 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
     </div>
 </div>
 
-<?php apply_page_end(['../js/apply-upload.js']); ?>
+<?php apply_page_end(['../js/photo-quality.js', '../js/apply-upload.js']); ?>

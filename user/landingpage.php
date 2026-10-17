@@ -660,13 +660,21 @@ $programs = [
             <aside class="help-card reveal" data-type-card>
                 <div class="help-icon"><i class="fas fa-headset"></i></div>
                 <h3>Need more help?</h3>
+                <?php if($is_logged_in): ?>
                 <p data-type-line>Our virtual assistant can answer your questions in Filipino or English, or you can reach our office directly.</p>
+                <?php else: ?>
+                <p data-type-line>Sign in to ask our virtual assistant in Filipino or English, or reach our office directly.</p>
+                <?php endif; ?>
                 <ul class="help-lines">
                     <li><i class="fas fa-phone"></i> <span data-type-line>(046) 123-4567</span></li>
                     <li><i class="fas fa-envelope"></i> <span data-type-line>assistance@lgu.gov.ph</span></li>
                     <li><i class="far fa-clock"></i> <span data-type-line>Mon – Fri, 8:00 AM – 5:00 PM</span></li>
                 </ul>
+                <?php if($is_logged_in): ?>
                 <button type="button" class="btn btn-gold btn-block" onclick="openChat()"><i class="fas fa-comment-dots"></i> Chat with Assistant</button>
+                <?php else: ?>
+                <a href="applicant_login.php" class="btn btn-gold btn-block"><i class="fas fa-sign-in-alt"></i> Sign in to chat with our Assistant</a>
+                <?php endif; ?>
                 <button type="button" class="btn btn-ghost-light btn-block" data-tour-start><i class="fas fa-route"></i> Take a guided tour</button>
             </aside>
         </div>
@@ -808,7 +816,8 @@ $programs = [
 <!-- BACK TO TOP -->
 <button type="button" class="back-to-top" id="backToTop" aria-label="Back to top"><i class="fas fa-arrow-up"></i></button>
 
-<!-- AI CHATBOT -->
+<!-- AI CHATBOT (signed-in applicants only; ai_chat.php refuses guests too) -->
+<?php if($is_logged_in): ?>
 <button type="button" id="chat-toggle" onclick="toggleChat()" aria-label="Open chat assistant">
     <img src="../asset/AI.jpg" alt="" class="chat-icon">
     <span class="online-dot"></span>
@@ -854,6 +863,7 @@ $programs = [
         <button type="button" onclick="sendMessage()" aria-label="Send message"><i class="fas fa-paper-plane"></i></button>
     </div>
 </div>
+<?php endif; ?>
 
 <?php portal_scripts(); ?>
 <script>
@@ -1377,8 +1387,9 @@ function getDefaultResponse() {
     Maaari mo ring i-type ang iyong tanong sa Filipino o English.`;
 }
 
-// Enter key support
-document.getElementById('userInput').addEventListener('keypress', function(e) {
+// Enter key support (the chat is only on the page for signed-in applicants)
+const chatInput = document.getElementById('userInput');
+if (chatInput) chatInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') sendMessage();
 });
 </script>

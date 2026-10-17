@@ -1,9 +1,11 @@
 // Step 2 - photo upload for the requirements (Medical / Burial / OPD)
-// (dialogs come from js/portal-ui.js)
+// (dialogs come from js/portal-ui.js, the clarity check from js/photo-quality.js)
 (function () {
     const form = document.getElementById('uploadForm');
     if (!form) return;
     const UI = window.PortalUI;
+    const PQ = window.PhotoQuality;
+    const calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     function ask(opts) {
         return UI ? UI.confirm(opts) : Promise.resolve(window.confirm(opts.title + (opts.text ? '\n\n' + opts.text : '')));
@@ -22,6 +24,9 @@
         catch (e) { return false; }
     })();
 
+    // Phones and tablets get a "Take a photo" button that opens the camera in one tap
+    const touchDevice = canManage && !!window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+
     // We show our own friendly messages instead of the browser's
     form.noValidate = true;
 
@@ -31,19 +36,61 @@
     const submitBtn = document.getElementById('submitBtn');
     const overlay = document.getElementById('uploadOverlay');
 
-    const docs = Array.from(form.querySelectorAll('[data-doc]')).map(function (el) {
+    const docs = Array.from(form.querySelectorAll('[data-doc]')).map(function (el, index) {
         return {
+            index: index,                                    // the same number as documents[<index>][] in the form
+            title: (el.querySelector('h3') || {}).textContent || 'Document',
             el: el,
             input: el.querySelector('[data-input]'),
             dropzone: el.querySelector('[data-dropzone]'),
             thumbs: el.querySelector('[data-thumbs]'),
+            notes: el.querySelector('[data-notes]'),
             status: el.querySelector('[data-status]'),
             error: el.querySelector('[data-error]'),
+            cameraRow: el.querySelector('[data-camera-row]'),
+            cameraBtn: el.querySelector('[data-camera]'),
+            cameraInput: el.querySelector('[data-camera-input]'),
             files: [],
             urls: [],
             busy: false
         };
     });
+
+    /* ---------- What the clarity check said about each photo (kept by the photo's File object) ----------
+       { result: what PhotoQuality.analyze() returned, accepted: the applicant chose "Use anyway" } */
+    const verdicts = new WeakMap();
+
+    function issuesOf(file) {
+        const v = verdicts.get(file);
+        return v && v.result && v.result.checked ? v.result.issues : [];
+    }
+
+    // Warned about, and the applicant has not yet chosen Retake or "Use anyway"
+    function needsDecision(file) {
+        const v = verdicts.get(file);
+        return !!v && !v.accepted && issuesOf(file).length > 0;
+    }
+
+    function issueText(issues) {
+        return issues.map(function (k) { return (PQ && PQ.messages[k] ? PQ.messages[k].title : k).toLowerCase(); }).join(', ');
+    }
+
+    // Every photo still waiting for a decision, in page order
+    function allPending() {
+        const list = [];
+        docs.forEach(function (doc) {
+            const files = currentFiles(doc);
+            files.forEach(function (file, i) {
+                if (needsDecision(file)) list.push({ doc: doc, file: file, number: i + 1, count: files.length });
+            });
+        });
+        return list;
+    }
+
+    function clarity(photo) {
+        if (!PQ) return Promise.resolve({ checked: false });
+        return PQ.analyze(photo).catch(function () { return { checked: false }; });
+    }
 
     function formatSize(bytes) {
         return bytes < 1024 * 1024 ? Math.max(1, Math.round(bytes / 1024)) + ' KB' : (bytes / 1024 / 1024).toFixed(1) + ' MB';
@@ -93,6 +140,106 @@
         return canManage ? doc.files : Array.from(doc.input.files);
     }
 
+    // Phones: the camera. Everything else: the usual file picker.
+    function openPicker(doc, preferCamera) {
+        if (preferCamera && touchDevice && doc.cameraInput) doc.cameraInput.click();
+        else doc.input.click();
+    }
+
+    function retake(doc, file) {
+        const i = doc.files.indexOf(file);
+        if (i === -1) return;
+        doc.files.splice(i, 1);
+        showError(doc, '');
+        render(doc);
+        openPicker(doc, true);
+    }
+
+    function useAnyway(doc, file) {
+        const v = verdicts.get(file);
+        if (v) v.accepted = true;
+        render(doc);
+    }
+
+    function makeButton(className, iconClass, text, onClick, label) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = className;
+        btn.innerHTML = '<i class="' + iconClass + '" aria-hidden="true"></i> ';
+        btn.appendChild(document.createTextNode(text));
+        if (label) btn.setAttribute('aria-label', label);
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    // One note under the thumbnails for each photo that may be hard to read
+    function renderNotes(doc, files) {
+        doc.notes.innerHTML = '';
+        if (!PQ) return;
+        files.forEach(function (file, i) {
+            const issues = issuesOf(file);
+            if (!issues.length) return;
+            const accepted = verdicts.get(file).accepted;
+            const name = files.length > 1 ? 'Photo ' + (i + 1) : 'This photo';
+            const about = name.toLowerCase() + ' of ' + doc.title;
+            const note = document.createElement('div');
+
+            if (accepted) {                         // a quiet reminder, with a way back
+                note.className = 'ap-note is-accepted';
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-info-circle';
+                icon.setAttribute('aria-hidden', 'true');
+                const text = document.createElement('span');
+                text.textContent = name + ' will be sent as it is (' + issueText(issues) + ').';
+                note.append(icon, text, makeButton('ap-link-btn', 'fas fa-camera', 'Retake', function () { retake(doc, file); }, 'Retake ' + about));
+            } else {
+                note.className = 'ap-note';
+                const head = document.createElement('h4');
+                head.innerHTML = '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> ';
+                head.appendChild(document.createTextNode(name + ' may be hard to read'));
+                const list = document.createElement('ul');
+                issues.forEach(function (key) {
+                    const m = PQ.messages[key];
+                    if (!m) return;
+                    const li = document.createElement('li');
+                    const ic = document.createElement('i');
+                    ic.className = 'fas ' + m.icon;
+                    ic.setAttribute('aria-hidden', 'true');
+                    const body = document.createElement('span');
+                    const strong = document.createElement('strong');
+                    strong.textContent = m.title + '. ';
+                    body.append(strong, document.createTextNode(m.tip));
+                    li.append(ic, body);
+                    list.appendChild(li);
+                });
+                const actions = document.createElement('div');
+                actions.className = 'ap-note-actions';
+                actions.append(
+                    makeButton('ap-note-btn ap-note-retake', 'fas fa-camera', touchDevice ? 'Retake photo' : 'Choose another photo', function () { retake(doc, file); }, 'Retake ' + about),
+                    makeButton('ap-note-btn ap-note-keep', 'fas fa-check', 'Use anyway', function () { useAnyway(doc, file); }, 'Use ' + about + ' anyway')
+                );
+                note.append(head, list, actions);
+            }
+            doc.notes.appendChild(note);
+        });
+    }
+
+    // The result for each photo goes to the server in the same order as the photos: quality[<document>][]
+    // (an empty value = not checked). The office sees it on the review page. It is only a hint.
+    function syncQualityFields(doc, files) {
+        Array.from(doc.el.querySelectorAll('input[data-quality]')).forEach(function (n) { n.remove(); });
+        if (!canManage || !PQ) return;
+        files.forEach(function (file) {
+            const v = verdicts.get(file);
+            const field = document.createElement('input');
+            field.type = 'hidden';
+            field.name = 'quality[' + doc.index + '][]';
+            field.value = v ? PQ.toField(v.result) : '';
+            field.setAttribute('data-quality', '');
+            doc.el.appendChild(field);
+        });
+    }
+
     function render(doc) {
         const files = currentFiles(doc);
 
@@ -115,6 +262,18 @@
             fig.innerHTML = '<img alt=""><figcaption></figcaption>';
             fig.querySelector('img').src = url;
             fig.querySelector('figcaption').textContent = formatSize(file.size) + ' · ' + file.name;
+
+            const v = verdicts.get(file);
+            if (v && v.result.checked) {                      // "Clear" or "Check" on the thumbnail
+                const flag = document.createElement('span');
+                flag.className = 'ap-thumb-flag ' + (v.result.ok ? 'ap-flag-ok' : 'ap-flag-warn');
+                flag.innerHTML = v.result.ok
+                    ? '<i class="fas fa-check" aria-hidden="true"></i> Clear'
+                    : '<i class="fas fa-exclamation-triangle" aria-hidden="true"></i> Check';
+                fig.classList.toggle('has-issues', !v.result.ok);
+                fig.appendChild(flag);
+            }
+
             if (canManage) {
                 const btn = document.createElement('button');
                 btn.type = 'button';
@@ -132,32 +291,52 @@
         });
 
         if (canManage && files.length > 0 && files.length < MAX_PHOTOS) {
+            if (touchDevice) {
+                const cam = document.createElement('button');
+                cam.type = 'button';
+                cam.className = 'ap-add-more ap-add-camera';
+                cam.innerHTML = '<i class="fas fa-camera"></i> Take another photo';
+                cam.addEventListener('click', function () { openPicker(doc, true); });
+                doc.thumbs.appendChild(cam);
+            }
             const more = document.createElement('button');
             more.type = 'button';
             more.className = 'ap-add-more';
-            more.innerHTML = '<i class="fas fa-plus"></i> Add another photo';
+            more.innerHTML = touchDevice ? '<i class="fas fa-images"></i> Add from gallery' : '<i class="fas fa-plus"></i> Add another photo';
             more.addEventListener('click', function () { doc.input.click(); });
             doc.thumbs.appendChild(more);
         }
 
-        doc.dropzone.classList.toggle('is-full', canManage && files.length > 0);
+        renderNotes(doc, files);
+        syncQualityFields(doc, files);
 
+        doc.dropzone.classList.toggle('is-full', canManage && files.length > 0);
+        if (doc.cameraRow) doc.cameraRow.hidden = !touchDevice || files.length > 0;
+
+        const waiting = files.filter(needsDecision).length;
         const ready = files.length > 0;
-        doc.el.classList.toggle('is-ready', ready);
+        doc.el.classList.toggle('is-ready', ready && waiting === 0);
+        doc.el.classList.toggle('has-warning', waiting > 0);
         doc.status.innerHTML = doc.busy
-            ? '<i class="fas fa-spinner fa-spin"></i> Preparing…'
-            : ready
-                ? '<i class="fas fa-check-circle"></i> ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + ' added'
-                : '<i class="far fa-clock"></i> Needed';
+            ? '<i class="fas fa-spinner fa-spin"></i> Checking photo…'
+            : waiting > 0
+                ? '<i class="fas fa-exclamation-triangle"></i> Check photo'
+                : ready
+                    ? '<i class="fas fa-check-circle"></i> ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + ' added'
+                    : '<i class="far fa-clock"></i> Needed';
 
         updateProgress();
     }
 
     function updateProgress() {
         const done = docs.filter(function (d) { return currentFiles(d).length > 0; }).length;
+        const waiting = allPending().length;
         progressText.textContent = done + ' of ' + docs.length;
         progressBar.style.width = (docs.length ? (done / docs.length) * 100 : 0) + '%';
-        if (done === docs.length) {
+        if (done === docs.length && waiting > 0) {
+            submitNote.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#b7791f"></i> ';
+            submitNote.appendChild(document.createTextNode(waiting + ' photo' + (waiting > 1 ? 's' : '') + ' may be hard to read. Retake ' + (waiting > 1 ? 'them' : 'it') + ' or choose “Use anyway”.'));
+        } else if (done === docs.length) {
             submitNote.innerHTML = '<i class="fas fa-check-circle" style="color:#1e9e5a"></i> All set! You can now submit your application.';
         } else {
             const left = docs.length - done;
@@ -184,15 +363,37 @@
                 problems.push('"' + file.name + '" is too large (' + formatSize(photo.size) + '). The limit is ' + formatSize(MAX_BYTES) + ' per photo.');
                 continue;
             }
+            // Is it clear enough to read? Looked at here, on this device, before anything is uploaded
+            verdicts.set(photo, { result: await clarity(photo), accepted: false });
             doc.files.push(photo);
         }
 
         doc.busy = false;
         showError(doc, problems.join(' '));
         render(doc);
+
+        // A photo that may be hard to read: bring its note into view
+        const note = doc.notes.querySelector('.ap-note:not(.is-accepted)');
+        if (note) note.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'nearest' });
     }
 
     docs.forEach(function (doc) {
+        if (touchDevice) {
+            if (doc.cameraRow) doc.cameraRow.hidden = false;
+            const title = doc.el.querySelector('[data-dz-title]');
+            const hint = doc.el.querySelector('[data-dz-hint]');
+            if (title) title.textContent = 'Choose from your gallery';
+            if (hint) hint.textContent = 'JPG, PNG or WEBP · up to ' + MAX_PHOTOS + ' photos';
+        }
+        if (doc.cameraBtn && doc.cameraInput) {
+            doc.cameraBtn.addEventListener('click', function () { doc.cameraInput.click(); });
+            doc.cameraInput.addEventListener('change', function () {
+                const picked = Array.from(doc.cameraInput.files);
+                doc.cameraInput.value = '';          // so taking another photo fires "change" again
+                if (picked.length) addFiles(doc, picked);
+            });
+        }
+
         doc.input.addEventListener('change', function () {
             if (canManage) {
                 const picked = Array.from(doc.input.files);
@@ -235,9 +436,10 @@
 
     const photoCount = function () { return docs.reduce(function (n, d) { return n + currentFiles(d).length; }, 0); };
 
-    // Last check before sending: what is being sent, and that it can't be changed afterwards
+    // Last check before sending: what is being sent, which photos may be hard to read, and that it can't be changed afterwards
     function askToSubmit() {
         if (!UI) return Promise.resolve(true);
+        const hard = allPending();
         const box = document.createElement('div');
         const summary = document.createElement('div');
         summary.className = 'pui-dialog-summary';
@@ -253,10 +455,36 @@
             line.append(label, value);
             summary.appendChild(line);
         });
+        box.appendChild(summary);
+
+        if (hard.length) {
+            const warn = document.createElement('div');
+            warn.className = 'pui-dialog-warn';
+            const head = document.createElement('strong');
+            head.textContent = hard.length === 1 ? '1 photo may be hard to read' : hard.length + ' photos may be hard to read';
+            const list = document.createElement('ul');
+            hard.forEach(function (h) {
+                const li = document.createElement('li');
+                li.textContent = h.doc.title + (h.count > 1 ? ' (photo ' + h.number + ')' : '') + ': ' + issueText(issuesOf(h.file));
+                list.appendChild(li);
+            });
+            warn.append(head, list);
+            box.appendChild(warn);
+        }
+
         const note = document.createElement('p');
-        note.textContent = "Please make sure every photo is clear and easy to read. You can't change your answers or photos after you submit.";
-        box.append(summary, note);
-        return UI.confirm({ title: 'Submit your application?', content: box, icon: 'question', confirmText: 'Submit application', cancelText: 'Review again' });
+        note.textContent = hard.length
+            ? "Photos the office can't read may delay or stop your application. You can't change your answers or photos after you submit."
+            : "Please make sure every photo is clear and easy to read. You can't change your answers or photos after you submit.";
+        box.appendChild(note);
+
+        return UI.confirm({
+            title: hard.length ? 'Send photos that may be hard to read?' : 'Submit your application?',
+            content: box,
+            icon: hard.length ? 'warning' : 'question',
+            confirmText: hard.length ? 'Submit anyway' : 'Submit application',
+            cancelText: hard.length ? 'Retake photos' : 'Review again'
+        });
     }
 
     function showSending() {
@@ -291,8 +519,20 @@
             return;
         }
 
+        const hard = allPending();
         askToSubmit().then(function (ok) {
-            if (!ok) return;
+            if (!ok) {
+                // "Retake photos": go to the first photo that may be hard to read
+                if (hard.length) {
+                    const first = hard[0].doc.notes.querySelector('.ap-note:not(.is-accepted) .ap-note-retake');
+                    if (first) {
+                        first.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+                        first.focus({ preventScroll: true });
+                    }
+                }
+                return;
+            }
+            hard.forEach(function (h) { verdicts.get(h.file).accepted = true; });   // sent as it is
             confirmed = true;
             if (form.requestSubmit) {
                 form.requestSubmit();

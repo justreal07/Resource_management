@@ -5,6 +5,18 @@ require_once '../includes/admin_security.php';   // admin_client_ip(), admin_too
 header("Content-Type: application/json");
 set_time_limit(90);   // room to try backup models (on Windows the default 30s counts real time)
 
+// Only signed-in applicants may use the chat (the landing page shows it only to them),
+// so guests cannot use up the AI account's quota by calling this page directly.
+if (!isset($_SESSION['applicant'])) {
+    http_response_code(401);
+    echo json_encode(["reply" => null, "error" => "Please sign in to use the chat."]);
+    exit;
+}
+
+// The chat needs nothing else from the session. Release its lock now: otherwise every other page this
+// applicant opens waits until the AI has answered.
+session_abort();
+
 // The chat page sends every typed question here (the quick-topic buttons use the built-in FAQ).
 // Request:  {"message": "...", "history": [{"role": "user"|"bot", "text": "..."}, ...]}
 // Reply:
@@ -47,22 +59,22 @@ if (chat_over_limit($pdo)) {
 }
 
 // Earlier turns of this conversation, so follow-up questions ("paano naman sa burial?") make sense
-$contents = [];
+$conversation = [];
 foreach (array_slice(is_array($data['history'] ?? null) ? $data['history'] : [], -10) as $turn) {
     $text = mb_substr(trim((string)($turn['text'] ?? '')), 0, 2000);
     if ($text === '') continue;
-    $role = ($turn['role'] ?? '') === 'user' ? 'user' : 'model';
-    // Gemini needs user/model turns to alternate: merge repeats, and start with a user turn
-    if ($contents && end($contents)['role'] === $role) {
-        $contents[count($contents) - 1]['parts'][0]['text'] .= "\n" . $text;
-    } elseif ($contents || $role === 'user') {
-        $contents[] = ['role' => $role, 'parts' => [['text' => $text]]];
+    $role = ($turn['role'] ?? '') === 'user' ? 'user' : 'assistant';
+    // Keep user/assistant turns alternating: merge repeats, and start with a user turn
+    if ($conversation && end($conversation)['role'] === $role) {
+        $conversation[count($conversation) - 1]['content'] .= "\n" . $text;
+    } elseif ($conversation || $role === 'user') {
+        $conversation[] = ['role' => $role, 'content' => $text];
     }
 }
-if ($contents && end($contents)['role'] === 'user') {
-    $contents[count($contents) - 1]['parts'][0]['text'] .= "\n" . $userMessage;
+if ($conversation && end($conversation)['role'] === 'user') {
+    $conversation[count($conversation) - 1]['content'] .= "\n" . $userMessage;
 } else {
-    $contents[] = ['role' => 'user', 'parts' => [['text' => $userMessage]]];
+    $conversation[] = ['role' => 'user', 'content' => $userMessage];
 }
 
 // Everything the assistant knows about the portal. Program details come from assistance_config.php,
@@ -113,20 +125,20 @@ $systemPrompt = "You are the LGU Virtual Assistant on the LGU Assistance Portal 
     . "Use plain text: no markdown headings or tables; simple '-' or numbered lists are fine; you may wrap a few key words in **double asterisks**.\n\n"
     . chat_knowledge_base($ASSISTANCE_PROGRAMS);
 
-// AI settings (Google Gemini): put them in ai_chat.local.php (next to config.php), e.g.
-//   <?php return ['GEMINI_API_KEY' => '...', 'GEMINI_MODEL' => 'gemini-3.8-flash'];
-// or set the GEMINI_API_KEY / GEMINI_MODEL environment variables.
+// AI settings (Groq): put them in ai_chat.local.php (next to config.php), e.g.
+//   <?php return ['GROQ_API_KEY' => 'gsk_...', 'GROQ_MODEL' => 'openai/gpt-oss-20b'];
+// or set the GROQ_API_KEY / GROQ_MODEL / GROQ_FALLBACK_MODELS environment variables.
 // With no key the AI stays off and the chat uses the FAQ only.
 $aiLocal = is_file(__DIR__ . '/../ai_chat.local.php') ? (array)(include __DIR__ . '/../ai_chat.local.php') : [];
 $aiSetting = function (string $key) use ($aiLocal): string {
     return trim((string)(getenv($key) ?: ($_ENV[$key] ?? ($aiLocal[$key] ?? ''))));
 };
 
-$apiKey = $aiSetting('GEMINI_API_KEY');
-$model  = $aiSetting('GEMINI_MODEL') ?: 'gemini-3.8-flash';
+$apiKey = $aiSetting('GROQ_API_KEY');
+$model  = $aiSetting('GROQ_MODEL') ?: 'openai/gpt-oss-20b';
 
 if ($apiKey === '') {
-    echo json_encode(["reply" => null, "error" => "AI disabled: no GEMINI_API_KEY configured"]);
+    echo json_encode(["reply" => null, "error" => "AI disabled: no GROQ_API_KEY configured"]);
     exit;
 }
 
@@ -135,64 +147,74 @@ if (!function_exists('curl_init')) {
     exit;
 }
 
-$payload = [
-    "systemInstruction" => ["parts" => [["text" => $systemPrompt]]],
-    "contents" => $contents,
-    "generationConfig" => [
-        "temperature" => 0.3,
-        // includes the model's internal "thinking" tokens, so keep it roomy or replies get cut off
-        "maxOutputTokens" => 4096
-    ]
-];
-
-// Gemini models are often busy (503), rate-limited (429) or slow. Try the configured model,
-// then backups (GEMINI_FALLBACK_MODELS, comma-separated) before giving up.
-$fallbacks = $aiSetting('GEMINI_FALLBACK_MODELS') ?: 'gemini-flash-latest,gemini-3.5-flash-lite';
+// If a model is busy (503), rate-limited (429) or slow, try the backups (comma-separated) before giving up
+$fallbacks = $aiSetting('GROQ_FALLBACK_MODELS') ?: 'openai/gpt-oss-120b,qwen/qwen3.8-27b';
 $models = array_values(array_unique(array_filter(array_map('trim', array_merge([$model], explode(',', $fallbacks))))));
+
+// These models reason before answering; looking up portal facts needs little of it, so keep it
+// short (faster replies) and leave the reasoning out of the answer.
+function chat_reasoning_options(string $model): array {
+    if (stripos($model, 'gpt-oss') !== false) return ['reasoning_effort' => 'low', 'include_reasoning' => false];
+    if (stripos($model, 'qwen3') !== false)   return ['reasoning_effort' => 'none', 'reasoning_format' => 'hidden'];
+    return [];
+}
 
 $errors = [];
 foreach ($models as $tryModel) {
-    $ch = curl_init("https://generativelanguage.googleapis.com/v1beta/models/" . rawurlencode($tryModel) . ":generateContent");
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 20);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, [
-        "Content-Type: application/json",
-        "x-goog-api-key: " . $apiKey
-    ]);
-    curl_setopt($ch, CURLOPT_POST, true);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    $payload = [
+        "model" => $tryModel,
+        "messages" => array_merge([["role" => "system", "content" => $systemPrompt]], $conversation),
+        "temperature" => 0.3,
+        "max_completion_tokens" => 2048
+    ];
+    $extra = chat_reasoning_options($tryModel);
 
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $curlErrorMsg = curl_errno($ch) ? curl_error($ch) : '';
-    curl_close($ch);
+    // Each model: once with the reasoning options, and once without if the model refuses them (400)
+    foreach ([true, false] as $withExtra) {
+        if (!$withExtra && !$extra) break;
+        $ch = curl_init("https://api.groq.com/openai/v1/chat/completions");
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 20);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "Content-Type: application/json",
+            "Authorization: Bearer " . $apiKey
+        ]);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($withExtra ? $payload + $extra : $payload));
 
-    if ($curlErrorMsg !== '') {
-        $errors[] = "$tryModel: connection error: $curlErrorMsg";
-        continue;
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErrorMsg = curl_errno($ch) ? curl_error($ch) : '';
+        curl_close($ch);
+
+        if ($curlErrorMsg !== '') {
+            $errors[] = "$tryModel: connection error: $curlErrorMsg";
+            continue 2;
+        }
+
+        $result = json_decode((string)$response, true);
+        if ($httpCode === 400 && $withExtra && $extra) {
+            $errors[] = "$tryModel: refused the reasoning options: " . ($result['error']['message'] ?? '');
+            continue;
+        }
+        if ($httpCode !== 200) {
+            $errors[] = "$tryModel: API error ($httpCode): " . ($result['error']['message'] ?? (string)$response);
+            // 401/403 are problems with the key - another model will not help
+            if (in_array($httpCode, [401, 403], true)) break 2;
+            continue 2;
+        }
+
+        // Some models put their reasoning in <think>…</think> inside the answer: drop it
+        $reply = trim(preg_replace('/<think>.*?<\/think>/s', '', (string)($result['choices'][0]['message']['content'] ?? '')));
+        if ($reply === '') {
+            $errors[] = "$tryModel: empty response (" . ($result['choices'][0]['finish_reason'] ?? 'unknown') . ")";
+            continue 2;
+        }
+
+        echo json_encode(["reply" => $reply, "model" => $tryModel]);
+        exit;
     }
-
-    $result = json_decode((string)$response, true);
-    if ($httpCode !== 200) {
-        $errors[] = "$tryModel: API error ($httpCode): " . ($result['error']['message'] ?? (string)$response);
-        // 400/401/403 are problems with the request or the key - another model will not help
-        if (in_array($httpCode, [400, 401, 403], true)) break;
-        continue;
-    }
-
-    $reply = '';
-    foreach ($result['candidates'][0]['content']['parts'] ?? [] as $part) {
-        if (empty($part['thought'])) $reply .= $part['text'] ?? '';
-    }
-    $reply = trim($reply);
-    if ($reply === '') {
-        $errors[] = "$tryModel: empty response (" . ($result['candidates'][0]['finishReason'] ?? $result['promptFeedback']['blockReason'] ?? 'unknown') . ")";
-        continue;
-    }
-
-    echo json_encode(["reply" => $reply, "model" => $tryModel]);
-    exit;
 }
 
 error_log("AI chat failed: " . implode(' | ', $errors));

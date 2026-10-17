@@ -72,6 +72,7 @@ function staff_nav(): array
         'opd'     => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['staff', 'admin']],
         'pending' => ['href' => ui_type_url(3, 'pending'), 'label' => 'To review', 'icon' => 'clock', 'roles' => ['staff', 'admin'], 'type' => 3],
         'reports' => ['href' => '../staff/opd_staff_report.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
+        'account' => ['href' => '../staff/my_account.php', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff']],
     ];
 }
 
@@ -223,6 +224,9 @@ function admin_layout_start(array $page): void
     foreach (array_slice(preg_split('/\s+/u', trim((string)$userName)) ?: [], 0, 2) as $word) {
         $initials .= mb_strtoupper(mb_substr($word, 0, 1));
     }
+    $myId = (int)($user['id'] ?? 0);   // for the profile picture
+    // The person's own page: the admin's settings, or the staff member's account page
+    $myPage = $role === 'admin' ? '../Main_dashboard/admin_settings.php' : '../staff/my_account.php';
     $waiting = admin_pending_counts();
     $nav = ui_area() === 'staff' ? staff_nav() : admin_nav();
     ?>
@@ -286,7 +290,7 @@ function admin_layout_start(array $page): void
 
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
         <div class="sidebar-brand">
-            <img src="../asset/ACCESS.jpg" alt="" width="40" height="40">
+            <img src="../asset/ACCESS.jpg" alt="" width="112" height="112">
             <div>
                 <strong>Community Affairs Office</strong>
                 <span>Assistance Records</span>
@@ -317,7 +321,7 @@ function admin_layout_start(array $page): void
         </div>
         <?php if ($user): ?>
             <div class="sidebar-user">
-                <span class="avatar" aria-hidden="true"><?= ui_e($initials ?: 'A') ?></span>
+                <?= ui_avatar($myId, (string)$userName) ?>
                 <div><strong><?= ui_e($userName) ?></strong><span><?= ui_e($roleLabel) ?></span></div>
             </div>
         <?php endif; ?>
@@ -345,10 +349,10 @@ function admin_layout_start(array $page): void
                 <?= ui_icon('moon', 'theme-moon') ?><?= ui_icon('sun', 'theme-sun') ?><span class="visually-hidden" data-theme-label>Switch to dark theme</span>
             </button>
             <?php if ($user): ?>
-                <div class="user-chip">
-                    <span class="avatar" aria-hidden="true"><?= ui_e($initials ?: 'A') ?></span>
+                <a class="user-chip" href="<?= ui_e($myPage) ?>" title="<?= ui_e($role === 'admin' ? 'Your profile and picture' : 'Your account and picture') ?>">
+                    <?= ui_avatar($myId, (string)$userName) ?>
                     <span class="user-chip-text"><strong><?= ui_e($userName) ?></strong><span class="role-badge"><?= ui_e($roleLabel) ?></span></span>
-                </div>
+                </a>
                 <a class="btn btn-secondary btn-logout" href="../login/admin_logout.php"><?= ui_icon('logout') ?>Log out</a>
             <?php else: ?>
                 <a class="btn btn-primary btn-logout" href="<?= ui_e(ui_login_url()) ?>"><?= ui_icon('login') ?>Sign in</a>
@@ -396,6 +400,21 @@ function admin_layout_start(array $page): void
  */
 function admin_layout_end(array $opts = []): void
 {
+    // A program page showed the "Add walk-in" button (ui_type_tabs): bring the walk-in window with it, posting to the dashboard's saver
+    if (!empty($GLOBALS['ui_walkin_on_page']) && strpos((string)($opts['after'] ?? ''), 'id="addApplicantModal"') === false) {
+        require_once __DIR__ . '/walkin_form.php';
+        // assistance_config.php loaded from inside this function keeps its program list local: make it global for its own functions (get_program())
+        if (!isset($GLOBALS['ASSISTANCE_PROGRAMS']) && isset($ASSISTANCE_PROGRAMS)) $GLOBALS['ASSISTANCE_PROGRAMS'] = $ASSISTANCE_PROGRAMS;
+        $typeInfo = [];
+        foreach (ui_types() as $id => $t) $typeInfo[$id] = $t;
+        $opts['after'] = ($opts['after'] ?? '') . walkin_form_html($typeInfo, '../Main_dashboard/submit_admin_applicant.php');
+        $opts['scripts'] = array_merge($opts['scripts'] ?? [], ['../js/admin_dashboard.js']);
+        $opts['config'] = array_merge([
+            'viewUrl'   => '../Main_dashboard/view_applicant.php?applicant_id=',
+            'documents' => [1 => array_keys(get_program('medical')['documents']), 2 => array_keys(get_program('burial')['documents']),
+                            3 => array_keys(get_program('opd')['documents'])],
+        ], $opts['config'] ?? []);
+    }
     $config = array_merge([
         'userId'          => (int)($_SESSION['user']['id'] ?? 0),
         'serverNow'       => time(),
@@ -462,6 +481,7 @@ function admin_layout_end(array $opts = []): void
 <script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <script src="../js/admin_ui.js"></script>
 <script src="../js/admin_theme.js"></script>
+<script src="../js/admin_avatar.js"></script>
 <script src="../js/admin_live.js"></script>
 <script src="../js/admin_command.js"></script>
 <?php foreach ($opts['scripts'] ?? [] as $src): ?>

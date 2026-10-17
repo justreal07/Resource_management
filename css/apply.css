@@ -828,6 +828,108 @@ img { max-width: 100%; display: block; }
 .ap-doc-error { margin: 10px 0 0; color: var(--danger); font-size: 0.88rem; font-weight: 600; }
 .ap-doc-error:empty { display: none; }
 
+/* ---- Photo clarity check (js/photo-quality.js, js/apply-upload.js) ---- */
+.ap-doc.has-warning { border-color: #f0d28a; background: #fffdf6; }
+.ap-doc.has-warning .ap-doc-num { background: var(--amber-soft); color: #7a4f00; }
+
+/* "Take a photo": phones and tablets only; opens the back camera in one tap */
+.ap-doc-actions { margin-bottom: 10px; }
+.ap-doc-actions[hidden] { display: none; }
+.ap-camera-btn { width: 100%; }
+.ap-sr-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.ap-add-more.ap-add-camera { border-style: solid; border-color: var(--navy); background: var(--info-soft); }
+
+/* Clear / Check badge on each thumbnail */
+.ap-thumb-flag {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    line-height: 1.35;
+    box-shadow: 0 2px 6px rgba(20, 33, 61, 0.25);
+}
+.ap-flag-ok { background: var(--green-soft); color: #146c3e; }
+.ap-flag-warn { background: var(--amber-soft); color: #7a4f00; }
+.ap-thumb.has-issues { border-color: #f0c36a; }
+
+/* What is wrong with a photo, and what to do about it */
+.ap-quality-notes { display: grid; gap: 10px; margin-top: 12px; }
+.ap-quality-notes:empty { display: none; }
+.ap-note {
+    padding: 14px 16px;
+    border: 1.5px solid #f0d28a;
+    border-radius: 14px;
+    background: var(--amber-soft);
+    color: #5c3d00;
+}
+.ap-note h4 {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.97rem;
+    font-weight: 700;
+    color: #5c3d00;
+}
+.ap-note ul { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.ap-note li { display: flex; gap: 10px; align-items: flex-start; font-size: 0.92rem; line-height: 1.45; }
+.ap-note li i { flex: none; width: 18px; margin-top: 3px; text-align: center; color: #9a6200; }
+.ap-note-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ap-note-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 9px 18px;
+    border: 1.5px solid transparent;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+.ap-note-retake { background: var(--navy); border-color: var(--navy); color: #fff; }
+.ap-note-retake:hover { background: var(--navy-700); }
+.ap-note-keep { background: #fff; border-color: #e2c27a; color: #5c3d00; }
+.ap-note-keep:hover { background: #fff8e6; }
+.ap-note-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+/* After "Use anyway": a quiet one-line reminder instead of the whole note */
+.ap-note.is-accepted {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 9px 14px;
+    border-color: var(--line);
+    background: var(--field);
+    color: var(--muted);
+    font-size: 0.88rem;
+}
+.ap-note.is-accepted i { color: var(--amber); }
+.ap-note.is-accepted .ap-link-btn { margin-left: auto; }
+
+/* In the "Submit your application?" dialog: the photos that may still be hard to read */
+.pui-dialog-warn {
+    margin: 4px 0 12px;
+    padding: 12px 14px;
+    border: 1.5px solid #f0d28a;
+    border-radius: 14px;
+    background: var(--amber-soft);
+    color: #5c3d00;
+    text-align: left;
+    font-size: 0.92rem;
+}
+.pui-dialog-warn strong { display: block; margin-bottom: 4px; }
+.pui-dialog-warn ul { margin: 0; padding-left: 18px; }
+
 .ap-summary { padding: 22px; }
 .ap-summary h3 { font-size: 1.05rem; display: flex; align-items: center; gap: 10px; }
 .ap-summary h3 i { color: var(--red); }
@@ -1003,6 +1105,8 @@ img { max-width: 100%; display: block; }
     .ap-doc-title { flex-basis: calc(100% - 48px); }
     .ap-status { margin-left: 48px; }
     .ap-thumb, .ap-add-more { width: calc(50% - 6px); }
+    .ap-note-btn { flex: 1 1 100%; }
+    .ap-note.is-accepted .ap-link-btn { margin-left: 0; }
 
     .ap-done-card { padding: 30px 18px; }
     .ap-ref { grid-template-columns: 1fr; }

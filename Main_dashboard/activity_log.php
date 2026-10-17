@@ -154,8 +154,13 @@ echo ui_page_head('Activity log', 'Who approved or disapproved a request, signed
                         <td data-label="When"><time datetime="<?= ui_e(date('c', $ts)) ?>"><?= ui_e(date('M j, Y', $ts)) ?><br><span class="muted"><?= ui_e(date('g:i A', $ts)) ?></span></time></td>
                         <td class="cell-main" data-label="Who">
                             <?php if ($r['actor_name'] !== ''): ?>
-                                <strong class="row-name"><?= ui_e($r['actor_name']) ?></strong>
-                                <span class="muted"><?= $isStranger ? 'Not signed in' : ($r['actor_role'] === 'admin' ? 'Admin' : ($r['actor_role'] === 'staff' ? 'Staff' : '')) ?></span>
+                                <div class="person-cell">
+                                    <?= (!$isStranger && (int)$r['actor_id'] > 0) ? ui_avatar((int)$r['actor_id'], (string)$r['actor_name'], 'avatar-sm') : '' ?>
+                                    <div>
+                                        <strong class="row-name"><?= ui_e($r['actor_name']) ?></strong>
+                                        <span class="muted"><?= $isStranger ? 'Not signed in' : ($r['actor_role'] === 'admin' ? 'Admin' : ($r['actor_role'] === 'staff' ? 'Staff' : '')) ?></span>
+                                    </div>
+                                </div>
                             <?php elseif ($r['actor_id']): ?>
                                 <strong class="row-name">Removed account</strong>
                             <?php else: ?>

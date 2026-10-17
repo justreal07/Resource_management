@@ -11,7 +11,7 @@
  */
 
 // Change this date whenever the notice changes in a way applicants should know about
-const PRIVACY_NOTICE_VERSION = '2026-10-16';
+const PRIVACY_NOTICE_VERSION = '2026-10-17';
 
 // Who is responsible for the data (the "personal information controller")
 const PRIVACY_CONTROLLER = 'Local Government Unit of General Mariano Alvarez, Cavite, through its Community Affairs Office';

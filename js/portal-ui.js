@@ -332,8 +332,7 @@
             { el: '.hero-cta', title: 'Create your free account', text: 'Sign up once to apply online and follow your application from home.' },
             { el: '#programs .program-card', title: 'Assistance programs', text: 'Medical, Burial and OPD assistance. Each card lists the documents to prepare.', side: 'right' },
             { el: '#how-it-works .steps-grid', title: 'How to apply', text: 'Four simple steps, from creating your account to getting a decision.', side: 'top' },
-            { el: '#faq .faq-list', title: 'Questions?', text: 'Answers to the questions applicants ask most.', side: 'right' },
-            { el: '#chat-toggle', title: 'Chat with us', text: 'Our virtual assistant answers in Filipino or English, any time.', side: 'top', align: 'end' }
+            { el: '#faq .faq-list', title: 'Questions?', text: 'Answers to the questions applicants ask most.', side: 'right' }
         ] },
         'account': {
             before() {   // the tour is about the Applications tab

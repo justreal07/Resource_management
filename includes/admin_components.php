@@ -6,7 +6,9 @@
  *
  * Every value printed through these helpers is escaped with ui_e().
  */
-require_once __DIR__ . '/documents.php';   // document_url() / document_file_path(): the submitted-documents list
+require_once __DIR__ . '/documents.php';
+require_once __DIR__ . '/avatar.php';   // profile pictures of admin and staff   // document_url() / document_file_path(): the submitted-documents list
+require_once __DIR__ . '/photo_quality.php';   // photo_quality_info(): what the applicant's device said about each photo
 
 /* ============================================================
    ASSISTANCE TYPES AND STATUSES
@@ -239,7 +241,15 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved'][$current] ?? null;
     if ($exportStatus === null) return $html;
     $label = $exportStatus === 'all' ? 'all applications' : strtolower($exportStatus) . ' applications';
-    return '<div class="tabs-bar">' . $html . '<div class="tabs-tools">'
+    // Admins: "Add walk-in" for THIS program. It opens the walk-in window on this very page with the program already
+    // chosen (admin_layout_end() adds the window, the form templates and js/admin_dashboard.js when this flag is set).
+    $walkIn = '';
+    if (($_SESSION['user']['role'] ?? '') === 'admin') {
+        $GLOBALS['ui_walkin_on_page'] = true;
+        $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
+            . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
+    }
+    return '<div class="tabs-bar">' . $html . '<div class="tabs-tools">' . $walkIn
         . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants.php?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
         . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
         . '<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">' . ui_icon('print') . 'Print</button>'
@@ -996,6 +1006,20 @@ function ui_document_link(array $doc): array
     return [document_url((int)($doc['id'] ?? 0)), document_file_path($doc) !== null];
 }
 
+/**
+ * What the applicant's own device said about a photo while they added it (includes/photo_quality.php):
+ * "Clear", or "Warned: blurry, too dark" (they chose to send it anyway). Nothing for a photo that was not
+ * checked (sent before the check existed). Only a hint: the office still looks at the photo.
+ */
+function ui_photo_quality_badge(array $doc): string
+{
+    $q = photo_quality_info($doc);
+    if ($q['state'] === 'unknown') return '';
+    $ok = $q['state'] === 'ok';
+    return '<span class="badge ' . ($ok ? 'badge-approved' : 'badge-pending') . '" title="' . ui_e($q['title']) . '">'
+        . ui_icon($ok ? 'check-circle' : 'alert') . ui_e($q['text']) . '</span>';
+}
+
 /** A staff/admin user's name for "Approved by" / "Disapproved by" ("User #12" if the account is gone). */
 function ui_user_name(int $userId): string
 {
@@ -1013,6 +1037,14 @@ function ui_user_name(int $userId): string
         }
     }
     return $names[$userId];
+}
+
+/** "Approved by" / "Disapproved by": the person's name with their picture (or initials) beside it. */
+function ui_detail_user(string $label, int $userId): string
+{
+    $name = ui_user_name($userId);
+    if ($name === '') return ui_detail($label, '');
+    return '<div><dt>' . ui_e($label) . '</dt><dd class="with-avatar">' . ui_avatar($userId, $name, 'avatar-sm') . '<span>' . ui_e($name) . '</span></dd></div>';
 }
 
 /** One "label: value" pair for a detail list; empty values say so instead of "N/A". */
@@ -1079,7 +1111,7 @@ function ui_record_cards(array $a): array
     $app = [ui_detail('Status', $a['status'])];
     if ($a['status'] === 'Approved') {
         if ($has('approved_at')) $app[] = ui_detail('Date approved', ui_date($a['approved_at'], 'F j, Y, g:i A'));
-        if ($has('approved_by')) $app[] = ui_detail('Approved by', ui_user_name((int)$a['approved_by']));
+        if ($has('approved_by')) $app[] = ui_detail_user('Approved by', (int)$a['approved_by']);
         if ($has('amount') && (float)$a['amount'] > 0) $app[] = ui_detail('Amount released', ui_peso($a['amount']));
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date
         // Approval details typed when approving, the same ones the approval email gave
@@ -1102,7 +1134,7 @@ function ui_record_cards(array $a): array
     }
     if ($a['status'] === 'Disapproved') {
         $app[] = ui_detail('Date disapproved', ui_date($a['disapproved_at'] ?? '', 'F j, Y, g:i A'));
-        $app[] = ui_detail('Disapproved by', $has('disapproved_by') ? ui_user_name((int)$a['disapproved_by']) : '');
+        $app[] = $has('disapproved_by') ? ui_detail_user('Disapproved by', (int)$a['disapproved_by']) : ui_detail('Disapproved by', '');
         $app[] = ui_detail('Reason (the applicant sees it)', $a['disapproval_remarks'] ?? '', true);
     }
 
@@ -1227,7 +1259,8 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         foreach ($documents as $doc) {
             [$url, $exists] = ui_document_link($doc);
             $html .= '<tr><td class="cell-main" data-label="Document"><strong class="row-name">' . ui_e($doc['document_name']) . '</strong>'
-                . ($exists ? '' : '<span class="badge badge-danger">' . ui_icon('alert') . 'File missing</span>') . '</td>'
+                . ($exists ? '' : '<span class="badge badge-danger">' . ui_icon('alert') . 'File missing</span>')
+                . ui_photo_quality_badge($doc) . '</td>'
                 . '<td data-label="Uploaded">' . ui_e(ui_date($doc['uploaded_at'], 'M j, Y, g:i A')) . '</td>'
                 . '<td class="cell-action">' . ($exists
                     ? '<a class="btn btn-secondary btn-sm" href="' . ui_e($url) . '" target="_blank" rel="noopener">' . ui_icon('file') . 'Open<span class="visually-hidden"> ' . ui_e($doc['document_name']) . ' (opens in a new tab)</span></a>'

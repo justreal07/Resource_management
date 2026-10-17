@@ -1,129 +1,137 @@
 <?php
+// Reports (admin). The filters, the numbers and the tables come from includes/report_data.php (report_filters, report_build,
+// report_render); reports/export.php downloads the same tables as an Excel file.
 require_once '../config.php';
 require_once '../includes/admin_layout.php';
+require_once '../includes/report_data.php';
 
-$report_type = isset($_GET['report']) ? $_GET['report'] : 'overview';
-$date_range = isset($_GET['range']) ? $_GET['range'] : 'year';
-$year = isset($_GET['year']) ? $_GET['year'] : date('Y');
-$month = isset($_GET['month']) ? $_GET['month'] : date('m');
-$week = isset($_GET['week']) ? intval($_GET['week']) : null;
+$f = report_filters($_GET);
+$reportTypes = report_types();
+$ranges = report_ranges();
+report_budget_ensure($pdo);   // the budget table is made the first time (here, never mid-transaction)
 
-// Only known values reach the reports: several report queries put $year and $month straight into the SQL.
-$reportTypes = ['overview' => 'Overview', 'medical' => 'Medical Assistance', 'burial' => 'Burial Assistance', 'opd' => 'Outpatient Diagnosis',
-                'feedback' => 'Client feedback'];   // the satisfaction survey (includes/feedback.php)
-$ranges = ['year' => 'Full year', 'month' => 'One month', 'week' => 'One week'];   // "Decade" was removed: it showed the same as Full year
-if (!is_string($report_type) || !isset($reportTypes[$report_type])) $report_type = 'overview';
-if (!is_string($date_range) || !isset($ranges[$date_range])) $date_range = 'year';
-$year = ui_year($year);
-$month = is_string($month) && ctype_digit($month) && (int)$month >= 1 && (int)$month <= 12 ? $month : date('m');
-// No week chosen: this week, when it belongs to the chosen year (around New Year it can belong to the next or last one)
-if ($week === null) $week = date('o') == $year ? (int)date('W') : 1;
-$week = max(1, min(53, $week));
-
-// Get all years for dropdown
-$years_stmt = $pdo->query("SELECT DISTINCT YEAR(created_at) as year FROM applicant ORDER BY year DESC");
-$years = $years_stmt->fetchAll(PDO::FETCH_ASSOC);
-$yearList = array_map('intval', array_column($years, 'year'));
-if (!in_array((int)$year, $yearList, true)) {
-    $yearList[] = (int)$year;
-    rsort($yearList);
+// Years for the Year picker: every year with an application, this year, and the one chosen
+$yearList = array_map('intval', $pdo->query("SELECT DISTINCT YEAR(created_at) FROM applicant WHERE created_at IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN));
+foreach ([(int)date('Y'), $f['year']] as $y) {
+    if (!in_array($y, $yearList, true)) $yearList[] = $y;
 }
-
-// Weeks of the selected year, for the Week picker (Monday to Sunday, numbered like weekly_report.php).
-// A week belongs to its ISO year ('o'): week 1 can start in late December, and that week used to be left out.
-$weekOptions = [];
-for ($i = 1; $i <= 53; $i++) {
-    $d = new DateTime();
-    $d->setISODate((int)$year, $i);   // the Monday of week $i
-    if ($d->format('o') == $year) {
-        $weekOptions[$i] = "Week $i: " . $d->format('M j') . ' – ' . (clone $d)->modify('+6 days')->format('M j');
-    }
-}
-// Week 53 only exists in some years
-if (!isset($weekOptions[$week])) $week = max(array_keys($weekOptions));
+rsort($yearList);
 [$monthsShort, $monthsLong] = ui_month_labels();
+$quarters = [1 => 'Q1: Jan – Mar', 2 => 'Q2: Apr – Jun', 3 => 'Q3: Jul – Sep', 4 => 'Q4: Oct – Dec'];
+$bases = ['approved' => 'Date approved (when it was released)', 'filed' => 'Date filed'];
+// The "count approved by" choice is about approved applications: the Disapproved and Feedback tabs do not use it
+$usesBasis = in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true);
+// A field of the filter bar is shown for some periods only (js/admin_reports.js keeps this in step when the Period changes)
+$hiddenUnless = function (string $forRanges) use ($f): string {
+    return in_array($f['range'], explode(' ', $forRanges), true) ? '' : ' hidden';
+};
 
-$periodText = $date_range === 'week' ? ($weekOptions[$week] ?? 'Week ' . $week) . ', ' . $year
-    : ($date_range === 'month' ? $monthsLong[(int)$month - 1] . ' ' . $year : 'Full year ' . $year);
-$reportTitle = $date_range === 'year' ? $reportTypes[$report_type] : ($date_range === 'week' ? 'Weekly report' : 'Monthly report');
+$sessionUser = $_SESSION['user'] ?? [];
+$preparedBy = trim((string)($sessionUser['name'] ?? '')) !== '' ? $sessionUser['name'] : (string)($sessionUser['username'] ?? 'Admin');
+$model = report_build($pdo, $f);
 
 admin_layout_start(['title' => 'Reports', 'section' => 'reports']);
 echo ui_page_head('Reports', 'Totals and lists to print or open in Excel.',
     '<button type="button" class="btn btn-secondary" data-print>' . ui_icon('print') . 'Print</button>'
-    . '<button type="button" class="btn btn-secondary" data-export-table="#reportContent .data-table" data-filename="report_' . date('Y-m-d') . '.xls">'
-    . ui_icon('download') . 'Export table to Excel</button>');
+    . '<a class="btn btn-secondary" href="export.php?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>');
 ?>
-<form class="panel report-filters" method="GET" action="reports.php" data-busy>
-    <input type="hidden" name="report" value="<?= ui_e($report_type) ?>">
+<form class="panel report-filters" method="GET" action="reports.php" data-busy id="reportFilters">
+    <input type="hidden" name="report" value="<?= ui_e($f['report']) ?>">
     <div class="field">
         <label for="rRange">Period</label>
         <select id="rRange" name="range">
             <?php foreach ($ranges as $key => $label): ?>
-                <option value="<?= $key ?>"<?= $date_range === $key ? ' selected' : '' ?>><?= ui_e($label) ?></option>
+                <option value="<?= $key ?>"<?= $f['range'] === $key ? ' selected' : '' ?>><?= ui_e($label) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="field">
+    <div class="field" data-range-show="year quarter month week"<?= $hiddenUnless('year quarter month week') ?>>
         <label for="rYear">Year</label>
         <select id="rYear" name="year">
             <?php foreach ($yearList as $y): ?>
-                <option value="<?= $y ?>"<?= $y === (int)$year ? ' selected' : '' ?>><?= $y ?></option>
+                <option value="<?= $y ?>"<?= $y === $f['year'] ? ' selected' : '' ?>><?= $y ?></option>
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="field" data-show-for="month" data-show-source="rRange"<?= $date_range === 'month' ? '' : ' hidden' ?>>
+    <div class="field" data-range-show="quarter"<?= $hiddenUnless('quarter') ?>>
+        <label for="rQuarter">Quarter</label>
+        <select id="rQuarter" name="quarter">
+            <?php foreach ($quarters as $q => $label): ?>
+                <option value="<?= $q ?>"<?= $f['quarter'] === $q ? ' selected' : '' ?>><?= ui_e($label) ?></option>
+            <?php endforeach; ?>
+        </select>
+    </div>
+    <div class="field" data-range-show="month"<?= $hiddenUnless('month') ?>>
         <label for="rMonth">Month</label>
         <select id="rMonth" name="month">
             <?php foreach ($monthsLong as $i => $m): ?>
-                <option value="<?= $i + 1 ?>"<?= (int)$month === $i + 1 ? ' selected' : '' ?>><?= ui_e($m) ?></option>
+                <option value="<?= $i + 1 ?>"<?= $f['month'] === $i + 1 ? ' selected' : '' ?>><?= ui_e($m) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
-    <div class="field" data-show-for="week" data-show-source="rRange"<?= $date_range === 'week' ? '' : ' hidden' ?>>
+    <div class="field" data-range-show="week"<?= $hiddenUnless('week') ?>>
         <label for="rWeek">Week</label>
         <select id="rWeek" name="week">
-            <?php foreach ($weekOptions as $w => $label): ?>
-                <option value="<?= $w ?>"<?= $w === $week ? ' selected' : '' ?>><?= ui_e($label) ?></option>
+            <?php foreach ($f['weekOptions'] as $w => $label): ?>
+                <option value="<?= $w ?>"<?= $f['week'] === $w ? ' selected' : '' ?>><?= ui_e($label) ?></option>
             <?php endforeach; ?>
         </select>
     </div>
+    <div class="field" data-range-show="custom"<?= $hiddenUnless('custom') ?>>
+        <label for="rFrom">From</label>
+        <input type="date" id="rFrom" name="from" value="<?= ui_e($f['from']) ?>" min="2000-01-01" max="<?= date('Y-m-d', strtotime('+1 year')) ?>">
+    </div>
+    <div class="field" data-range-show="custom"<?= $hiddenUnless('custom') ?>>
+        <label for="rTo">To</label>
+        <input type="date" id="rTo" name="to" value="<?= ui_e($f['to']) ?>" min="2000-01-01" max="<?= date('Y-m-d', strtotime('+1 year')) ?>">
+    </div>
+    <?php if ($usesBasis): ?>
+        <div class="field">
+            <label for="rBasis">Count approved by</label>
+            <select id="rBasis" name="basis">
+                <?php foreach ($bases as $key => $label): ?>
+                    <option value="<?= $key ?>"<?= $f['basis'] === $key ? ' selected' : '' ?>><?= ui_e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    <?php else: ?>
+        <input type="hidden" name="basis" value="<?= ui_e($f['basis']) ?>">
+    <?php endif; ?>
     <button type="submit" class="btn btn-primary">Show report</button>
 </form>
 
-<?php if ($date_range === 'year'): ?>
-    <?php
-    $tabItems = [];
-    foreach ($reportTypes as $key => $label) {
-        $tabItems[$key] = [$label, 'reports.php?' . http_build_query(['report' => $key, 'range' => 'year', 'year' => $year])];
-    }
-    echo ui_tabs($tabItems, $report_type, 'Report type');
-    ?>
-<?php else: ?>
-    <p class="report-range"><?= ui_icon('info') ?> Weekly and monthly reports cover all three programs.</p>
+<?php
+$tabItems = [];
+foreach ($reportTypes as $key => $label) {
+    $tabItems[$key] = [$label, 'reports.php?' . report_query($f, ['report' => $key])];
+}
+echo ui_tabs($tabItems, $f['report'], 'Report type');
+?>
+
+<?php if ($model['notes']): ?>
+    <ul class="report-notes">
+        <?php foreach ($model['notes'] as $note): ?>
+            <li><?= ui_icon('info') ?><span><?= ui_e($note) ?></span></li>
+        <?php endforeach; ?>
+    </ul>
 <?php endif; ?>
 
 <div class="report-section" id="reportContent">
-    <h2 class="print-title">LGU Assistance Report · <?= ui_e($reportTitle) ?> · <?= ui_e($periodText) ?></h2>
-    <p class="report-range">Showing <strong><?= ui_e($periodText) ?></strong></p>
-    <?php
-    if($date_range == 'week') {
-        // Show weekly report regardless of report type
-        include __DIR__ . '/weekly_report.php';
-    } elseif($date_range == 'month') {
-        // Show monthly report regardless of report type
-        include __DIR__ . '/monthly_report.php';
-    } elseif($report_type == 'overview') {
-        include __DIR__ . '/overview_report.php';
-    } elseif($report_type == 'medical') {
-        include __DIR__ . '/medical_report.php';
-    } elseif($report_type == 'burial') {
-        include __DIR__ . '/burial_report.php';
-    } elseif($report_type == 'opd') {
-        include __DIR__ . '/opd_report.php';
-    } elseif($report_type == 'feedback') {
-        include __DIR__ . '/feedback_report.php';
-    }
-    ?>
+    <!-- The heading of the printed page (hidden on screen): office, report, period, who printed it and when -->
+    <header class="print-head">
+        <p class="print-office">LGU General Mariano Alvarez, Cavite</p>
+        <p class="print-office-sub">Social Assistance Records</p>
+        <h2><?= ui_e($model['title']) ?> report</h2>
+        <p><?= ui_e($f['label']) ?><?= $usesBasis ? ' · approved applications counted by date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved') : '' ?></p>
+        <p class="print-meta">Printed by <?= ui_e($preparedBy) ?> on <?= ui_e(date('F j, Y, g:i A')) ?></p>
+    </header>
+    <p class="report-range">Showing <strong><?= ui_e($model['title']) ?></strong> for <strong><?= ui_e($f['label']) ?></strong></p>
+    <?= report_render($model) ?>
+    <!-- Signatures at the end of the printed report (hidden on screen) -->
+    <div class="print-sign">
+        <div><span class="sign-line"></span><p>Prepared by: <?= ui_e($preparedBy) ?></p><p class="sign-sub">Signature over printed name</p></div>
+        <div><span class="sign-line"></span><p>Noted by:</p><p class="sign-sub">Signature over printed name</p></div>
+    </div>
 </div>
 <?php
-admin_layout_end();
+admin_layout_end(['scripts' => ['../js/admin_reports.js']]);

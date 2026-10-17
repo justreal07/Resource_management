@@ -1,0 +1,12 @@
+# Pictures of office staff (personal data): opened only through Main_dashboard/avatar.php, which checks who is asking.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+Options -Indexes -ExecCGI
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
