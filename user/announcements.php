@@ -100,7 +100,7 @@ $h = 'ann_e';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $single ? $h($single['title']) . ' | ' : '' ?>Announcements | LGU Assistance Portal</title>
     <meta name="description" content="News, schedules and advisories from the Municipality of General Mariano Alvarez, Cavite.">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="<?= $h(portal_asset('../css/home.css')) ?>">
     <link rel="stylesheet" href="<?= $h(portal_asset('../css/announcements.css')) ?>">
     <?php portal_head(); ?>

@@ -37,7 +37,7 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Choose your assistance | LGU Assistance Portal</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="<?= $h(portal_asset('../css/home.css')) ?>">
     <link rel="stylesheet" href="<?= $h(portal_asset('../css/choose.css')) ?>">
     <?php portal_head(); ?>

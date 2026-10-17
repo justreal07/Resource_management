@@ -113,7 +113,7 @@ function apply_page_start(string $title, array $program, int $step): void {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= e($title) ?> | LGU Assistance Portal</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="<?= e(portal_asset('../css/apply.css')) ?>">
     <?php portal_head(); ?>
 </head>

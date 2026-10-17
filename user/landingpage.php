@@ -115,7 +115,7 @@ $programs = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>LGU Assistance Portal | General Mariano Alvarez, Cavite</title>
     <meta name="description" content="Apply for Medical, Burial and OPD assistance from the Municipality of General Mariano Alvarez, Cavite — online, anytime.">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(portal_asset('../css/home.css')); ?>">
     <?php portal_head(); ?>
     <?php if($is_logged_in): ?><meta name="csrf-token" content="<?php echo csrf_token(); ?>"><?php endif; ?>
@@ -250,9 +250,18 @@ $programs = [
 <!-- HERO -->
 <section class="hero">
     <div class="hero-media" aria-hidden="true">
-        <video autoplay muted loop playsinline poster="../asset/top.jpeg">
-            <source src="../asset/muni.mp4" type="video/mp4">
-        </video>
+        <?php /* The photo shows first. The (small) video is only loaded on a wider screen, when the visitor isn't saving data and hasn't asked for less motion, so a phone on mobile data never downloads it. */ ?>
+        <video id="heroVideo" muted loop playsinline preload="none" poster="../asset/top.jpeg" data-src="../asset/muni-small.mp4"></video>
+        <script>
+        (function () {
+            var v = document.getElementById('heroVideo');
+            var c = navigator.connection || {};
+            if (!v || c.saveData || /(^|-)2g$/.test(c.effectiveType || '') ||
+                !matchMedia('(min-width: 768px)').matches || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            v.src = v.getAttribute('data-src');
+            v.play().catch(function () {});
+        })();
+        </script>
     </div>
 
     <div class="container hero-grid">

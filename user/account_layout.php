@@ -45,7 +45,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="<?= csrf_token() ?>">
     <title><?= e($title) ?> | LGU Assistance Portal</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="<?= e(portal_asset('../css/apply.css')) ?>">
     <link rel="stylesheet" href="<?= e(portal_asset('../css/account.css')) ?>">
     <link rel="stylesheet" href="<?= e(portal_asset('../css/dashboard.css')) ?>">

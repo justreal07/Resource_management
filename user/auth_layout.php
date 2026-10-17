@@ -13,7 +13,7 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo htmlspecialchars($title); ?> | LGU Assistance Portal</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../css/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(portal_asset('../css/home.css')); ?>">
     <link rel="stylesheet" href="<?php echo htmlspecialchars(portal_asset('../css/auth.css')); ?>">
     <?php portal_head(); ?>

@@ -1705,7 +1705,8 @@ a { color: var(--navy); }
     .container { padding: 0 16px; }
     .topbar-info span:not(:first-child) { display: none; }
     .brand-text small { display: none; }
-    .brand-text strong { font-size: 1rem; }
+    /* On a phone the title wraps onto two lines instead of ending in "…" */
+    .brand-text strong { font-size: 0.95rem; line-height: 1.2; white-space: normal; overflow: visible; text-overflow: clip; }
     .brand-logos img { width: 50px; height: 50px; }
     .brand-logos img + img { margin-left: -14px; }
 

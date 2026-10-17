@@ -1,0 +1,21 @@
+name: PHP syntax check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+      - name: php -l on every PHP file (vendor/ is skipped)
+        run: |
+          status=0
+          while IFS= read -r -d '' f; do
+            php -l "$f" >/dev/null || { echo "::error file=$f::PHP syntax error"; status=1; }
+          done < <(find . -name '*.php' -not -path './vendor/*' -print0)
+          exit $status
