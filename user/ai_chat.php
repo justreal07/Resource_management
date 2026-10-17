@@ -3,7 +3,16 @@ require_once '../config.php';
 require_once 'assistance_config.php';
 header("Content-Type: application/json");
 set_time_limit(90);   // room to try backup models (on Windows the default 30s counts real time)
-// The chat never uses the session. Release its lock now: otherwise every other page this
+
+// Only signed-in applicants may use the chat (the landing page shows it only to them),
+// so guests cannot use up the AI account's quota by calling this page directly.
+if (!isset($_SESSION['applicant'])) {
+    http_response_code(401);
+    echo json_encode(["reply" => null, "error" => "Please sign in to use the chat."]);
+    exit;
+}
+
+// The chat needs nothing else from the session. Release its lock now: otherwise every other page this
 // applicant opens waits until the AI has answered.
 session_abort();
 
