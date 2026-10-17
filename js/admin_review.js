@@ -74,8 +74,10 @@
             if (count) count.textContent = (index + 1) + ' of ' + thumbs.length;
             if (openLink) openLink.href = t.dataset.src;
             if (saveLink) saveLink.href = t.dataset.download;
+            // What the applicant's device said about this photo (clear / warned), if it was checked
+            root.querySelectorAll('[data-quality-for]').forEach((el) => { el.hidden = Number(el.dataset.qualityFor) !== index; });
             t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            if (announce) say(t.dataset.name + ', photo ' + (index + 1) + ' of ' + thumbs.length);
+            if (announce) say(t.dataset.name + ', photo ' + (index + 1) + ' of ' + thumbs.length + (t.dataset.qualityText ? '. ' + t.dataset.qualityText : ''));
         };
 
         img.addEventListener('load', () => { stage.classList.remove('is-loading'); layout(); });

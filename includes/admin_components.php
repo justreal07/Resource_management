@@ -7,6 +7,7 @@
  * Every value printed through these helpers is escaped with ui_e().
  */
 require_once __DIR__ . '/documents.php';   // document_url() / document_file_path(): the submitted-documents list
+require_once __DIR__ . '/photo_quality.php';   // photo_quality_info(): what the applicant's device said about each photo
 
 /* ============================================================
    ASSISTANCE TYPES AND STATUSES
@@ -1004,6 +1005,20 @@ function ui_document_link(array $doc): array
     return [document_url((int)($doc['id'] ?? 0)), document_file_path($doc) !== null];
 }
 
+/**
+ * What the applicant's own device said about a photo while they added it (includes/photo_quality.php):
+ * "Clear", or "Warned: blurry, too dark" (they chose to send it anyway). Nothing for a photo that was not
+ * checked (sent before the check existed). Only a hint: the office still looks at the photo.
+ */
+function ui_photo_quality_badge(array $doc): string
+{
+    $q = photo_quality_info($doc);
+    if ($q['state'] === 'unknown') return '';
+    $ok = $q['state'] === 'ok';
+    return '<span class="badge ' . ($ok ? 'badge-approved' : 'badge-pending') . '" title="' . ui_e($q['title']) . '">'
+        . ui_icon($ok ? 'check-circle' : 'alert') . ui_e($q['text']) . '</span>';
+}
+
 /** A staff/admin user's name for "Approved by" / "Disapproved by" ("User #12" if the account is gone). */
 function ui_user_name(int $userId): string
 {
@@ -1235,7 +1250,8 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         foreach ($documents as $doc) {
             [$url, $exists] = ui_document_link($doc);
             $html .= '<tr><td class="cell-main" data-label="Document"><strong class="row-name">' . ui_e($doc['document_name']) . '</strong>'
-                . ($exists ? '' : '<span class="badge badge-danger">' . ui_icon('alert') . 'File missing</span>') . '</td>'
+                . ($exists ? '' : '<span class="badge badge-danger">' . ui_icon('alert') . 'File missing</span>')
+                . ui_photo_quality_badge($doc) . '</td>'
                 . '<td data-label="Uploaded">' . ui_e(ui_date($doc['uploaded_at'], 'M j, Y, g:i A')) . '</td>'
                 . '<td class="cell-action">' . ($exists
                     ? '<a class="btn btn-secondary btn-sm" href="' . ui_e($url) . '" target="_blank" rel="noopener">' . ui_icon('file') . 'Open<span class="visually-hidden"> ' . ui_e($doc['document_name']) . ' (opens in a new tab)</span></a>'

@@ -1667,7 +1667,24 @@ kbd {
     border-radius: var(--radius-sm);
     cursor: pointer;
 }
+.review-thumb { position: relative; }
 .review-thumb img { width: 100%; height: 64px; object-fit: cover; border-radius: 3px; background: var(--c-surface-2); }
+/* A photo the applicant's device warned about (clarity check: blurry, too dark, glare, too small) */
+.review-thumb-flag {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    color: var(--c-pending-text);
+    background: var(--c-pending-bg);
+    border: 1px solid var(--c-pending-border);
+    border-radius: 50%;
+}
+.review-thumb-flag .icon { width: 12px; height: 12px; }
+.review-quality[hidden] { display: none; }
 .review-thumb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-thumb:hover { border-color: var(--c-border-strong); }
 .review-thumb[aria-pressed="true"] { border-color: var(--c-primary); background: var(--c-primary-soft); }

@@ -4,6 +4,7 @@ require_once 'assistance_config.php';
 require_once 'person_rules.php';
 require_once 'account_helpers.php';   // ensure_user_schema()
 require_once '../includes/privacy.php';
+require_once '../includes/photo_quality.php';   // the clarity note the applicant's device made for each photo
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
@@ -99,7 +100,10 @@ foreach (array_keys($program['documents']) as $i => $doc_name) {
             continue;
         }
 
-        $photos[] = ['doc_name' => $doc_name, 'tmp' => $tmp, 'ext' => PHOTO_ALLOWED_TYPES[$mime]];
+        // quality[<document>][] comes in the same order as the photos of that document (js/apply-upload.js);
+        // it is only a hint for the office, so a missing or odd value just means "not checked"
+        $photos[] = ['doc_name' => $doc_name, 'tmp' => $tmp, 'ext' => PHOTO_ALLOWED_TYPES[$mime],
+                     'quality' => photo_quality_parse($_POST['quality'][$i][$n] ?? null)];
     }
 
     if ($count === 0) {
@@ -127,10 +131,13 @@ $type_id = $program['type_id'];
 $f = $form_data;
 // The birthdate / date of death columns come with database/migrations/migration_person_rules.sql
 $with_person_columns = person_rules_installed($pdo);
+// The clarity-note columns of applicant_documents (added here, before the transaction: ALTER TABLE would end it).
+// If they can't be added the photos are still saved, just without the note.
+$with_quality = photo_quality_ensure($pdo);
 
 // date_released is left empty: it is the day the assistance is handed over, not the day the form was sent
 // (it used to be filled in with the submission time)
-$save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $type_id, $f, $with_person_columns, $photos, $upload_dir, &$saved_files): int {
+$save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $type_id, $f, $with_person_columns, $with_quality, $photos, $upload_dir, &$saved_files): int {
     if ($form_type === 'opd') {
         $stmt = $pdo->prepare("INSERT INTO applicant (
             account_id, assistance_type_id, first_name, middle_name, last_name, house_no, street,
@@ -164,7 +171,9 @@ $save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $typ
 
     $applicant_id = (int)$pdo->lastInsertId();
 
-    $doc_stmt = $pdo->prepare("INSERT INTO applicant_documents (applicant_id, document_name, file_path) VALUES (?, ?, ?)");
+    $doc_stmt = $pdo->prepare($with_quality
+        ? "INSERT INTO applicant_documents (applicant_id, document_name, file_path, quality_flags, quality_metrics) VALUES (?, ?, ?, ?, ?)"
+        : "INSERT INTO applicant_documents (applicant_id, document_name, file_path) VALUES (?, ?, ?)");
     foreach ($photos as $photo) {
         $clean_doc_name = preg_replace('/[^a-zA-Z0-9]/', '_', $photo['doc_name']);
         $filename = uniqid() . bin2hex(random_bytes(3)) . '_' . $clean_doc_name . '.' . $photo['ext'];
@@ -173,7 +182,9 @@ $save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $typ
             throw new RuntimeException('Could not save the photo for ' . $photo['doc_name']);
         }
         $saved_files[] = $upload_dir . $filename;
-        $doc_stmt->execute([$applicant_id, $photo['doc_name'], $filename]);
+        $doc_stmt->execute($with_quality
+            ? [$applicant_id, $photo['doc_name'], $filename, $photo['quality']['flags'], $photo['quality']['metrics']]
+            : [$applicant_id, $photo['doc_name'], $filename]);
     }
 
     return $applicant_id;

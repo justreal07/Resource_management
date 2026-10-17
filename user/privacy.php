@@ -141,6 +141,9 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                     <li>Medical Assistance: the purpose of the request. Burial Assistance: the date of death.
                         OPD: the preferred hospital, the check-up date, the reason for the check-up or diagnosis, and whether a wheelchair or stretcher is needed.</li>
                     <li>Photos of your requirements: <?= $h(implode('; ', array_keys($documentNames))) ?>.</li>
+                    <li>A short note about how clear each photo is. While you add a photo, your own phone or computer checks whether it looks
+                        blurry, too dark, too small or has glare. The check happens on your device and the photo is not sent anywhere for it;
+                        we keep only the result (for example “clear”, or “may be hard to read: blurry”) with the photo, so the office knows which photos to look at first.</li>
                     <li>The office's decision on your request: status, approved amount, schedule and remarks.</li>
                 </ul>
                 <p class="pv-note"><i class="fas fa-triangle-exclamation" aria-hidden="true"></i>

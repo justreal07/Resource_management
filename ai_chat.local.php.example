@@ -1,8 +1,10 @@
 <?php
-// Local AI chat settings for user/ai_chat.php.
+// Local AI chat settings for user/ai_chat.php (Groq, https://console.groq.com/keys).
 // Copy this file to ai_chat.local.php and fill in your own key.
 // ai_chat.local.php is ignored by git: never commit it or share it.
 return [
-    'GEMINI_API_KEY' => 'REPLACE_WITH_YOUR_GEMINI_API_KEY',
-    'GEMINI_MODEL'   => 'gemini-3.8-flash',
+    'GROQ_API_KEY' => 'REPLACE_WITH_YOUR_GROQ_API_KEY',
+    'GROQ_MODEL'   => 'openai/gpt-oss-20b',
+    // Optional: tried in order when the main model is busy
+    // 'GROQ_FALLBACK_MODELS' => 'openai/gpt-oss-120b,qwen/qwen3.8-27b',
 ];
