@@ -9,9 +9,9 @@ LGU (General Mariano Alvarez, Cavite) social-assistance system: plain procedural
 ## Running it
 
 - Start Apache + MySQL from the XAMPP Control Panel; open `http://localhost/Resource_management/Resource_management/user/landingpage.php` (applicant portal) or `.../login/login.php` (admin/staff).
-- DB: `lgu_assistance_system`, `root` with empty password (hard-coded in [config.php](config.php)). Fresh install: import [database/lgu_assistance_system.sql](database/lgu_assistance_system.sql) (it already includes the person-rules and Disapprove schema; no migration needed). Existing DB: apply `migration_fix_schema.sql`, `migration_person_rules.sql`, `migration_disapprove.sql` via phpMyAdmin, in that order; all are safe to re-run (each file's header explains what it does; `_cleanup`/`_rollback` are optional follow-ups to the disapprove migration). Until `migration_person_rules.sql` is run, Medical/Burial applications are still accepted but without the person checks (`person_rules_installed()`), and admin pages show a "Database update needed" banner.
+- DB: `lgu_assistance_system`, `root` with empty password by default; override with `db.local.php` (copy `db.local.php.example`) or the `DB_HOST`/`DB_NAME`/`DB_USER`/`DB_PASS` env vars, and never use root on a real server. Fresh install: import [database/lgu_assistance_system.sql](database/lgu_assistance_system.sql) (it already includes the person-rules and Disapprove schema; no migration needed). Existing DB: apply `migration_fix_schema.sql`, `migration_person_rules.sql`, `migration_disapprove.sql` via phpMyAdmin, in that order; all are safe to re-run (each file's header explains what it does; `_cleanup`/`_rollback` are optional follow-ups to the disapprove migration). Until `migration_person_rules.sql` is run, Medical/Burial applications are still accepted but without the person checks (`person_rules_installed()`), and admin pages show a "Database update needed" banner.
 - `composer install` for `google/apiclient` (Google sign-in) and `phpmailer/phpmailer` (approval emails). `vendor/autoload.php` may be missing locally. On Windows, unpacking `google/apiclient-services` can exceed Composer's 300 s limit: set `COMPOSER_PROCESS_TIMEOUT=0`.
-- Default admin: open [includes/admin_init.php](includes/admin_init.php) once (creates `admin` / `admin123`).
+- First admin: while no admin exists, `login/register.php` creates the first admin account (there is no default password); add staff afterwards from Admin settings. Do not keep `includes/admin_init.php` on a real server.
 - Syntax-check a file: `C:\xampp\php\php.exe -l path\to\file.php`. Verification is otherwise manual in the browser.
 
 ## Architecture
@@ -56,7 +56,7 @@ LGU (General Mariano Alvarez, Cavite) social-assistance system: plain procedural
 - **OPD companion is optional** (`petitioner_name` + `relationship` on OPD = who goes with the patient): both empty = the patient goes alone; one filled in needs the other (`opd_companion_errors()` in `assistance_config.php`, used by `opdform.php`, the walk-in submit and `edit_applicant.php`; `data-all-or-none` in `js/apply-form.js` does the same in the browser). Lists and views show `ui_opd_companion()` ("No companion").
 - **Own age**: the applicant's own birthdate is `applicant_accounts.birthdate` (added by `ensure_user_schema()` v3; set in My Account → Profile, or kept from a Medical "For myself" application when empty; `account_own_birthdate()` falls back to that application's birthdate). `get_form_prefill()` returns it as `own` and fills the age of the person filling in the form (Burial claimant, Medical claimant, OPD patient when the name is theirs) as of today; `js/apply-form.js` does the same when the Medical choice or the OPD name changes (`data-own-*` on the form). Ages are not in `'remember'` (they go stale), and name/sex are copied from another program's application only when it was about the account holder (`application_is_about_holder()`).
 - `user/application_eligibility.php`: account-level eligibility checks.
-- `user/ai_chat.php`: Gemini-backed chat helper.
+- `user/ai_chat.php`: Gemini-backed chat helper; limited to 20 questions per address per 10 minutes (`chat_over_limit()`, counted in `login_attempts` under `c:<address>` so it never affects sign-in tries).
 
 **Local secrets** live in private local files at the project root: `google_oauth.local.php`, `ai_chat.local.php` and `mail.local.php` (Gmail address + app password for the approval emails) (each returns an array; env vars `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/`GOOGLE_REDIRECT_URI`, `GEMINI_API_KEY`/`GEMINI_MODEL`, `MAIL_USERNAME`/`MAIL_PASSWORD`/`MAIL_FROM_NAME` override; each has a `.example` to copy). Don't inline credentials into code.
 
@@ -65,3 +65,7 @@ LGU (General Mariano Alvarez, Cavite) social-assistance system: plain procedural
 - PDO prepared statements everywhere; user-facing error messages are plain-language and never expose SQL (log details with `error_log`).
 - Code comments explain the business rule in plain English; match that style.
 - `zsetup_guideline/*.md` are older setup notes and partly stale (e.g. they reference `gmail_login.php`, which no longer exists, and a project path without the nested `Resource_management/`).
+
+## Progress check-ins
+
+When the user says "read again my current progress" (or similar), re-read the repo from GitHub with read-only `gh api` calls (branches, latest commits on `main`, PRs, files changed in new commits) instead of trusting the local clone, then tell them: what changed since the last check, which earlier problems are now fixed or still open, and a short, prioritized recommendation of what to develop or improve next (security first, then reliability, then UI). Don't change anything until they approve.
