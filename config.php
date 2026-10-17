@@ -10,10 +10,21 @@ if (isset($_SESSION['user']['id'])) {
     unset($_SESSION['user_id']);
 }
 
-$host = "localhost";
-$dbname = "lgu_assistance_system";
-$username = "root";
-$password = "";
+// Database settings: put your own in db.local.php (copy db.local.php.example; it is not committed),
+// or set the DB_HOST / DB_NAME / DB_USER / DB_PASS environment variables. With neither, the XAMPP
+// defaults below are used (root, no password), which is only fine on your own computer.
+$dbLocal = is_file(__DIR__ . '/db.local.php') ? (array)(include __DIR__ . '/db.local.php') : [];
+$dbSetting = function (string $key, string $default) use ($dbLocal): string {
+    $value = getenv($key);
+    if ($value === false || $value === '') {
+        $value = $dbLocal[$key] ?? $default;
+    }
+    return (string)$value;
+};
+$host = $dbSetting('DB_HOST', 'localhost');
+$dbname = $dbSetting('DB_NAME', 'lgu_assistance_system');
+$username = $dbSetting('DB_USER', 'root');
+$password = $dbSetting('DB_PASS', '');
 
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
