@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once 'assistance_config.php';
+require_once '../includes/admin_security.php';   // admin_client_ip(), admin_tools_ensure()
 header("Content-Type: application/json");
 set_time_limit(90);   // room to try backup models (on Windows the default 30s counts real time)
 
@@ -15,6 +16,33 @@ $userMessage = mb_substr(trim((string)($data['message'] ?? '')), 0, 1000);
 
 if ($userMessage === '') {
     echo json_encode(["reply" => "Please type a message."]);
+    exit;
+}
+
+// Every question costs a call to the AI service, so one address can only ask so many in a short time.
+// The counts live in login_attempts under their own address key ('c:' + address), so they never
+// count against anyone's sign-in tries. If the table can't be used the chat keeps working.
+const CHAT_MAX_MESSAGES = 20;
+const CHAT_WINDOW_MINUTES = 10;
+function chat_over_limit(PDO $pdo): bool
+{
+    try {
+        admin_tools_ensure($pdo);
+        $key = substr('c:' . admin_client_ip(), 0, 45);
+        $stmt = $pdo->prepare('SELECT COUNT(*) FROM login_attempts WHERE username = ? AND ip = ? AND attempted_at >= NOW() - INTERVAL ' . CHAT_WINDOW_MINUTES . ' MINUTE');
+        $stmt->execute(['chat', $key]);
+        if ((int)$stmt->fetchColumn() >= CHAT_MAX_MESSAGES) {
+            return true;
+        }
+        $pdo->prepare('INSERT INTO login_attempts (username, ip, attempted_at) VALUES (?, ?, NOW())')->execute(['chat', $key]);
+    } catch (Throwable $e) {
+        error_log('chat_over_limit: ' . $e->getMessage());
+    }
+    return false;
+}
+if (chat_over_limit($pdo)) {
+    http_response_code(429);
+    echo json_encode(["reply" => "You've asked a lot of questions in a short time. Please wait a few minutes and try again, or use the quick topics.", "error" => "rate limited"]);
     exit;
 }
 
