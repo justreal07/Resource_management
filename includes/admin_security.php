@@ -206,6 +206,7 @@ function activity_actions(): array
         'staff_password_reset'    => ['Password reset',             'accounts',  'pending'],
         'applicant_password_reset' => ['Applicant password reset',  'accounts',  'pending'],
         'profile_updated'         => ['Profile changed',            'settings',  'neutral'],
+        'avatar_changed'          => ['Profile picture changed',    'settings',  'neutral'],
         'password_changed'        => ['Password changed',           'settings',  'neutral'],
         'export_csv'              => ['Exported a list',            'exports',   'neutral'],
     ];

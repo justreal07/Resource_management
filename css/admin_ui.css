@@ -81,10 +81,19 @@
     --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
     --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.22);
     --sidebar-w: 256px;
+    --topbar-h: 64px;   /* the top bar's height: bigger on a large screen (see the end of the top bar rules); the review page subtracts it */
 
     /* Which of the top bar's two theme icons shows (the moon in light mode, the sun in dark mode) */
     --theme-moon-display: inline-block;
     --theme-sun-display: none;
+
+    /* Glass (see the "Glass" block near the end): a see-through tint over a blur, only for what floats above the page.
+       Tints stay 88% solid so text keeps 4.5:1 on any background behind them. */
+    --glass-blur: 12px;
+    --glass-nav: rgba(18, 59, 99, 0.88);         /* the top bar */
+    --glass-surface: rgba(255, 255, 255, 0.88);  /* windows, notices, the review bar */
+    --glass-edge: rgba(255, 255, 255, 0.65);     /* the light rim of a glass window */
+    --glass-tip: rgba(27, 35, 51, 0.92);         /* small hover boxes */
 }
 
 /* ---------- Dark theme ----------
@@ -135,6 +144,10 @@
         --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);   /* the ring keeps a dialog's edge visible on a dark page */
         --theme-moon-display: none;
         --theme-sun-display: inline-block;
+        --glass-nav: rgba(10, 34, 56, 0.88);
+        --glass-surface: rgba(23, 32, 42, 0.88);
+        --glass-edge: rgba(255, 255, 255, 0.14);
+        --glass-tip: rgba(231, 237, 243, 0.92);
     }
 }
 @media screen and (prefers-color-scheme: dark) {
@@ -178,6 +191,10 @@
         --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
         --theme-moon-display: none;
         --theme-sun-display: inline-block;
+        --glass-nav: rgba(10, 34, 56, 0.88);
+        --glass-surface: rgba(23, 32, 42, 0.88);
+        --glass-edge: rgba(255, 255, 255, 0.14);
+        --glass-tip: rgba(231, 237, 243, 0.92);
     }
 }
 
@@ -358,6 +375,21 @@ a:hover { color: var(--c-primary-hover); }
     border-radius: 50%;
 }
 
+/* Profile pictures (includes/avatar.php): the same round box as the initials circle; the photo fills it */
+.avatar-photo { overflow: hidden; background: var(--c-surface-2); }
+.avatar-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.avatar-sm { width: 28px; height: 28px; font-size: 12px; }
+.avatar-xl { width: 96px; height: 96px; font-size: var(--fs-xl); }
+.person-cell { display: flex; align-items: center; gap: 10px; }
+.person-cell > div { min-width: 0; }
+.with-avatar { display: flex; align-items: center; gap: 8px; }
+.user-chip { color: inherit; text-decoration: none; border-radius: var(--radius-sm); padding: 2px 6px; margin: -2px -6px; }   /* a link to the person's own page */
+.user-chip:hover { background: rgba(255, 255, 255, 0.12); }
+.avatar-box { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid var(--c-border); }
+.avatar-box-main { display: grid; gap: 12px; min-width: 0; max-width: 520px; }
+.avatar-form { display: grid; gap: 6px; }
+.avatar-actions { margin-top: 4px; }
+.account-panel { display: grid; gap: 16px; max-width: 760px; }
 .sidebar-backdrop { position: fixed; inset: 0; z-index: 850; background: rgba(15, 23, 42, 0.5); }
 
 .main-col { margin-left: var(--sidebar-w); min-width: 0; }
@@ -370,7 +402,7 @@ a:hover { color: var(--c-primary-hover); }
     display: flex;
     align-items: center;
     gap: 12px;
-    min-height: 64px;
+    min-height: var(--topbar-h);
     padding: 8px 24px;
     background: var(--c-nav-bg);
     color: #fff;
@@ -1623,8 +1655,8 @@ kbd {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
     gap: 16px;
-    height: calc(100vh - 64px - 48px);
-    height: calc(100dvh - 64px - 48px);
+    height: calc(100vh - var(--topbar-h) - 48px);
+    height: calc(100dvh - var(--topbar-h) - 48px);
     min-height: 520px;
 }
 .review-docs { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 14px; }
@@ -1752,6 +1784,38 @@ kbd {
     .content { padding: 16px; }
 }
 
+/* A larger top bar on desktop screens, in step with the page below it: 1024px and up a step bigger, 1280px and up the full size.
+   (Phones and tablets keep the compact bar: it has to fit the title, bell, buttons and Log out on one line.) */
+@media (min-width: 1024px) {
+    :root { --topbar-h: 76px; }
+    .topbar { padding: 10px 28px; gap: 14px; }
+    .topbar-title h1 { font-size: 1.375rem; }
+    .topbar-title p { font-size: var(--fs-sm); }
+    .topbar .icon-btn { width: 48px; height: 48px; }
+    .topbar .icon-btn .icon { width: 26px; height: 26px; }
+    .cmdk-btn { min-height: 48px; font-size: var(--fs-base); }
+    .cmdk-btn .icon { width: 22px; height: 22px; }
+    .topbar .user-chip .avatar { width: 48px; height: 48px; font-size: var(--fs-base); }
+    .user-chip { gap: 12px; }
+    .user-chip-text strong { font-size: var(--fs-base); }
+    .topbar .btn-logout { min-height: 48px; font-size: var(--fs-base); padding: 10px 20px; }
+}
+@media (min-width: 1024px) and (max-width: 1200px) {
+    .cmdk-btn { width: 48px; min-width: 48px; height: 48px; }   /* still just the icon here, to leave room for the title */
+}
+@media (min-width: 1280px) {
+    :root { --topbar-h: 92px; }
+    .topbar { padding: 12px 36px; gap: 18px; }
+    .topbar-title h1 { font-size: 1.75rem; }
+    .topbar-title p { font-size: var(--fs-base); }
+    .topbar .icon-btn { width: 54px; height: 54px; }
+    .topbar .icon-btn .icon { width: 28px; height: 28px; }
+    .cmdk-btn { min-width: 250px; min-height: 54px; padding: 8px 18px; }
+    .topbar .user-chip .avatar { width: 58px; height: 58px; font-size: var(--fs-md); }
+    .user-chip-text strong { font-size: var(--fs-md); }
+    .topbar .role-badge { font-size: var(--fs-base); padding: 1px 12px; }
+    .topbar .btn-logout { min-height: 54px; padding: 10px 24px; font-size: var(--fs-md); }
+}
 /* Desktop: the menu button hides the sidebar so the content uses the full width (remembered in this browser) */
 @media (min-width: 1024px) {
     .sidebar { transition: transform 0.2s ease, visibility 0s linear 0s; }
@@ -1865,6 +1929,48 @@ kbd {
     .period-switch button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: 2px; }
 }
 
+/* ---------- Glass ----------
+   Used only where something floats above the page, so there is something to see through to: the top bar (the page
+   scrolls under it), windows and the Ctrl+K bar, notices, the hover box, and the review page's decision bar on tablets and
+   phones. Never on tables, forms, charts or status colours: those need a solid, predictable background.
+   Browsers without blur keep the solid colours above (@supports); so do people who ask for less transparency and
+   Windows high-contrast mode (the block after). Printouts hide all of it. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .topbar {
+        background: var(--glass-nav);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+        backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+        border-bottom-color: rgba(255, 255, 255, 0.2);
+    }
+    .modal,
+    .live-toast,
+    .review-bar,
+    .swal2-popup.swal-lgu,
+    .swal2-popup.swal-lgu-toast {
+        background: var(--glass-surface);
+        -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+        backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    }
+    .modal { border: 1px solid var(--glass-edge); }
+    .cmdk { --glass-blur: 18px; }   /* the command bar: the page behind is blurred more, so it reads as one thing */
+    .modal::backdrop,
+    body:not(.swal2-toast-shown) .swal2-container {
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+    }
+    .spark-tip {
+        background: var(--glass-tip);
+        -webkit-backdrop-filter: blur(6px);
+        backdrop-filter: blur(6px);
+    }
+}
+@media (prefers-reduced-transparency: reduce), (forced-colors: active) {
+    .topbar { background: var(--c-nav-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .modal, .live-toast, .review-bar, .swal2-popup.swal-lgu, .swal2-popup.swal-lgu-toast { background: var(--c-surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .modal { border: 0; }
+    .modal::backdrop, body:not(.swal2-toast-shown) .swal2-container { -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .spark-tip { background: var(--c-text); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
 @media print {
     body { background: #fff; }
     .sidebar, .sidebar-backdrop, .topbar, .skip-link, .quick-actions, .filters, .report-filters, .month-pills,

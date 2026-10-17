@@ -6,7 +6,8 @@
  *
  * Every value printed through these helpers is escaped with ui_e().
  */
-require_once __DIR__ . '/documents.php';   // document_url() / document_file_path(): the submitted-documents list
+require_once __DIR__ . '/documents.php';
+require_once __DIR__ . '/avatar.php';   // profile pictures of admin and staff   // document_url() / document_file_path(): the submitted-documents list
 require_once __DIR__ . '/photo_quality.php';   // photo_quality_info(): what the applicant's device said about each photo
 
 /* ============================================================
@@ -1038,6 +1039,14 @@ function ui_user_name(int $userId): string
     return $names[$userId];
 }
 
+/** "Approved by" / "Disapproved by": the person's name with their picture (or initials) beside it. */
+function ui_detail_user(string $label, int $userId): string
+{
+    $name = ui_user_name($userId);
+    if ($name === '') return ui_detail($label, '');
+    return '<div><dt>' . ui_e($label) . '</dt><dd class="with-avatar">' . ui_avatar($userId, $name, 'avatar-sm') . '<span>' . ui_e($name) . '</span></dd></div>';
+}
+
 /** One "label: value" pair for a detail list; empty values say so instead of "N/A". */
 function ui_detail(string $label, $value, bool $multiline = false): string
 {
@@ -1102,7 +1111,7 @@ function ui_record_cards(array $a): array
     $app = [ui_detail('Status', $a['status'])];
     if ($a['status'] === 'Approved') {
         if ($has('approved_at')) $app[] = ui_detail('Date approved', ui_date($a['approved_at'], 'F j, Y, g:i A'));
-        if ($has('approved_by')) $app[] = ui_detail('Approved by', ui_user_name((int)$a['approved_by']));
+        if ($has('approved_by')) $app[] = ui_detail_user('Approved by', (int)$a['approved_by']);
         if ($has('amount') && (float)$a['amount'] > 0) $app[] = ui_detail('Amount released', ui_peso($a['amount']));
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date
         // Approval details typed when approving, the same ones the approval email gave
@@ -1125,7 +1134,7 @@ function ui_record_cards(array $a): array
     }
     if ($a['status'] === 'Disapproved') {
         $app[] = ui_detail('Date disapproved', ui_date($a['disapproved_at'] ?? '', 'F j, Y, g:i A'));
-        $app[] = ui_detail('Disapproved by', $has('disapproved_by') ? ui_user_name((int)$a['disapproved_by']) : '');
+        $app[] = $has('disapproved_by') ? ui_detail_user('Disapproved by', (int)$a['disapproved_by']) : ui_detail('Disapproved by', '');
         $app[] = ui_detail('Reason (the applicant sees it)', $a['disapproval_remarks'] ?? '', true);
     }
 
