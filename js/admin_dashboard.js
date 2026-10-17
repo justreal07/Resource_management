@@ -391,6 +391,13 @@
         resetForm(false);
         UI.openDialog(modal);
         goTo(1);
+        // From a program's page (data-add-type): that program is already chosen, so go straight to the details
+        const typeId = opener && opener.dataset ? opener.dataset.addType : '';
+        const radio = typeId ? modal.querySelector('input[name="modal_assistance_type"][value="' + typeId + '"]') : null;
+        if (radio) {
+            radio.checked = true;
+            btn.proceed.click();
+        }
     }
 
     function closeModal() {

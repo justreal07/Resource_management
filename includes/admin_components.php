@@ -239,7 +239,15 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved'][$current] ?? null;
     if ($exportStatus === null) return $html;
     $label = $exportStatus === 'all' ? 'all applications' : strtolower($exportStatus) . ' applications';
-    return '<div class="tabs-bar">' . $html . '<div class="tabs-tools">'
+    // Admins: "Add walk-in" for THIS program. It opens the walk-in window on this very page with the program already
+    // chosen (admin_layout_end() adds the window, the form templates and js/admin_dashboard.js when this flag is set).
+    $walkIn = '';
+    if (($_SESSION['user']['role'] ?? '') === 'admin') {
+        $GLOBALS['ui_walkin_on_page'] = true;
+        $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
+            . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
+    }
+    return '<div class="tabs-bar">' . $html . '<div class="tabs-tools">' . $walkIn
         . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants.php?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
         . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
         . '<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">' . ui_icon('print') . 'Print</button>'

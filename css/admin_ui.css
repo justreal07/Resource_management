@@ -267,13 +267,15 @@ a:hover { color: var(--c-primary-hover); }
 
 .sidebar-brand {
     display: flex;
+    flex-direction: column;   /* the seal on top, big enough to recognise; the office name under it */
     align-items: center;
     gap: 12px;
     padding: 0 8px 20px;
     margin-bottom: 12px;
+    text-align: center;
     border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
-.sidebar-brand img { width: 40px; height: 40px; border-radius: 50%; background: #fff; }
+.sidebar-brand img { width: 112px; height: 112px; border-radius: 50%; background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
 .sidebar-brand strong { display: block; color: #fff; font-size: var(--fs-base); line-height: 1.25; }
 .sidebar-brand span { font-size: var(--fs-sm); }
 
@@ -1216,6 +1218,17 @@ td .field-error { margin-top: 4px; }
 .report-table { font-size: var(--fs-sm); }
 .report-table th, .report-table td { padding: 10px 12px; }
 .print-title { display: none; }
+/* How to read the numbers (under the filters) */
+.report-notes { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--c-text-muted); font-size: var(--fs-sm); }
+.report-notes li { display: flex; align-items: flex-start; gap: 8px; }
+.report-notes .icon { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--c-primary); }
+/* "Set the budget" under the Budget use table */
+.budget-form { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-border); }
+.budget-form summary { min-height: 36px; padding: 6px 0; color: var(--c-primary); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
+.budget-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 8px 0; }
+.budget-fields .field { min-width: 200px; }
+/* The heading and the signature lines of a printed report: only on paper */
+.print-head, .print-sign { display: none; }
 
 /* ---------- Modals (native <dialog>) ---------- */
 .modal {
@@ -1839,6 +1852,8 @@ kbd {
     body { background: #fff; }
     .sidebar, .sidebar-backdrop, .topbar, .skip-link, .quick-actions, .filters, .report-filters, .month-pills,
     .tabs, .tabs-bar, .pagination, .cell-action, .review-bar, .review-tools, .review-thumbs, .cmdk-btn, .theme-btn, .table-view, .table-tools, .no-print, .alert, .mobile-user { display: none !important; }
+    /* The page title and its Print / Download buttons: a printed report has its own heading (.print-head) */
+    .page-head, .page-actions, .report-notes, .report-range { display: none !important; }
     .main-col { margin: 0; }
     .content { padding: 0; max-width: none; }
     .panel, .chart, .stat-card { box-shadow: none; break-inside: avoid; }
@@ -1846,4 +1861,21 @@ kbd {
     .table-wrap { overflow: visible; border: 0; }
     .col-bar, .bar, .seg, .swatch { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .sort-icon, .swal2-container { display: none !important; }
+
+    /* Printed report: office, report, period and who printed it; signature lines at the end */
+    .print-head { display: block; margin-bottom: 12px; text-align: center; color: var(--c-text); }
+    .print-head p { margin: 0; }
+    .print-head h2 { margin: 8px 0 2px; font-size: 14pt; }
+    .print-office { font-size: 14pt; font-weight: 700; }
+    .print-office-sub { font-size: 10pt; }
+    .print-meta { margin-top: 4px !important; font-size: 9pt; color: var(--c-text-muted); }
+    .print-sign { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; margin-top: 24px; color: var(--c-text); break-inside: avoid; }
+    .print-sign p { margin: 0; font-size: 10pt; }
+    .sign-line { display: block; height: 36px; margin-bottom: 4px; border-bottom: 1px solid var(--c-text); }
+    .print-sign .sign-sub { font-size: 8pt; color: var(--c-text-muted); }
 }
+/* Wide report tables print best on a landscape page (only the reports: other pages keep the browser's page). The page
+   number needs a browser that supports page margin boxes; the others print without it. */
+@page report { size: A4 landscape; margin: 14mm 12mm 16mm; }
+@page report { @bottom-right { content: "Page " counter(page) " of " counter(pages); font: 9pt sans-serif; } }
+.report-section { page: report; }

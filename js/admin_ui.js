@@ -705,15 +705,6 @@
     setInterval(checkSession, 60000);
     document.querySelectorAll('[data-reload]').forEach((btn) => btn.addEventListener('click', () => window.location.reload()));
 
-    /* ---------- Fields that only apply to one choice (report Month / Week) ---------- */
-    document.querySelectorAll('[data-show-for]').forEach((field) => {
-        const select = document.getElementById(field.dataset.showSource);
-        if (!select) return;
-        const sync = () => { field.hidden = field.dataset.showFor !== select.value; };
-        select.addEventListener('change', sync);
-        sync();
-    });
-
     /* ---------- Contact number boxes (<input data-phone>): digits only, at most 11 ----------
        Same rule as the online forms. Only while typing: a stored number the admin doesn't touch
        is left as it is (older records may have another format). +63 / 63 numbers become 09... */
@@ -726,7 +717,7 @@
         });
     });
 
-    /* ---------- Reports: print and Excel export (same export as before) ---------- */
+    /* ---------- Print, and Excel export of one table (the staff OPD daily report). The admin Reports page downloads a real .xlsx from reports/export.php instead ---------- */
     document.querySelectorAll('[data-print]').forEach((btn) => btn.addEventListener('click', () => window.print()));
     document.querySelectorAll('[data-export-table]').forEach((btn) => {
         btn.addEventListener('click', () => {

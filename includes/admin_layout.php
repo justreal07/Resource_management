@@ -286,7 +286,7 @@ function admin_layout_start(array $page): void
 
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
         <div class="sidebar-brand">
-            <img src="../asset/ACCESS.jpg" alt="" width="40" height="40">
+            <img src="../asset/ACCESS.jpg" alt="" width="112" height="112">
             <div>
                 <strong>Community Affairs Office</strong>
                 <span>Assistance Records</span>
@@ -396,6 +396,21 @@ function admin_layout_start(array $page): void
  */
 function admin_layout_end(array $opts = []): void
 {
+    // A program page showed the "Add walk-in" button (ui_type_tabs): bring the walk-in window with it, posting to the dashboard's saver
+    if (!empty($GLOBALS['ui_walkin_on_page']) && strpos((string)($opts['after'] ?? ''), 'id="addApplicantModal"') === false) {
+        require_once __DIR__ . '/walkin_form.php';
+        // assistance_config.php loaded from inside this function keeps its program list local: make it global for its own functions (get_program())
+        if (!isset($GLOBALS['ASSISTANCE_PROGRAMS']) && isset($ASSISTANCE_PROGRAMS)) $GLOBALS['ASSISTANCE_PROGRAMS'] = $ASSISTANCE_PROGRAMS;
+        $typeInfo = [];
+        foreach (ui_types() as $id => $t) $typeInfo[$id] = $t;
+        $opts['after'] = ($opts['after'] ?? '') . walkin_form_html($typeInfo, '../Main_dashboard/submit_admin_applicant.php');
+        $opts['scripts'] = array_merge($opts['scripts'] ?? [], ['../js/admin_dashboard.js']);
+        $opts['config'] = array_merge([
+            'viewUrl'   => '../Main_dashboard/view_applicant.php?applicant_id=',
+            'documents' => [1 => array_keys(get_program('medical')['documents']), 2 => array_keys(get_program('burial')['documents']),
+                            3 => array_keys(get_program('opd')['documents'])],
+        ], $opts['config'] ?? []);
+    }
     $config = array_merge([
         'userId'          => (int)($_SESSION['user']['id'] ?? 0),
         'serverNow'       => time(),
