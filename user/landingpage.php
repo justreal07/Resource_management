@@ -765,6 +765,19 @@ $programs = [
                 </span>
             </a>
             <p>Making public assistance simpler, faster and more accessible for every resident of GMA, Cavite.</p>
+            <div class="footer-social">
+                <a href="https://www.facebook.com/CommunityAffairsECAccess" target="_blank" rel="noopener" class="social-fb" aria-label="Facebook" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                <a href="https://www.instagram.com/lgu_gma/" target="_blank" rel="noopener" class="social-ig" aria-label="Instagram" title="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="mailto:pio.gmacavite@gmail.com" class="social-gm" aria-label="Gmail" title="Gmail">
+                    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                        <path fill="#4285F4" d="M2 6.5v11A1.5 1.5 0 0 0 3.5 19H6.5V10.2L2 6.5z"/>
+                        <path fill="#34A853" d="M17.5 19h3a1.5 1.5 0 0 0 1.5-1.5v-11l-4.5 3.7V19z"/>
+                        <path fill="#FBBC04" d="M17.5 5.6v4.6L22 6.5V5.2c0-1.9-2.2-3-3.7-1.8l-.8.6z"/>
+                        <path fill="#EA4335" d="M6.5 10.2V5.6L12 9.8l5.5-4.2v4.6L12 14.4 6.5 10.2z"/>
+                        <path fill="#C5221F" d="M2 5.2v1.3l4.5 3.7V5.6l-.8-.6C4.2 3.8 2 4.900 2 5.200z"/>
+                    </svg>
+                </a>
+            </div>
         </div>
         <div>
             <h4>Quick Links</h4>
@@ -798,6 +811,10 @@ $programs = [
                 <li><i class="far fa-clock"></i>Mon – Fri, 8 AM – 5 PM</li>
                 <li><i class="fas fa-map-marker-alt"></i>Municipal Hall, GMA, Cavite</li>
             </ul>
+        </div>
+        <div class="footer-qr">
+            <h4>Scan Me</h4>
+            <img src="../asset/footer_qr.jpg" alt="QR code" width="240" height="240" loading="lazy">
         </div>
     </div>
     <div class="footer-bottom">
