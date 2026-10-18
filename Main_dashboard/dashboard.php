@@ -433,6 +433,7 @@ admin_layout_start([
                     <a class="btn btn-secondary" href="<?= ui_e($action['href']) ?>"><?= ui_icon($action['icon']) ?><?= ui_e($action['label']) ?></a>
                 <?php endforeach; ?>
             </div>
+            <!-- KPI_ROW_HERE -->
 
             <!-- ============ 1. NEEDS YOUR ACTION (live queue, any date) ============ -->
             <section class="panel panel-action" aria-labelledby="actionTitle">
@@ -506,7 +507,6 @@ admin_layout_start([
             </section>
 
             <div class="dash-grid">
-
               <div class="dash-col">
                 <!-- ============ 2. OVERVIEW FOR THE SELECTED YEAR ============ -->
                 <section class="panel" id="overview" aria-labelledby="overviewTitle">
@@ -573,31 +573,6 @@ admin_layout_start([
                         </p>
                     <?php endif; ?>
                 </section>
-
-                <!-- ============ 2b. BARANGAY HEAT MAP (selected year; tiles: includes/barangay_map.php) ============ -->
-                <section class="panel" id="barangays" aria-labelledby="barangaysTitle">
-                    <div class="panel-head">
-                        <h2 id="barangaysTitle">Applications by barangay</h2>
-                        <p class="panel-sub">Applications filed <strong><?= ui_e($rangeText) ?></strong>, every program. Darker means more, and the number is on each tile. Select a barangay to see its applications.</p>
-                    </div>
-                    <?php if (!empty($loadFailed['barangaymap'])): ?>
-                        <?= ui_load_error('the barangay map', $url([], 'barangays')) ?>
-                    <?php elseif (!$brgyMap || $brgyMap['total'] === 0): ?>
-                        <?= ui_state('inbox', 'No applications in ' . $year, 'The map fills in as applications come in.') ?>
-                    <?php else: ?>
-                        <?php
-                        $mapTypes = [];
-                        foreach ($typeInfo as $id => $info) $mapTypes[$id] = $info['short'];
-                        $tableRows = [];
-                        $sorted = $brgyMap['official'];
-                        uasort($sorted, function ($a, $b) { return $b['total'] <=> $a['total']; });
-                        foreach ($sorted as $name => $row) $tableRows[] = [$name, number_format($row['total']), round($row['total'] / $brgyMap['total'] * 100) . '%'];
-                        if ($brgyMap['other']['total'] > 0) $tableRows[] = ['Not on the official list', number_format($brgyMap['other']['total']), round($brgyMap['other']['total'] / $brgyMap['total'] * 100) . '%'];
-                        ?>
-                        <?= ui_barangay_map($brgyMap, $mapTypes, $mapLink) ?>
-                        <?= ui_table_view(['Barangay', 'Applications', 'Share'], $tableRows) ?>
-                    <?php endif; ?>
-                </section>
               </div>
 
                 <!-- ============ 3. RECENT ACTIVITY (unread state: admin_dashboard.js) ============ -->
@@ -646,7 +621,103 @@ admin_layout_start([
                         <p class="panel-note">"Mark all as read" is remembered on this computer.</p>
                     <?php endif; ?>
                 </section>
+
             </div>
+
+
+
+            <!-- ============ 5. TRENDS (below the fold; plain HTML charts, no library) ============ -->
+            <section class="panel trends" id="trends" aria-labelledby="trendsTitle">
+                <div class="panel-head">
+                    <h2 id="trendsTitle">Trends for <?= ui_e($year) ?></h2>
+                    <p class="panel-sub">Applications filed <?= ui_e($rangeText) ?>. Change the year in the Overview.</p>
+                </div>
+                <div class="chart-grid">
+                    <?php
+                    // 1. Applications per month
+                    if (!empty($loadFailed['charts'])) {
+                        $chart = ui_load_error('this chart', $url([], 'trends'));
+                    } elseif (array_sum($monthlyData) == 0) {
+                        $chart = '';
+                    } else {
+                        $chart = ui_column_chart($monthlyData, $monthsShort, $months,
+                                function ($v) { return number_format($v) . ($v == 1 ? ' application' : ' applications'); },
+                                function ($v) { return number_format($v); })
+                            . ui_table_view(['Month', 'Applications'], array_map(function ($m, $v) { return [$m, number_format($v)]; }, $months, array_values($monthlyData)));
+                    }
+                    echo ui_chart_card('Applications per month', 'All assistance types', $chart, 'No applications were filed in ' . $year . '.');
+
+                    // 2. Amount approved per month
+                    if (!empty($loadFailed['charts'])) {
+                        $chart = ui_load_error('this chart', $url([], 'trends'));
+                    } elseif (array_sum($monthlyAmount) == 0) {
+                        $chart = '';
+                    } else {
+                        $chart = ui_column_chart($monthlyAmount, $monthsShort, $months, function ($v) { return ui_peso($v); }, 'ui_peso_short')
+                            . ui_table_view(['Month', 'Amount approved'], array_map(function ($m, $v) { return [$m, ui_peso($v)]; }, $months, array_values($monthlyAmount)));
+                    }
+                    echo ui_chart_card('Amount approved per month', 'Approved applications, by the month they were filed', $chart, 'No approved amounts for applications filed in ' . $year . '.');
+
+                    // 3. Status by assistance type
+                    if (!empty($loadFailed['summary'])) {
+                        $chart = ui_load_error('this chart', $url([], 'trends'));
+                    } elseif ($yearTotal === 0) {
+                        $chart = '';
+                    } else {
+                        $groups = $statusRows = [];
+                        foreach ($typeInfo as $id => $t) {
+                            $groups[$t['short']] = $summary[$id] ?? [];
+                            $row = [$t['name']];
+                            foreach ($statusInfo as $status => $s) $row[] = number_format($summary[$id][$status] ?? 0);
+                            $row[] = number_format(array_sum($summary[$id] ?? []));
+                            $statusRows[] = $row;
+                        }
+                        $chart = ui_status_bars($groups)
+                            . ui_table_view(array_merge(['Type'], array_column($statusInfo, 'label'), ['Total']), $statusRows);
+                    }
+                    echo ui_chart_card('Status by assistance type', "Share of each type's applications", $chart, 'No applications were filed in ' . $year . '.');
+
+                    // 4. Applications by barangay
+                    if (!empty($loadFailed['barangays'])) {
+                        $chart = ui_load_error('this chart', $url([], 'trends'));
+                    } elseif (!$barangays) {
+                        $chart = '';
+                    } else {
+                        $items = array_map(function ($b) { return ['label' => $b['barangay'], 'value' => $b['n']]; }, $barangays);
+                        $otherCount = empty($loadFailed['summary']) ? max(0, $yearTotal - array_sum(array_column($barangays, 'n'))) : 0;
+                        if ($otherCount > 0) $items[] = ['label' => 'Other barangays', 'value' => $otherCount, 'other' => true];
+                        $chart = ui_bar_list($items, function ($v) { return number_format($v); })
+                            . ui_table_view(['Barangay', 'Applications'], array_map(function ($i) { return [trim($i['label']) !== '' ? $i['label'] : '(not given)', number_format($i['value'])]; }, $items));
+                    }
+                    echo ui_chart_card('Applications by barangay', 'Barangays with the most applications', $chart, 'No applications were filed in ' . $year . '.');
+                    ?>
+                </div>
+            </section>
+
+            <!-- ============ 2b. BARANGAY HEAT MAP (selected year; tiles: includes/barangay_map.php) ============ -->
+            <section class="panel" id="barangays" aria-labelledby="barangaysTitle">
+                <div class="panel-head">
+                    <h2 id="barangaysTitle">Applications by barangay</h2>
+                    <p class="panel-sub">Applications filed <strong><?= ui_e($rangeText) ?></strong>, every program. Darker means more, and the number is on each tile. Select a barangay to see its applications.</p>
+                </div>
+                <?php if (!empty($loadFailed['barangaymap'])): ?>
+                    <?= ui_load_error('the barangay map', $url([], 'barangays')) ?>
+                <?php elseif (!$brgyMap || $brgyMap['total'] === 0): ?>
+                    <?= ui_state('inbox', 'No applications in ' . $year, 'The map fills in as applications come in.') ?>
+                <?php else: ?>
+                    <?php
+                    $mapTypes = [];
+                    foreach ($typeInfo as $id => $info) $mapTypes[$id] = $info['short'];
+                    $tableRows = [];
+                    $sorted = $brgyMap['official'];
+                    uasort($sorted, function ($a, $b) { return $b['total'] <=> $a['total']; });
+                    foreach ($sorted as $name => $row) $tableRows[] = [$name, number_format($row['total']), round($row['total'] / $brgyMap['total'] * 100) . '%'];
+                    if ($brgyMap['other']['total'] > 0) $tableRows[] = ['Not on the official list', number_format($brgyMap['other']['total']), round($brgyMap['other']['total'] / $brgyMap['total'] * 100) . '%'];
+                    ?>
+                    <?= ui_barangay_map($brgyMap, $mapTypes, $mapLink) ?>
+                    <?= ui_table_view(['Barangay', 'Applications', 'Share'], $tableRows) ?>
+                <?php endif; ?>
+            </section>
 
             <!-- ============ 4. APPLICATIONS: search, filter, sort, pages ============ -->
             <section class="panel" id="applications" aria-labelledby="appsTitle">
@@ -837,74 +908,6 @@ admin_layout_start([
                         </nav>
                     <?php endif; ?>
                 <?php endif; ?>
-            </section>
-
-            <!-- ============ 5. TRENDS (below the fold; plain HTML charts, no library) ============ -->
-            <section class="panel trends" id="trends" aria-labelledby="trendsTitle">
-                <div class="panel-head">
-                    <h2 id="trendsTitle">Trends for <?= ui_e($year) ?></h2>
-                    <p class="panel-sub">Applications filed <?= ui_e($rangeText) ?>. Change the year in the Overview.</p>
-                </div>
-                <div class="chart-grid">
-                    <?php
-                    // 1. Applications per month
-                    if (!empty($loadFailed['charts'])) {
-                        $chart = ui_load_error('this chart', $url([], 'trends'));
-                    } elseif (array_sum($monthlyData) == 0) {
-                        $chart = '';
-                    } else {
-                        $chart = ui_column_chart($monthlyData, $monthsShort, $months,
-                                function ($v) { return number_format($v) . ($v == 1 ? ' application' : ' applications'); },
-                                function ($v) { return number_format($v); })
-                            . ui_table_view(['Month', 'Applications'], array_map(function ($m, $v) { return [$m, number_format($v)]; }, $months, array_values($monthlyData)));
-                    }
-                    echo ui_chart_card('Applications per month', 'All assistance types', $chart, 'No applications were filed in ' . $year . '.');
-
-                    // 2. Amount approved per month
-                    if (!empty($loadFailed['charts'])) {
-                        $chart = ui_load_error('this chart', $url([], 'trends'));
-                    } elseif (array_sum($monthlyAmount) == 0) {
-                        $chart = '';
-                    } else {
-                        $chart = ui_column_chart($monthlyAmount, $monthsShort, $months, function ($v) { return ui_peso($v); }, 'ui_peso_short')
-                            . ui_table_view(['Month', 'Amount approved'], array_map(function ($m, $v) { return [$m, ui_peso($v)]; }, $months, array_values($monthlyAmount)));
-                    }
-                    echo ui_chart_card('Amount approved per month', 'Approved applications, by the month they were filed', $chart, 'No approved amounts for applications filed in ' . $year . '.');
-
-                    // 3. Status by assistance type
-                    if (!empty($loadFailed['summary'])) {
-                        $chart = ui_load_error('this chart', $url([], 'trends'));
-                    } elseif ($yearTotal === 0) {
-                        $chart = '';
-                    } else {
-                        $groups = $statusRows = [];
-                        foreach ($typeInfo as $id => $t) {
-                            $groups[$t['short']] = $summary[$id] ?? [];
-                            $row = [$t['name']];
-                            foreach ($statusInfo as $status => $s) $row[] = number_format($summary[$id][$status] ?? 0);
-                            $row[] = number_format(array_sum($summary[$id] ?? []));
-                            $statusRows[] = $row;
-                        }
-                        $chart = ui_status_bars($groups)
-                            . ui_table_view(array_merge(['Type'], array_column($statusInfo, 'label'), ['Total']), $statusRows);
-                    }
-                    echo ui_chart_card('Status by assistance type', "Share of each type's applications", $chart, 'No applications were filed in ' . $year . '.');
-
-                    // 4. Applications by barangay
-                    if (!empty($loadFailed['barangays'])) {
-                        $chart = ui_load_error('this chart', $url([], 'trends'));
-                    } elseif (!$barangays) {
-                        $chart = '';
-                    } else {
-                        $items = array_map(function ($b) { return ['label' => $b['barangay'], 'value' => $b['n']]; }, $barangays);
-                        $otherCount = empty($loadFailed['summary']) ? max(0, $yearTotal - array_sum(array_column($barangays, 'n'))) : 0;
-                        if ($otherCount > 0) $items[] = ['label' => 'Other barangays', 'value' => $otherCount, 'other' => true];
-                        $chart = ui_bar_list($items, function ($v) { return number_format($v); })
-                            . ui_table_view(['Barangay', 'Applications'], array_map(function ($i) { return [trim($i['label']) !== '' ? $i['label'] : '(not given)', number_format($i['value'])]; }, $items));
-                    }
-                    echo ui_chart_card('Applications by barangay', 'Barangays with the most applications', $chart, 'No applications were filed in ' . $year . '.');
-                    ?>
-                </div>
             </section>
 <?php
 admin_layout_end([

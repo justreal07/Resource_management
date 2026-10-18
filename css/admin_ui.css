@@ -37,6 +37,14 @@
     --c-nav-muted: #c3d3e3;          /* secondary text on navy (7:1) */
     --c-nav-active: #1e5a8a;         /* selected menu item */
 
+    /* Sidebar: white, like the design's filter panel (the top bar stays navy) */
+    --c-side-bg: #ffffff;
+    --c-side-text: #26324d;
+    --c-side-muted: #56627a;
+    --c-side-hover: #eef2f9;
+    --c-side-active-bg: #123b63;     /* the box ticked for the page you are on */
+    --c-side-border: #dce3ea;
+
     /* Focus ring: always visible, never removed */
     --c-focus: #1e5a8a;
     --c-focus-on-dark: #ffffff;
@@ -68,7 +76,9 @@
     --hm-5: #104281; --hm-5-ink: #ffffff;
 
     /* Type scale (nothing below 14px) */
-    --font: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    /* Bahnschrift is the DIN-style font that comes with Windows 10/11 (the narrow, square type of the design), no web font needed;
+       other computers use the next font in the list */
+    --font: "Bahnschrift", "DIN Alternate", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
     --fs-sm: 0.875rem;   /* 14px */
     --fs-base: 1rem;     /* 16px */
     --fs-md: 1.125rem;   /* 18px */
@@ -123,6 +133,12 @@
         --c-nav-text: #dce6f0;
         --c-nav-muted: #b4c6d9;
         --c-nav-active: #1e5a8a;
+        --c-side-bg: #121b26;
+        --c-side-text: #dce6f0;
+        --c-side-muted: #aab7c5;
+        --c-side-hover: #1e2935;
+        --c-side-active-bg: #2b6cb0;
+        --c-side-border: #2c3a49;
         --c-focus: #9ec5f4;
         --c-on-primary: #06182b;
         --c-on-accent: #2a0808;
@@ -170,6 +186,12 @@
         --c-nav-text: #dce6f0;
         --c-nav-muted: #b4c6d9;
         --c-nav-active: #1e5a8a;
+        --c-side-bg: #121b26;
+        --c-side-text: #dce6f0;
+        --c-side-muted: #aab7c5;
+        --c-side-hover: #1e2935;
+        --c-side-active-bg: #2b6cb0;
+        --c-side-border: #2c3a49;
         --c-focus: #9ec5f4;
         --c-on-primary: #06182b;
         --c-on-accent: #2a0808;
@@ -1896,6 +1918,35 @@ kbd {
     .col-bar, .bar, .seg, .swatch { forced-color-adjust: none; border: 1px solid CanvasText; }
     .badge { border: 1px solid CanvasText; }
     .period-switch button[aria-pressed="true"] { outline: 2px solid Highlight; outline-offset: 2px; }
+}
+
+/* ---------- Sidebar and type, newer look ----------
+   A white sidebar laid out like the design's filter list: a capital heading with an icon and a rule, then each page with a small
+   square box in front (ticked and bold for the page you are on). Type: the narrow DIN-style face (Bahnschrift's width axis; other
+   fonts ignore it) one step larger. Screen only: a printout keeps the plain look. Colours are tokens, so dark theme follows. */
+@media screen {
+    :root { --fs-sm: 0.9375rem; --fs-base: 1.0625rem; --fs-md: 1.1875rem; }
+    body, button, input, select, textarea { font-variation-settings: "wdth" 88; }
+    h1, h2, h3, .stat-value { font-variation-settings: "wdth" 85; }
+
+    .sidebar { background: var(--c-side-bg); color: var(--c-side-text); border-right: 1px solid var(--c-side-border); }
+    .sidebar :focus-visible { outline-color: var(--c-focus); }
+    .sidebar-brand { border-bottom-color: var(--c-side-border); }
+    .sidebar-brand img { box-shadow: none; border: 1px solid var(--c-side-border); }
+    .sidebar-brand strong { color: var(--c-heading); text-transform: uppercase; letter-spacing: 0.05em; }
+    .sidebar-brand span { color: var(--c-side-muted); }
+    .sidebar-user { border-top-color: var(--c-side-border); color: var(--c-side-muted); }
+    .sidebar-user strong { color: var(--c-heading); }
+
+    .sidebar-heading { display: flex; align-items: center; gap: 10px; padding: 4px 12px 12px; margin-bottom: 6px; color: var(--c-heading); font-size: var(--fs-md); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--c-side-border); }
+    .nav-list { gap: 0; }
+    .nav-list .nav-link { gap: 12px; padding: 8px 12px; font-weight: 500; background: none; color: var(--c-side-text); }
+    .nav-list .nav-link:hover { background: var(--c-side-hover); color: var(--c-heading); }
+    .nav-list .nav-link[aria-current="page"] { background: var(--c-side-hover); color: var(--c-heading); font-weight: 700; }   /* the page you are on: bold, on a light tint */
+    .nav-list .nav-link[aria-current="page"]::before { display: none; }
+    /* The light/dark button in the menu keeps its icon and the old look (white text on navy would vanish on a white sidebar) */
+    .sidebar-theme .nav-link { color: var(--c-side-text); }
+    .sidebar-theme .nav-link:hover { background: var(--c-side-hover); color: var(--c-heading); }
 }
 
 /* ---------- Glass ----------

@@ -236,7 +236,8 @@ function admin_layout_start(array $page): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= ui_e($title) ?> · LGU Assistance Records</title>
-    <link rel="stylesheet" href="../css/admin_ui.css">
+    <?php /* ?v= is the file's last-change time, so the browser loads the new look instead of its old copy */ ?>
+    <link rel="stylesheet" href="../css/admin_ui.css?v=<?= (int)@filemtime(__DIR__ . '/../css/admin_ui.css') ?>">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <!-- Hidden sidebar (menu button on desktop) is applied before the page draws, so it doesn't flash open -->
     <script>try { if (localStorage.getItem('lgu.sidebarCollapsed') === '1') document.documentElement.classList.add('sidebar-collapsed'); } catch (e) {}</script>
@@ -297,6 +298,7 @@ function admin_layout_start(array $page): void
             </div>
         </div>
         <nav>
+            <p class="sidebar-heading"><?= ui_icon('menu') ?>Menu</p>
             <ul class="nav-list">
                 <?php foreach ($nav as $key => $item): ?>
                     <?php if ($role !== '' && !in_array($role, $item['roles'], true)) continue; ?>
