@@ -53,8 +53,8 @@ if ($status === 'Approved') {
     $timeline[] = ['time' => $app['approved_at'] ?: $app['created_at'], 'title' => 'Approved', 'text' => $app['remarks'] ?: 'Your application was approved.', 'icon' => 'fa-check', 'tone' => 'success'];
 } elseif ($status === 'Disapproved') {
     // CHANGED (Disapprove): was 'Rejected'. The reason is the one typed when the application was disapproved.
-    $timeline[] = ['time' => ($app['disapproved_at'] ?? null) ?: $app['created_at'], 'title' => 'Not approved',
-                   'text' => 'Your application was not approved. You may apply again.', 'icon' => 'fa-times', 'tone' => 'danger'];
+    $timeline[] = ['time' => ($app['disapproved_at'] ?? null) ?: $app['created_at'], 'title' => 'Declined',
+                   'text' => 'Your application was declined. You may apply again.', 'icon' => 'fa-times', 'tone' => 'danger'];
 }
 usort($timeline, fn($a, $b) => strcmp($a['time'], $b['time']));
 
@@ -105,27 +105,25 @@ account_page_start($ctx, "Application #$app_id", 'account', [
         <span class="acc-status-icon"><i class="fas <?= $status === 'Approved' ? 'fa-check' : ($status === 'Disapproved' ? 'fa-times' : 'fa-hourglass-half') ?>"></i></span>
         <div>
             <small>Current status</small>
-            <h2><?= $status === 'Disapproved' ? 'Not approved' : e($status) ?></h2>
+            <h2><?= $status === 'Disapproved' ? 'Declined' : e($status) ?></h2>
             <p>
                 <?php if ($status === 'Approved'): ?>
                     Your application was approved<?= $app['approved_at'] ? ' on ' . e(date('F d, Y', strtotime($app['approved_at']))) : '' ?>.
                 <?php elseif ($status === 'Disapproved'): ?>
-                    Your application was not approved<?= !empty($app['disapproved_at']) ? ' on ' . e(date('F d, Y', strtotime($app['disapproved_at']))) : '' ?>. You may apply again.
+                    Your application was declined<?= !empty($app['disapproved_at']) ? ' on ' . e(date('F d, Y', strtotime($app['disapproved_at']))) : '' ?>. You may apply again.
                 <?php else: ?>
                     The office is reviewing your application. We'll notify you once there's a decision.
                 <?php endif; ?>
             </p>
         </div>
-        <?php if ($status === 'Approved' && (float)$app['amount'] > 0): ?>
-            <div class="acc-amount-box"><small>Approved amount</small><strong>₱<?= number_format((float)$app['amount'], 2) ?></strong></div>
-        <?php endif; ?>
+        <?php /* The approved amount is not shown to the applicant: only that the application was approved */ ?>
     </div>
 
     <ol class="acc-steps">
         <li class="is-done"><span><i class="fas fa-paper-plane"></i></span>Submitted</li>
         <li class="<?= $status === 'Pending' ? 'is-current' : 'is-done' ?>"><span><i class="fas fa-search"></i></span>Under review</li>
         <li class="<?= $status === 'Approved' ? 'is-done' : ($status === 'Disapproved' ? 'is-failed' : '') ?>">
-            <span><i class="fas <?= $status === 'Disapproved' ? 'fa-times' : 'fa-check' ?>"></i></span><?= $status === 'Disapproved' ? 'Not approved' : 'Approved' ?>
+            <span><i class="fas <?= $status === 'Disapproved' ? 'fa-times' : 'fa-check' ?>"></i></span><?= $status === 'Disapproved' ? 'Declined' : 'Approved' ?>
         </li>
     </ol>
 

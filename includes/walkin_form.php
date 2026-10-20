@@ -142,8 +142,8 @@ $wiAddress = function () use ($req, $opt): string {
         . '<option value="">Choose the barangay</option>';
     foreach (BARANGAYS as $b) $html .= '<option value="' . ui_e($b) . '">' . ui_e($b) . '</option>';
     return $html . '</select></div>'
-        . '<div class="field"><label for="municipality">Municipality ' . $req . '</label><input type="text" id="municipality" name="municipality" maxlength="100" value="General Mariano Alvarez" required></div>'
-        . '<div class="field"><label for="province">Province ' . $req . '</label><input type="text" id="province" name="province" maxlength="100" value="Cavite" required></div>'
+        . '<div class="field"><label for="municipality">Municipality ' . $req . '</label><input type="text" id="municipality" name="municipality" maxlength="100" value="' . ui_e(SERVICE_MUNICIPALITY) . '" required readonly aria-readonly="true"></div>'
+        . '<div class="field"><label for="province">Province ' . $req . '</label><input type="text" id="province" name="province" maxlength="100" value="' . ui_e(SERVICE_PROVINCE) . '" required readonly aria-readonly="true"></div>'
         . '</div></fieldset>';
 };
 // A list of choices ending with "Others": picking Others shows a box for the typed answer
@@ -185,6 +185,7 @@ $wiList = function (string $id, array $options): string {
             <?= $wiDate('beneficiary_birthdate', 'Birthdate', OLDEST_DATE, $today) ?>
             <?= $wiContact() ?>
         </div>
+        <p class="field-help">The number the office will call about this application. When someone else applies for the patient, give that person's number.</p>
     </fieldset>
     <?= $wiAddress() ?>
     <fieldset class="form-section" data-claimant hidden disabled>
@@ -243,8 +244,7 @@ $wiList = function (string $id, array $options): string {
         <p class="field-help">As written on the patient's valid ID.</p>
         <div class="form-grid">
             <?= $wiNames() ?>
-            <div class="field"><label for="age">Age <?= $req ?></label>
-                <input type="number" id="age" name="age" min="0" max="120" inputmode="numeric" required placeholder="Age"></div>
+            <?= $wiDate('beneficiary_birthdate', 'Birthdate', OLDEST_DATE, $today) ?>
             <?= $wiSex() ?>
             <?= $wiContact() ?>
         </div>

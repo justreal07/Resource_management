@@ -43,8 +43,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $username)) {
             $errors[] = 'Username must be 3 to 50 characters, using only letters, numbers, dot, dash or underscore (no spaces).';
         }
-        if (strlen($password) < 6) {
-            $errors[] = 'Password must be at least 6 characters.';
+        if ($problem = staff_password_problem($password)) {
+            $errors[] = $problem;
         } elseif ($password !== $confirm) {
             $errors[] = "The two passwords don't match.";
         }
@@ -165,12 +165,12 @@ auth_side(
                         <div class="auth-input has-toggle">
                             <?= auth_icon('lock') ?>
                             <input type="password" id="password" name="password"
-                                   minlength="6" autocomplete="new-password" aria-describedby="passwordHelp" required>
+                                   minlength="8" autocomplete="new-password" aria-describedby="passwordHelp" required>
                             <button type="button" class="toggle-pass" data-toggle-password="password" aria-label="Show password" aria-pressed="false">
                                 <?= auth_icon('eye') ?>
                             </button>
                         </div>
-                        <div class="field-help" id="passwordHelp">At least 6 characters.</div>
+                        <div class="field-help" id="passwordHelp">At least 8 characters, with letters and numbers.</div>
                     </div>
 
                     <div class="field">
@@ -178,7 +178,7 @@ auth_side(
                         <div class="auth-input has-toggle">
                             <?= auth_icon('lock') ?>
                             <input type="password" id="confirm_password" name="confirm_password"
-                                   minlength="6" autocomplete="new-password" data-match="password" data-match-note="matchNote" required>
+                                   minlength="8" autocomplete="new-password" data-match="password" data-match-note="matchNote" required>
                             <button type="button" class="toggle-pass" data-toggle-password="confirm_password" aria-label="Show password" aria-pressed="false">
                                 <?= auth_icon('eye') ?>
                             </button>

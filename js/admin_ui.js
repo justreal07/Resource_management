@@ -508,7 +508,7 @@
 
     /* ---------- Disapprove (pending lists): the Disapprove dialog ----------
        ui_disapprove_dialog() in admin_components.php: the reasons to choose from (ui_disapprove_reasons), a box for a
-       written reason, then "Disapprove & send email". At least one reason is needed (decide_application() checks it
+       written reason, then "Decline & send email". At least one reason is needed (decide_application() checks it
        again). Posts to Main_dashboard/disapprove_applicant.php through the dialog's form, which carries the form token.
        Always the built-in dialog (not SweetAlert2): it has to hold tick boxes. */
 
@@ -565,7 +565,7 @@
                     : (email || 'No email on the applicant\'s account. They will see the reason when they sign in.');
                 disapproveSubmit.innerHTML = disapproveLabel;
                 disapproveSubmit.disabled = false;
-                if (!email || walkIn) disapproveSubmit.lastChild.textContent = 'Disapprove';
+                if (!email || walkIn) disapproveSubmit.lastChild.textContent = 'Decline';
                 disapproveHelp.textContent = !email || walkIn
                     ? 'The applicant sees the reasons you choose and anything you write here, so they know what to fix before applying again.'
                     : disapproveHelpText;
@@ -586,7 +586,7 @@
                 return;
             }
             disapproveForm.dataset.sending = '1';
-            setButtonBusy(disapproveSubmit, true, 'Disapproving…');
+            setButtonBusy(disapproveSubmit, true, 'Declining…');
             disapproveForm.submit();
         });
     }
@@ -669,14 +669,14 @@
                 rememberClaim(claimSection);
             }
             confirmAction({
-                title: disapprove ? 'Disapprove this application for ' + (form.dataset.name || 'this applicant') + '?' : 'Approve this application?',
+                title: disapprove ? 'Decline this application for ' + (form.dataset.name || 'this applicant') + '?' : 'Approve this application?',
                 message: disapprove ? 'The applicant may apply again, and is told the reason.' : 'The application moves to the approved list'
                     + (claimSection ? ', and the applicant is emailed the ' + (extraLabel === 'Departure' ? 'trip schedule.' : 'claim details.') : '.'),
                 name: form.dataset.name,
                 ref: form.dataset.ref,
                 extraLabel: extraLabel,
                 extra: extra,
-                okLabel: disapprove ? 'Disapprove' : 'Approve',
+                okLabel: disapprove ? 'Decline' : 'Approve',
                 danger: disapprove
             }).then((ok) => {
                 if (!ok) return;

@@ -183,6 +183,33 @@ function login_clear_failures(PDO $pdo, string $username, string $ip): void
 }
 
 /* ============================================================
+   PASSWORDS OF THE OFFICE (admin and staff)
+   The same rule applicants have: these accounts can approve payments and read every ID photo, so they
+   need the stronger password, not the weaker one. Old shorter passwords keep working until they are changed.
+   ============================================================ */
+
+const STAFF_PASSWORD_MIN = 8;
+
+/** Why this password is not allowed for an admin or staff account, in plain words; null when it is fine. */
+function staff_password_problem(string $password): ?string
+{
+    if (strlen($password) < STAFF_PASSWORD_MIN || !preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password)) {
+        return 'The password must be at least ' . STAFF_PASSWORD_MIN . ' characters and include letters and numbers.';
+    }
+    return null;
+}
+
+/**
+ * A short fingerprint of an account's stored password hash. It is kept in the signed-in session ($_SESSION['user']['pwv']):
+ * when the password is changed or reset, the fingerprint no longer matches and every other open sign-in of that account
+ * ends on its next page (decision_account_active()). No database column needed, and the password itself is never in the session.
+ */
+function account_password_mark(string $passwordHash): string
+{
+    return substr(hash('sha256', $passwordHash), 0, 16);
+}
+
+/* ============================================================
    WORDS FOR THE ACTIVITY LOG PAGE
    ============================================================ */
 
@@ -191,7 +218,7 @@ function activity_actions(): array
 {
     return [
         'application_approved'    => ['Approved an application',    'decisions', 'approved'],
-        'application_disapproved' => ['Disapproved an application', 'decisions', 'danger'],
+        'application_disapproved' => ['Declined an application', 'decisions', 'danger'],
         'application_status'      => ['Changed a status',           'decisions', 'neutral'],
         'application_edited'      => ['Edited an application',      'decisions', 'pending'],
         'login_success'           => ['Signed in',                  'signins',   'neutral'],
@@ -221,6 +248,6 @@ function activity_actions(): array
 
 function activity_groups(): array
 {
-    return ['decisions' => 'Approvals, disapprovals and edits', 'signins' => 'Sign-ins', 'accounts' => 'Staff accounts',
+    return ['decisions' => 'Approvals, declines and edits', 'signins' => 'Sign-ins', 'accounts' => 'Staff accounts',
             'settings' => 'Own settings', 'exports' => 'Exports', 'budget' => 'Budget'];
 }

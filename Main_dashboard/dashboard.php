@@ -26,7 +26,7 @@ $typeInfo = [];
 foreach (ui_types() as $id => $t) {
     $typeInfo[$id] = $t + ['queue' => ui_type_url($id, 'pending'), 'home' => ui_type_url($id, 'overview')];
 }
-$statusInfo = ui_statuses();   // Pending and Approved: disapproved applications are discarded and not counted
+$statusInfo = ui_statuses();   // Pending and Approved: declined applications are discarded and not counted
 
 // A pending application older than this gets a "waiting over a week" warning
 $waitWarnDays = 7;
@@ -310,7 +310,7 @@ $mapLink = function (string $name) use ($url, $year, $mapTo): string {
     return $url(['q' => '', 'type' => '', 'status' => '', 'barangay' => $name, 'from' => $year . '-01-01', 'to' => $mapTo, 'page' => ''], 'applications');
 };
 
-$where = ["a.status <> 'Disapproved'"];   // discarded applications are only on each program's Disapproved tab
+$where = ["a.status <> 'Disapproved'"];   // discarded applications are only on each program's Declined tab
 $params = [];
 if ($filters['q'] !== '') {
     if (preg_match('/^#?(\d+)$/', $filters['q'], $m)) {
@@ -807,6 +807,7 @@ admin_layout_start([
                                 </tr>
                             </thead>
                             <tbody>
+                                <?php applicant_avatar_files(array_column($rows, 'id')); /* the applicants' own pictures, one query */ ?>
                                 <?php foreach ($rows as $row): ?>
                                     <?php
                                     $created = strtotime($row['created_at']);
@@ -814,11 +815,16 @@ admin_layout_start([
                                     ?>
                                     <tr>
                                         <td class="cell-main" data-label="Applicant">
-                                            <strong class="row-name"><?= ui_e($fullName) ?></strong>
-                                            <span class="ref">Ref #<?= (int)$row['id'] ?></span>
-                                            <?php if ((int)$row['assistance_type_id'] === 1 && (int)$row['is_deceased'] === 1): ?>
-                                                <span class="badge badge-deceased"><?= ui_icon('flag') ?>Recorded as deceased</span>
-                                            <?php endif; ?>
+                                            <div class="person-cell">
+                                                <?= ui_applicant_avatar((int)$row['id'], $fullName) ?>
+                                                <div>
+                                                    <strong class="row-name"><?= ui_e($fullName) ?></strong>
+                                                    <span class="ref">Ref #<?= (int)$row['id'] ?></span>
+                                                    <?php if ((int)$row['assistance_type_id'] === 1 && (int)$row['is_deceased'] === 1): ?>
+                                                        <span class="badge badge-deceased"><?= ui_icon('flag') ?>Recorded as deceased</span>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td data-label="Type"><?= ui_e($typeInfo[(int)$row['assistance_type_id']]['short'] ?? ($row['assistance_type'] ?? 'Other')) ?></td>
                                         <td data-label="Status">

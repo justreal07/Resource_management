@@ -7,13 +7,17 @@
  *            APPROVED Medical application needs an admin's permission to apply again;
  *            the permission is used up by that one new application.
  *   Burial   The deceased (full name + birthdate + date of death). One Burial
- *            application per deceased FULL NAME (the birthdate is not compared, so the same
- *            name can't be filed again once it is Pending or Approved). Filing it records the person as
+ *            application per deceased person: the same name WITH the same birthdate OR the same date of
+ *            death can't be filed again once it is Pending or Approved. (The name alone is not enough: two
+ *            different people called "Juan Dela Cruz" are both entitled to apply. Checking the date of death too
+ *            still catches the same person filed again with a changed birthdate.) Filing it records the person as
  *            deceased, so nobody can apply for Medical for them again.
  *   Disapproved applications don't count for any of this: disapproving one gives the
  *   person back their state from before it (application_decision.php).
- *   OPD      No person rules: patients request a vehicle for every check-up
- *            their doctor schedules.
+ *   OPD      No limit on how many check-ups a patient may request a vehicle for (one for every check-up their
+ *            doctor schedules), but ONE request per patient per check-up date: the same patient (name, and
+ *            birthdate when both have one) can't be on the van schedule twice for the same day, online or
+ *            as a walk-in (opd_find_duplicate()). A declined request doesn't count.
  *
  * A person is matched by birthdate + name. Names are compared after normalising
  * (case, accents, punctuation, extra spaces, "Last, First" order, "Dela Cruz" =
@@ -163,9 +167,12 @@ function person_names_equal(array $a, array $b): bool
 function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accountId): array
 {
     $office = $accountId === null;
+    if ($formKey === 'opd') {
+        return opd_duplicate_result($pdo, $data, $accountId);   // OPD: no person registry, only "one request per patient per check-up date"
+    }
     $person = person_from_form($formKey, $data);
     if ($person === null) {
-        return person_result();   // OPD: no person rules
+        return person_result();
     }
     if (!person_rules_installed($pdo)) {
         return person_result();   // the database update isn't installed yet: accepted without the person checks
@@ -211,7 +218,7 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
                 $ref = person_ref($previous, $accountId);
                 if ($previous['status'] === 'Pending') {
                     return person_result('person', $office
-                        ? "This patient already has a Medical application waiting for review$ref. Approve or disapprove that one first."
+                        ? "This patient already has a Medical application waiting for review$ref. Approve or decline that one first."
                         : "This person already has a Medical application waiting for review$ref. Please wait for the decision before applying again.");
                 }
                 // The admin gives the permission on the patient's approved Medical record (medical/reapply_decision.php)
@@ -237,8 +244,8 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
                 $grantId = (int)$decision['id'];   // used up when the application is saved
             }
         } else {
-            // Burial is checked by the deceased's full name alone (any birthdate): the same name can't be filed twice
-            $sameName = person_find_by_name($pdo, $person);
+            // Burial: the same name with the same birthdate or the same date of death is the same deceased person
+            $sameName = person_find_burial_matches($pdo, $person);
             $nameIds = array_map('intval', array_column($sameName, 'id'));
             $deceased = in_array(1, array_map('intval', array_column($sameName, 'is_deceased')), true);
             $burial = person_last_application($pdo, $nameIds, 2);
@@ -276,7 +283,8 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
  */
 function submit_with_person_rules(PDO $pdo, string $formKey, array $data, ?int $accountId, callable $insert): array
 {
-    $lock = person_rules_installed($pdo) ? person_lock_name($formKey, $data) : null;
+    // The OPD one-per-day rule needs no registry tables, so its lock is taken even before the person-rules update is installed
+    $lock = ($formKey === 'opd' || person_rules_installed($pdo)) ? person_lock_name($formKey, $data) : null;
     if ($lock !== null && !person_lock($pdo, $lock)) {
         return ['ok' => false, 'message' => 'Another application for this person is being saved right now. Please try again in a moment.'];
     }
@@ -286,7 +294,7 @@ function submit_with_person_rules(PDO $pdo, string $formKey, array $data, ?int $
         if (!$check['ok']) {
             $pdo->rollBack();
             $labels = ['first_name' => 'First name', 'last_name' => 'Last name', 'petitioner_name' => 'Name of the deceased',
-                       'beneficiary_birthdate' => 'Birthdate', 'date_of_death' => 'Date of death'];
+                       'beneficiary_birthdate' => 'Birthdate', 'date_of_death' => 'Date of death', 'checkup_date' => 'Check-up date'];
             return ['ok' => false, 'message' => $check['field'] === 'person' ? $check['message']
                 : ($labels[$check['field']] ?? 'Form') . ': ' . $check['message'] . ' Please go back to the form to fix it.'];
         }
@@ -339,10 +347,16 @@ function person_record_rules(PDO $pdo, string $formKey, array $check, ?int $bene
 
 /**
  * Lock name for a person: everyone born on the same day shares it, so name variants can't slip past each other.
- * Burial is checked by name alone, so all Burial saves share one lock (they are rare).
+ * Burial is looked for among all Burial applications (the same name with the same birthdate or date of death), not only those born
+ * on one day, so all Burial saves share one lock (they are rare).
  */
 function person_lock_name(string $formKey, array $data): ?string
 {
+    if ($formKey === 'opd') {
+        // OPD: everyone going on the same day shares one lock, so two requests for one patient can't both pass the check
+        $day = person_text($data, 'checkup_date');
+        return is_ymd($day) ? 'lgu_opd_' . $day : null;
+    }
     $birthdate = person_text($data, 'beneficiary_birthdate');
     if ($formKey === 'burial' && is_ymd($birthdate)) return 'lgu_burial_same_name';
     return in_array($formKey, ['medical', 'burial'], true) && is_ymd($birthdate) ? 'lgu_person_' . $birthdate : null;
@@ -490,11 +504,11 @@ function person_correct_identity(PDO $pdo, string $formKey, array $application, 
         return $same . ', so saving would mix two people up. Open that person\'s record first' . person_clash_ref($pdo, array_column($clash, 'id')) . '.';
     }
     if ($formKey === 'burial') {
-        $byName = array_filter(person_find_by_name($pdo, $person), function ($row) use ($beneficiaryId) { return (int)$row['id'] !== $beneficiaryId; });
+        $byName = array_filter(person_find_burial_matches($pdo, $person), function ($row) use ($beneficiaryId) { return (int)$row['id'] !== $beneficiaryId; });
         if ($byName) {
             $ids = array_map('intval', array_column($byName, 'id'));
             if (person_last_application($pdo, $ids, 2) || in_array(1, array_map('intval', array_column($byName, 'is_deceased')), true)) {
-                return 'A Burial application or a recorded death already exists for this name' . person_clash_ref($pdo, $ids)
+                return 'A Burial application or a recorded death already exists for this person' . person_clash_ref($pdo, $ids)
                     . '. Only one Burial application is allowed per deceased person.';
             }
         }
@@ -526,6 +540,85 @@ function person_clash_ref(PDO $pdo, array $beneficiaryIds): string
     $stmt->execute($beneficiaryIds);
     $id = $stmt->fetchColumn();
     return $id ? ' (Ref #' . (int)$id . ')' : '';
+}
+
+/* ============================================================
+   OPD: ONE REQUEST PER PATIENT PER CHECK-UP DATE
+   ============================================================ */
+
+/**
+ * Is this patient already on the schedule for this check-up day? A Pending or Approved OPD request for the same check-up date
+ * with the same patient: the names match (case, accents, "Dela Cruz" = "Delacruz", a left-out middle name) and, when both requests
+ * have a birthdate, the birthdates are the same (two patients with one name but different birthdates are different people).
+ * A Disapproved request is discarded and doesn't count. Never throws.
+ *
+ * @param ?int $excludeId an application to leave out (the one an admin is editing)
+ * @return ?array the earlier request: id, account_id, status, plus 'checkup_date'; null when there is none
+ */
+function opd_find_duplicate(PDO $pdo, array $data, ?int $excludeId = null): ?array
+{
+    $day = person_text($data, 'checkup_date');
+    $words = person_name_parts(implode(' ', [person_text($data, 'first_name'), person_text($data, 'middle_name'), person_text($data, 'last_name')]));
+    if (!is_ymd($day) || count($words['words']) < 2) {
+        return null;   // the form's own checks report a missing date or name
+    }
+    $birth = person_text($data, 'beneficiary_birthdate');
+    try {
+        $withBirth = person_rules_installed($pdo);   // beneficiary_birthdate comes with migration_person_rules.sql
+        $stmt = $pdo->prepare('SELECT id, account_id, status, first_name, middle_name, last_name' . ($withBirth ? ', beneficiary_birthdate' : '') . "
+                               FROM applicant
+                               WHERE assistance_type_id = 3 AND checkup_date = ? AND status IN ('Pending', 'Approved') AND id <> ?
+                               ORDER BY status = 'Pending' DESC, id");
+        $stmt->execute([$day, (int)$excludeId]);
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $other = person_name_parts(implode(' ', [$row['first_name'], (string)$row['middle_name'], $row['last_name']]));
+            if (!person_names_equal($words, $other) && !person_names_match($words, $other)) continue;
+            $otherBirth = (string)($row['beneficiary_birthdate'] ?? '');
+            if (is_ymd($birth) && is_ymd($otherBirth) && $birth !== $otherBirth) continue;
+            $row['checkup_date'] = $day;
+            return $row;
+        }
+    } catch (PDOException $e) {
+        error_log('opd_find_duplicate: ' . $e->getMessage());
+    }
+    return null;
+}
+
+/**
+ * The OPD answer of checkPersonConflict(): fine, or "this patient already has a request for that day" on the check-up date box.
+ * $excludeId: the request an admin is editing, which must not count as a duplicate of itself.
+ */
+function opd_duplicate_result(PDO $pdo, array $data, ?int $accountId, ?int $excludeId = null): array
+{
+    $dup = opd_find_duplicate($pdo, $data, $excludeId);
+    if ($dup === null) {
+        return person_result();
+    }
+    $when = date('F j, Y', strtotime($dup['checkup_date']));
+    $state = $dup['status'] === 'Pending' ? 'waiting for review' : 'approved';
+    $ref = person_ref($dup, $accountId);
+    return person_result('checkup_date', $accountId === null
+        ? "This patient already has an OPD request for $when that is $state$ref. Open that one instead of adding a second."
+        : "This patient already has an OPD request for $when that is $state$ref. There is one request for each patient for each check-up date: "
+          . 'if the check-up is on another day, change the date.');
+}
+
+/**
+ * The claimant's age when the claimant is the account holder and their birthdate is saved (My Account → Profile, or kept
+ * from an earlier Medical "For myself"): worked out from the birthdate instead of the typed box, so it can't be mistyped
+ * or go out of date. null when the claimant is someone else (a relative using the account) or the birthdate isn't known.
+ *
+ * @param array  $own      the 'own' part of get_form_prefill(): first_name, last_name, age
+ * @param string $fullName the claimant's name as written on the form
+ */
+function claimant_age_from_account(array $own, string $fullName): ?string
+{
+    if (($own['age'] ?? '') === '' || trim((string)($own['first_name'] ?? '')) === '' || trim((string)($own['last_name'] ?? '')) === '') {
+        return null;
+    }
+    $mine = person_name_parts($own['first_name'] . ' ' . $own['last_name']);
+    $written = person_name_parts($fullName);
+    return person_names_equal($mine, $written) || person_names_match($mine, $written) ? (string)$own['age'] : null;
 }
 
 /* ============================================================
@@ -568,11 +661,18 @@ function person_find(PDO $pdo, array $person): array
     return array_merge($exact, $close);
 }
 
-/** Beneficiaries whose name matches, whatever their birthdate (used for the Burial "same name" rule). */
-function person_find_by_name(PDO $pdo, array $person): array
+/**
+ * The people on file who are the same deceased person as this one (the Burial rule): the name matches AND the birthdate or the
+ * date of death is the same. Only the rows with one of those two dates are read, then their names are compared, so this stays
+ * fast as the registry grows.
+ */
+function person_find_burial_matches(PDO $pdo, array $person): array
 {
+    $death = (string)($person['date_of_death'] ?? '');
+    $stmt = $pdo->prepare('SELECT id, full_name, is_deceased FROM beneficiaries WHERE birthdate = ?' . (is_ymd($death) ? ' OR date_of_death = ?' : '') . ' ORDER BY id');
+    $stmt->execute(is_ymd($death) ? [$person['birthdate'], $death] : [$person['birthdate']]);
     $found = [];
-    foreach ($pdo->query('SELECT id, full_name, is_deceased FROM beneficiaries ORDER BY id')->fetchAll(PDO::FETCH_ASSOC) as $row) {
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
         $parts = person_name_parts($row['full_name']);
         if (person_names_equal($parts, $person['parts']) || person_names_match($parts, $person['parts'])) {
             $found[] = $row;

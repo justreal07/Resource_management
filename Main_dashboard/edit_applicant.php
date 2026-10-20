@@ -12,7 +12,7 @@ if (($_SESSION['user']['role'] ?? '') !== 'admin') {
 
 // Get applicant ID from query string
 if (!isset($_GET['id'])) {
-    header('Location: applicants.php');
+    header('Location: dashboard.php');
     exit;
 }
 $id = intval($_GET['id']);
@@ -21,7 +21,7 @@ $id = intval($_GET['id']);
 // so a link can't send the user to another website.
 $redirect = isset($_GET['redirect']) && is_string($_GET['redirect'])
     && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/)?[A-Za-z_]+\.php(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
-    ? $_GET['redirect'] : 'applicants.php';
+    ? $_GET['redirect'] : 'dashboard.php';
 
 // Fetch applicant data
 $stmt = $pdo->prepare('SELECT * FROM applicant WHERE id = ?');
@@ -40,7 +40,7 @@ if (!$applicant) {
    WHAT CAN BE EDITED
    Every detail the online form (and the walk-in form) asks for, per program, laid out like the record view.
    The checks are the online forms' own (validate_application()); the status is not changed here
-   (Approve / Disapprove go through decide_application() from the lists and the Update page).
+   (Approve / Decline go through decide_application() from the lists and the Update page).
    ============================================================ */
 $typeId = (int)$applicant['assistance_type_id'];
 $formKey = ui_types()[$typeId]['key'] ?? 'opd';   // medical | burial | opd
@@ -94,7 +94,8 @@ $sections = [
         ['Address and contact', 'pin', $address, $aboutAddress],
     ],
     'opd' => [
-        ['Patient', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'age'], 'Who the check-up is for, as written on the valid ID.'],
+        ['Patient', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'beneficiary_birthdate', 'age'],
+         'Who the check-up is for, as written on the valid ID. When a birthdate is saved, the age is worked out from it (as of the day the request was filed). A patient can have one request for each check-up date.'],
         ['Address and contact', 'pin', $address, $aboutAddress],
         ['Check-up and transport', 'van', ['hospital', 'checkup_date', 'diagnosis', 'petitioner_name', 'relationship', 'wheelchair', 'stretcher'],
          'Where and when the check-up is, and what the patient needs for the trip.'],
@@ -168,6 +169,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $required = array_values(array_diff($required, CLAIMANT_FIELDS));
         }
     }
+    // OPD: the age comes from the patient's birthdate (as of the day it was filed), as online; an older request
+    // without a birthdate keeps the age that is typed
+    if ($formKey === 'opd' && in_array('beneficiary_birthdate', $fields, true)) {
+        $filedOn = substr((string)$applicant['created_at'], 0, 10);
+        $computedAge = age_on((string)($values['beneficiary_birthdate'] ?? ''), $filedOn);
+        if ($computedAge !== '') $values['age'] = $computedAge;
+    }
     // The check-up date may be in the past here (an old request is being corrected), so it is checked below instead
     $check = $values;
     unset($check['checkup_date']);
@@ -227,6 +235,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         return $f !== 'applying_for' && !$same($values[$f] ?? '', $original[$f]);
     }));
     $identityChanged = (bool)array_intersect($changed, $identityFields);
+    // OPD: moving a waiting or approved request to another day, or changing who the patient is, must not put the same patient
+    // on the schedule twice for one day (checked below under the day's lock)
+    $opdMoved = $formKey === 'opd' && $status !== 'Disapproved'
+        && (bool)array_intersect($changed, ['checkup_date', 'first_name', 'middle_name', 'last_name', 'beneficiary_birthdate']);
 
     if (!$errors && !$changed) {
         $_SESSION['success_message'] = 'Nothing was changed for ' . ui_person_name($applicant) . ' (Ref #' . $id . ').';
@@ -245,8 +257,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $locks[] = $lock;
                 }
             }
-            $pdo->beginTransaction();
-            if ($identityChanged) {
+            if ($opdMoved && is_ymd((string)$values['checkup_date'])) {
+                $dayLock = person_lock_name('opd', $values);   // the same lock a new request takes for that day
+                if (!person_lock($pdo, $dayLock)) {
+                    throw new RuntimeException('busy');
+                }
+                $locks[] = $dayLock;
+                $dup = opd_duplicate_result($pdo, $values, null, $id);
+                if (!$dup['ok']) $errors['checkup_date'] = $dup['message'];
+            }
+            if (!$errors) $pdo->beginTransaction();
+            if ($identityChanged && !$errors) {
                 $problem = person_correct_identity($pdo, $formKey, $applicant, $values);
                 if ($problem !== null) {
                     $pdo->rollBack();
@@ -463,7 +484,7 @@ admin_layout_start(['title' => 'Edit applicant', 'section' => $section]);
     <footer class="edit-foot">
         <p class="field-help"><?= ui_icon('info') ?>
             <?= $status === 'Pending'
-                ? 'The status is not changed here: use Approve or Disapprove in its list.' . (decision_needs_amount($typeId) ? ' The amount is entered when approving.' : '')
+                ? 'The status is not changed here: use Approve or Decline in its list.' . (decision_needs_amount($typeId) ? ' The amount is entered when approving.' : '')
                 : 'The status can\'t be changed here.' ?></p>
         <div class="form-actions">
             <a class="btn btn-secondary" href="<?= ui_e($redirect) ?>">Cancel</a>

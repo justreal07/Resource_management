@@ -67,9 +67,10 @@
 
     /* ---------- The applicant's own details (data-own-* on the form, from get_form_prefill()) ----------
        Whoever fills in the form is the claimant, so their age is filled in from their birthdate:
-       Burial (section 1 is them), Medical "For another person" (the claimant section is them) and
-       OPD while the patient on the form is them. Medical "For myself": the patient is them, so
-       their birthdate goes in the patient's birthdate. A box the applicant typed in is never changed. */
+       Burial (section 1 is them) and Medical "For another person" (the claimant section is them).
+       OPD: while the patient on the form is them, their birthdate goes in the patient's birthdate.
+       Medical "For myself": the patient is them, so their birthdate goes in the patient's birthdate.
+       A box the applicant typed in is never changed. */
     const own = {
         first: form.dataset.ownFirst || '', last: form.dataset.ownLast || '',
         birthdate: form.dataset.ownBirthdate || '', age: form.dataset.ownAge || ''
@@ -105,18 +106,18 @@
             && norm(firstName.value) === norm(own.first) && norm(lastName.value) === norm(own.last);
     };
 
-    // OPD: the patient's age, while the patient on the form is the applicant
-    const opdAge = byId('age');
-    if (opdAge && own.age !== '' && !forRadios.length) {
-        const syncOpdAge = function () {
+    // OPD: the patient's birthdate, while the patient on the form is the applicant
+    // (only the OPD form has a check-up date; Burial's birthdate is the deceased's, Medical's has its own switch below)
+    const opdBirth = byId('checkup_date') ? byId('beneficiary_birthdate') : null;
+    if (opdBirth && own.birthdate !== '' && !forRadios.length) {
+        const syncOpdBirth = function () {
             if (isOwnName()) {
-                if (untouched(opdAge)) fill(opdAge, own.age);
-            } else if (untouched(opdAge) && opdAge.value === own.age) {
-                fill(opdAge, '');   // someone else's check-up: their age is typed in
+                if (untouched(opdBirth)) fill(opdBirth, own.birthdate);
+            } else if (untouched(opdBirth) && opdBirth.value === own.birthdate) {
+                fill(opdBirth, '');   // someone else's check-up: their birthdate is typed in
             }
-            syncAgeHints();
         };
-        [firstName, lastName].forEach(function (el) { if (el) el.addEventListener('input', syncOpdAge); });
+        [firstName, lastName].forEach(function (el) { if (el) el.addEventListener('input', syncOpdBirth); });
     }
 
     // Medical: switching between "For myself" and "For another person"

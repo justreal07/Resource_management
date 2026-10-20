@@ -84,13 +84,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "Current password is incorrect.";
         } elseif ($new_password !== $confirm_password) {
             $errors[] = "New passwords do not match.";
-        } elseif (strlen($new_password) < 6) {
-            $errors[] = "New password must be at least 6 characters long.";
+        } elseif ($problem = staff_password_problem($new_password)) {
+            $errors[] = $problem;
         } else {
             // Update password
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             if ($stmt->execute([$hashed_password, $admin_id])) {
+                // Any other computer still signed in as this admin is signed out on its next page; this one stays signed in
+                $_SESSION['user']['pwv'] = account_password_mark($hashed_password);
+                $admin['password'] = $hashed_password;
+                session_regenerate_id(true);
                 activity_log('password_changed', 'Own password changed.');
                 $success = "Password updated successfully!";
             } else {
@@ -107,12 +111,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$staff) {
             $errors[] = "That staff account no longer exists. The list below is up to date.";
+        } elseif (staff_has_records($pdo, $staff_id)) {
+            // Removing it would wipe "who approved / declined this" from those applications. Turning access off keeps the trail.
+            $errors[] = ($staff['full_name'] ?: $staff['username']) . " has approved or declined requests, so the account can't be removed: the office must always be able to see who decided what. Use \"Turn off access\" instead.";
         } else {
             try {
                 avatar_remove($pdo, $staff_id);   // their picture goes with the account
                 $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'staff'")->execute([$staff_id]);
                 activity_log('staff_removed', 'Removed staff account: ' . ($staff['full_name'] ?: $staff['username']) . ' (@' . $staff['username'] . ').');
-                // Their past approvals stay on the applications; only the name is no longer linked (the database sets it to empty).
+                // An account with no decisions on record: nothing on any application pointed to it
                 $_SESSION['staff_flash'] = ($staff['full_name'] ?: $staff['username']) . " no longer has access. They cannot sign in anymore.";
                 header("Location: admin_settings.php?tab=staff");
                 exit;
@@ -140,23 +147,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "There was no picture to remove.";
         }
     }
-    elseif ($action === 'toggle_staff') {
-        // Turn a staff account off (it cannot sign in, and is signed out on its next page) or back on. Nothing is deleted.
+    elseif ($action === 'toggle_staff' || $action === 'toggle_admin') {
+        // Turn a staff account (or another administrator's) off (it cannot sign in, and is signed out on its next page) or back on.
+        // Nothing is deleted. The signed-in admin can't turn themself off, so there is always one admin who can still sign in.
+        $isAdminTarget = $action === 'toggle_admin';
+        $targetRole = $isAdminTarget ? 'admin' : 'staff';
         $staff_id = (int)($_POST['staff_id'] ?? 0);
         $turnOn = ($_POST['turn'] ?? '') === 'on';
-        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = 'staff'");
-        $stmt->execute([$staff_id]);
+        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = ?");
+        $stmt->execute([$staff_id, $targetRole]);
         $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$staff) {
-            $errors[] = "That staff account no longer exists. The list below is up to date.";
+            $errors[] = $isAdminTarget ? "That administrator account no longer exists. The list below is up to date." : "That staff account no longer exists. The list below is up to date.";
+        } elseif ($isAdminTarget && $staff_id === (int)$admin_id) {
+            $errors[] = "You can't turn off the account you are signed in with.";
         } elseif (!admin_tools_ensure($pdo)) {
             $errors[] = "Turning accounts off needs a small database update that could not be applied automatically. Import database/migrations/migration_admin_tools.sql in phpMyAdmin, then try again.";
         } else {
             try {
-                $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ? AND role = 'staff'")->execute([$turnOn ? 1 : 0, $staff_id]);
+                $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ? AND role = ?")->execute([$turnOn ? 1 : 0, $staff_id, $targetRole]);
                 $name = $staff['full_name'] ?: $staff['username'];
-                activity_log($turnOn ? 'staff_enabled' : 'staff_disabled', ($turnOn ? 'Access turned on for ' : 'Access turned off for ') . $name . ' (@' . $staff['username'] . ').');
+                activity_log($turnOn ? 'staff_enabled' : 'staff_disabled', ($turnOn ? 'Access turned on for ' : 'Access turned off for ')
+                    . ($isAdminTarget ? 'administrator ' : '') . $name . ' (@' . $staff['username'] . ').');
                 $_SESSION['staff_flash'] = $turnOn
                     ? $name . " can sign in again."
                     : $name . " can no longer sign in. Their records are kept, and you can turn access back on any time.";
@@ -181,12 +194,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "Choose the staff member whose password you want to reset.";
         } elseif ($new_password === '' || $confirm_password === '') {
             $errors[] = "Type the new password twice.";
-        } elseif (strlen($new_password) < 6) {
-            $errors[] = "The new password must be at least 6 characters long.";
+        } elseif ($problem = staff_password_problem($new_password)) {
+            $errors[] = $problem;
         } elseif ($new_password !== $confirm_password) {
             $errors[] = "The two passwords don't match.";
         } else {
             try {
+                // The staff member is signed out wherever they are signed in: their open sign-ins carry the old password's fingerprint
                 $pdo->prepare("UPDATE users SET password = ? WHERE id = ? AND role = 'staff'")
                     ->execute([password_hash($new_password, PASSWORD_DEFAULT), $staff_id]);
                 $name = $staff['full_name'] ?: $staff['username'];
@@ -272,6 +286,25 @@ $isGoogleApplicant = function (array $a): bool {
     return !empty($a['google_token']) && strpos((string)$a['username'], '@') !== false;
 };
 
+/**
+ * Has this staff account decided any request? (approved or declined one, or left a line in the status history)
+ * Then it must not be removed: that would erase who decided what. If a column is missing (older database), only what exists counts.
+ */
+function staff_has_records(PDO $pdo, int $staffId): bool
+{
+    foreach (["SELECT 1 FROM applicant WHERE approved_by = ? LIMIT 1", "SELECT 1 FROM applicant WHERE disapproved_by = ? LIMIT 1",
+              "SELECT 1 FROM application_status_history WHERE changed_by = ? LIMIT 1"] as $sql) {
+        try {
+            $stmt = $pdo->prepare($sql);
+            $stmt->execute([$staffId]);
+            if ($stmt->fetchColumn()) return true;
+        } catch (PDOException $e) {
+            error_log('staff_has_records: ' . $e->getMessage());
+        }
+    }
+    return false;
+}
+
 // Staff accounts: they can sign in and handle OPD requests (and nothing else)
 $staffFlash = (string)($_SESSION['staff_flash'] ?? '');
 unset($_SESSION['staff_flash']);
@@ -301,6 +334,16 @@ try {
     $staffLoadError = true;
 }
 
+// The other administrators (the signed-in one can't turn themself off): listed under the staff so their access can be turned off too
+$otherAdmins = [];
+try {
+    $stmt = $pdo->prepare("SELECT u.id, u.username, u.full_name, $statusColumns FROM users u WHERE u.role = 'admin' AND u.id <> ? ORDER BY u.created_at, u.id");
+    $stmt->execute([$admin_id]);
+    $otherAdmins = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    error_log('admin_settings other admins: ' . $e->getMessage());
+}
+
 /** The result of the last save, shown inside the card of the form that was sent. */
 $messageFor = function (string $formAction) use ($errors, $success): string {
     if (($_POST['action'] ?? '') !== $formAction) return '';
@@ -319,14 +362,14 @@ echo ui_page_head('Admin settings', 'Your own account, and the staff accounts th
 $profileSent  = ($_POST['action'] ?? '') === 'update_profile';
 $fullnameVal  = $profileSent ? ($_POST['new_fullname'] ?? '') : ($admin['full_name'] ?? '');
 $usernameVal  = $profileSent ? ($_POST['new_username'] ?? '') : $admin['username'];
-$staffActions = ['delete_staff', 'toggle_staff', 'reset_staff_password', 'remove_staff_avatar'];
+$staffActions = ['delete_staff', 'toggle_staff', 'toggle_admin', 'reset_staff_password', 'remove_staff_avatar'];
 $active       = ($_POST['action'] ?? '') === 'change_password' ? 'security'
               : (($_POST['action'] ?? '') === 'reset_applicant_password' || ($_GET['tab'] ?? '') === 'applicants' ? 'applicants'
               : ((in_array($_POST['action'] ?? '', $staffActions, true) || ($_GET['tab'] ?? '') === 'staff') ? 'staff' : 'profile'));
 $tabs = [
     'profile'    => ['Profile',    'user',   'Your name and the username you sign in with.'],
     'security'   => ['Password',   'lock',   'Choose a new password for your account.'],
-    'staff'      => ['OPD staff',  'van',    'Who can sign in as staff and handle OPD requests. Turn an account off, reset a password, or remove it.'],
+    'staff'      => ['OPD staff',  'van',    'Who can sign in as staff and handle OPD requests, and which other administrators can sign in. Turn an account off, or reset a staff password. An account that never decided a request can also be removed.'],
     'applicants' => ['Applicants', 'search', 'Help an applicant who forgot their password and has no email on the account.'],
 ];
 ?>
@@ -388,8 +431,8 @@ $tabs = [
                 </div>
                 <div class="field">
                     <label for="new_password">New password <span class="req" aria-hidden="true">*</span></label>
-                    <input type="password" id="new_password" name="new_password" autocomplete="new-password" minlength="6" required data-message="Enter a new password of at least 6 characters." aria-describedby="new_passwordHelp">
-                    <p class="field-help" id="new_passwordHelp">At least 6 characters.</p>
+                    <input type="password" id="new_password" name="new_password" autocomplete="new-password" minlength="8" required data-message="Enter a new password of at least 8 characters, with letters and numbers." aria-describedby="new_passwordHelp">
+                    <p class="field-help" id="new_passwordHelp">At least 8 characters, with letters and numbers.</p>
                 </div>
                 <div class="field">
                     <label for="confirm_password">Type the new password again <span class="req" aria-hidden="true">*</span></label>
@@ -407,6 +450,7 @@ $tabs = [
                 <div class="alert alert-success" role="status"><?= ui_icon('check-circle', 'alert-icon') ?><div class="alert-body"><?= ui_e($staffFlash) ?></div></div>
             <?php endif; ?>
             <?= $messageFor('toggle_staff') ?>
+            <?= $messageFor('toggle_admin') ?>
             <?= $messageFor('delete_staff') ?>
             <?= $messageFor('reset_staff_password') ?>
             <?= $messageFor('remove_staff_avatar') ?>
@@ -420,14 +464,14 @@ $tabs = [
                 $nowTs = time();
             ?>
                 <p class="staff-count"><strong><?= $activeCount ?></strong> of <?= count($staffList) ?> staff <?= count($staffList) === 1 ? 'account' : 'accounts' ?> can use OPD right now.
-                    <span class="muted">Staff can approve and disapprove OPD requests only. They cannot open Medical, Burial, Reports or Settings.</span></p>
+                    <span class="muted">Staff can approve and decline OPD requests only. They cannot open Medical, Burial, Reports or Settings.</span></p>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead><tr>
                             <th scope="col">Staff member</th>
                             <th scope="col">Last signed in</th>
                             <th scope="col">Approved</th>
-                            <th scope="col">Disapproved</th>
+                            <th scope="col">Declined</th>
                             <th scope="col"><span class="visually-hidden">Manage</span></th>
                         </tr></thead>
                         <tbody>
@@ -448,7 +492,7 @@ $tabs = [
                                 </td>
                                 <td data-label="Last signed in"><?= !empty($s['last_login_at']) ? ui_e(ui_ago(strtotime($s['last_login_at']), $nowTs)) : '<span class="muted">Never</span>' ?></td>
                                 <td data-label="Approved"><?= (int)$s['approved_count'] ?></td>
-                                <td data-label="Disapproved"><?= (int)$s['disapproved_count'] ?></td>
+                                <td data-label="Declined"><?= (int)$s['disapproved_count'] ?></td>
                                 <td class="cell-action">
                                     <details class="row-menu">
                                         <summary class="btn btn-secondary btn-sm">Manage<span class="visually-hidden"> <?= ui_e($sname) ?></span></summary>
@@ -482,17 +526,21 @@ $tabs = [
                                                     data-confirm-ok="Remove picture">Remove picture</button>
                                             </form>
                                             <?php endif; ?>
+                                            <?php if (staff_has_records($pdo, (int)$s['id'])): ?>
+                                                <p class="row-menu-note muted">Has approved or declined requests, so the account is kept: the office always needs to see who decided what. Turn off access instead.</p>
+                                            <?php else: ?>
                                             <form method="POST">
                                                 <?= decision_csrf_field() ?>
                                                 <input type="hidden" name="action" value="delete_staff">
                                                 <input type="hidden" name="staff_id" value="<?= (int)$s['id'] ?>">
                                                 <button type="submit" class="btn btn-link btn-sm row-menu-danger"
                                                     data-confirm="Remove this staff account?"
-                                                    data-confirm-message="They will not be able to sign in anymore. Requests they already approved or disapproved stay as they are, but no longer show their name. This cannot be undone. To keep the account for later, use Turn off access instead."
+                                                    data-confirm-message="This account has not decided any request yet, so nothing else changes. They will not be able to sign in anymore. This cannot be undone."
                                                     data-confirm-name="<?= ui_e($sname) ?>"
                                                     data-confirm-ref="<?= ui_e('@' . $s['username']) ?>"
                                                     data-confirm-ok="Remove account">Remove account</button>
                                             </form>
+                                            <?php endif; ?>
                                         </div>
                                     </details>
                                 </td>
@@ -518,13 +566,66 @@ $tabs = [
                     </div>
                     <div class="field">
                         <label for="staff_new_password">New password <span class="req" aria-hidden="true">*</span></label>
-                        <input type="password" id="staff_new_password" name="staff_new_password" autocomplete="new-password" minlength="6" required data-message="Enter a new password of at least 6 characters.">
+                        <input type="password" id="staff_new_password" name="staff_new_password" autocomplete="new-password" minlength="8" required data-message="Enter a new password of at least 8 characters, with letters and numbers.">
                     </div>
                     <div class="field">
                         <label for="staff_confirm_password">Type the new password again <span class="req" aria-hidden="true">*</span></label>
                         <input type="password" id="staff_confirm_password" name="staff_confirm_password" autocomplete="new-password" required data-message="Type the new password again.">
                     </div>
                 </form>            <?php endif; ?>
+
+            <?php /* Other administrators: they can be turned off like staff (never deleted: their name stays on the budget and on every decision) */ ?>
+            <?php if ($otherAdmins): ?>
+                <h3 class="iis-subhead" id="otherAdminsTitle">Other administrators</h3>
+                <p class="field-help">Administrators can open everything. Turn off the access of someone who no longer works here, or of an account that should not be used (for example one made for testing). Nothing is deleted, and you can turn it back on any time.</p>
+                <div class="table-wrap">
+                    <table class="data-table" aria-labelledby="otherAdminsTitle">
+                        <thead><tr>
+                            <th scope="col">Administrator</th>
+                            <th scope="col">Last signed in</th>
+                            <th scope="col"><span class="visually-hidden">Manage</span></th>
+                        </tr></thead>
+                        <tbody>
+                        <?php foreach ($otherAdmins as $o):
+                            $oname = trim((string)$o['full_name']) !== '' ? $o['full_name'] : $o['username'];
+                            $oOn = (int)$o['is_active'] === 1;
+                        ?>
+                            <tr>
+                                <td class="cell-main" data-label="Administrator">
+                                    <div class="person-cell">
+                                        <?= ui_avatar((int)$o['id'], (string)$oname) ?>
+                                        <div>
+                                            <strong class="row-name"><?= ui_e($oname) ?></strong>
+                                            <span class="muted">@<?= ui_e($o['username']) ?></span>
+                                            <?php if (!$oOn): ?><span class="badge badge-disapproved"><?= ui_icon('x-circle') ?>Turned off</span><?php endif; ?>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td data-label="Last signed in"><?= !empty($o['last_login_at']) ? ui_e(ui_ago(strtotime($o['last_login_at']), time())) : '<span class="muted">Never</span>' ?></td>
+                                <td class="cell-action">
+                                    <form method="POST">
+                                        <?= decision_csrf_field() ?>
+                                        <input type="hidden" name="action" value="toggle_admin">
+                                        <input type="hidden" name="staff_id" value="<?= (int)$o['id'] ?>">
+                                        <input type="hidden" name="turn" value="<?= $oOn ? 'off' : 'on' ?>">
+                                        <?php if ($oOn): ?>
+                                            <button type="submit" class="btn btn-secondary btn-sm"
+                                                data-confirm="Turn off this administrator account?"
+                                                data-confirm-message="They cannot sign in, and are signed out on their next page. Nothing is deleted. You can turn it back on any time."
+                                                data-confirm-name="<?= ui_e($oname) ?>"
+                                                data-confirm-ref="<?= ui_e('@' . $o['username']) ?>"
+                                                data-confirm-ok="Turn off">Turn off access<span class="visually-hidden"> for <?= ui_e($oname) ?></span></button>
+                                        <?php else: ?>
+                                            <button type="submit" class="btn btn-secondary btn-sm">Turn access back on<span class="visually-hidden"> for <?= ui_e($oname) ?></span></button>
+                                        <?php endif; ?>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
         </section>
 
         <section role="tabpanel" id="panel-applicants" aria-labelledby="tab-applicants"<?= $active === 'applicants' ? '' : ' hidden' ?>>
@@ -703,6 +804,8 @@ $tabs = [
     .row-menu-list .btn { width: 100%; justify-content: flex-start; text-decoration: none; padding: 6px 10px; }
     .row-menu-list .btn:hover { background: var(--c-primary-soft); }
     .row-menu-list .row-menu-danger { color: var(--c-accent); }
+    .row-menu-list .row-menu-note { max-width: 15rem; padding: 6px 10px; font-size: var(--fs-sm); }
+    .iis-subhead { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--c-border); font-size: var(--fs-md); }
     @media (max-width: 900px) {
         .iis { grid-template-columns: 1fr; }
         .iis-nav { border-right: 0; border-bottom: 1px solid var(--c-border); }

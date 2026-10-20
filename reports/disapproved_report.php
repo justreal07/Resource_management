@@ -11,7 +11,7 @@ if (!defined('REPORT_ENGINE')) {
 function report_build_disapproved(PDO $pdo, array $f): array
 {
     if (!decision_schema_ready($pdo)) {
-        return ['empty' => ui_state('alert', 'The Disapproved columns are not installed yet',
+        return ['empty' => ui_state('alert', 'The Declined columns are not installed yet',
             'Ask the system administrator to run database/migrations/migration_disapprove.sql, then reload this page.')];
     }
     $types = ui_types();
@@ -40,9 +40,9 @@ function report_build_disapproved(PDO $pdo, array $f): array
     uasort($reasons, function ($x, $y) { return $y[1] <=> $x[1]; });
     $total = count($rows);
 
-    $cards = [['label' => 'Disapproved', 'value' => number_format($total), 'icon' => 'x-circle', 'note' => 'Disapproved in this period']];
+    $cards = [['label' => 'Declined', 'value' => number_format($total), 'icon' => 'x-circle', 'note' => 'Declined in this period']];
     foreach ($types as $id => $t) {
-        $cards[] = ['label' => $t['short'], 'value' => number_format($byType[$id]), 'icon' => $t['icon'], 'note' => 'Disapproved in this period'];
+        $cards[] = ['label' => $t['short'], 'value' => number_format($byType[$id]), 'icon' => $t['icon'], 'note' => 'Declined in this period'];
     }
 
     $countFmt = function ($v) { return number_format($v); };
@@ -54,14 +54,14 @@ function report_build_disapproved(PDO $pdo, array $f): array
     if ($restReasons > 0) $reasonItems[] = ['label' => 'All other reasons', 'value' => $restReasons, 'other' => true];
 
     $charts = [
-        ui_chart_card('Disapproved per ' . $b['unit'], report_sub($f, 'by date disapproved'),
+        ui_chart_card('Declined per ' . $b['unit'], report_sub($f, 'by date declined'),
             array_sum($counts)
-                ? ui_column_chart($counts, $b['labels'], $b['names'], function ($v) { return number_format($v) . ' disapproved'; }, $countFmt)
-                    . ui_table_view([ucfirst($b['unit']), 'Disapproved'], array_map(function ($n, $v) { return [$n, number_format($v)]; }, $b['names'], $counts))
+                ? ui_column_chart($counts, $b['labels'], $b['names'], function ($v) { return number_format($v) . ' declined'; }, $countFmt)
+                    . ui_table_view([ucfirst($b['unit']), 'Declined'], array_map(function ($n, $v) { return [$n, number_format($v)]; }, $b['names'], $counts))
                 : '',
-            'No applications were disapproved in this period.'),
-        ui_chart_card('Disapproved by program', report_sub($f), $total ? ui_bar_list($programItems, $countFmt) : '', 'No applications were disapproved in this period.'),
-        ui_chart_card('Reasons given', report_sub($f), $total ? ui_bar_list($reasonItems, $countFmt) : '', 'No applications were disapproved in this period.'),
+            'No applications were declined in this period.'),
+        ui_chart_card('Declined by program', report_sub($f), $total ? ui_bar_list($programItems, $countFmt) : '', 'No applications were declined in this period.'),
+        ui_chart_card('Reasons given', report_sub($f), $total ? ui_bar_list($reasonItems, $countFmt) : '', 'No applications were declined in this period.'),
     ];
 
     $reasonRows = [];
@@ -82,19 +82,19 @@ function report_build_disapproved(PDO $pdo, array $f): array
     }
     [$n, $average, $median, $longest] = report_stats($waited);
     $tables = [
-        report_table('Reasons', 'Reasons for disapproving', 'What the office wrote when it disapproved. The same words are counted together.',
-            ['Reason', 'Number', 'Share'], $reasonRows, [1, 2], $reasonRows ? ['Total', number_format($total), '100%'] : null, 'No applications were disapproved in this period.'),
-        report_table('Disapproved', 'Disapproved applications (' . count($listRows) . ')', report_sub($f, 'by date disapproved'),
-            ['Date filed', 'Date disapproved', 'Assistance type', 'Name', 'Listed as', 'Contact', 'Reason', 'Disapproved by'], $listRows, [],
-            null, 'No applications were disapproved in this period.'),
-        report_table('Days to decide', 'How long they waited', 'Days from the date filed to the date disapproved.',
+        report_table('Reasons', 'Reasons for declining', 'What the office wrote when it declined. The same words are counted together.',
+            ['Reason', 'Number', 'Share'], $reasonRows, [1, 2], $reasonRows ? ['Total', number_format($total), '100%'] : null, 'No applications were declined in this period.'),
+        report_table('Declined', 'Declined applications (' . count($listRows) . ')', report_sub($f, 'by date declined'),
+            ['Date filed', 'Date declined', 'Assistance type', 'Name', 'Listed as', 'Contact', 'Reason', 'Declined by'], $listRows, [],
+            null, 'No applications were declined in this period.'),
+        report_table('Days to decide', 'How long they waited', 'Days from the date filed to the date declined.',
             ['Decided', 'Average (days)', 'Median (days)', 'Longest (days)'], $n ? [[number_format($n), number_format($average, 1), number_format($median, 1), number_format($longest, 1)]] : [],
-            [0, 1, 2, 3], null, 'No applications were disapproved in this period.', false, '', false),
-        report_table('Per ' . $b['unit'], 'Disapproved per ' . $b['unit'], $f['label'], [ucfirst($b['unit']), 'Disapproved'],
+            [0, 1, 2, 3], null, 'No applications were declined in this period.', false, '', false),
+        report_table('Per ' . $b['unit'], 'Declined per ' . $b['unit'], $f['label'], [ucfirst($b['unit']), 'Declined'],
             array_map(function ($name, $v) { return [$name, number_format($v)]; }, $b['names'], $counts), [1], ['Total', number_format($total)], '', false, '', false),
     ];
 
-    $cards[] = ['label' => 'Average wait', 'value' => $n ? number_format($average, 1) . ' days' : '—', 'icon' => 'clock', 'note' => 'From filing to disapproval'];
+    $cards[] = ['label' => 'Average wait', 'value' => $n ? number_format($average, 1) . ' days' : '—', 'icon' => 'clock', 'note' => 'From filing to the decision'];
     return ['cards' => $cards, 'charts' => $charts, 'tables' => $tables,
-        'notes' => ['Disapproved applications are counted by the date they were disapproved. The "count by" choice does not apply to this tab.']];
+        'notes' => ['Declined applications are counted by the date they were declined. The "count by" choice does not apply to this tab.']];
 }

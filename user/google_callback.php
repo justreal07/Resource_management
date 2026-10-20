@@ -52,10 +52,11 @@ try {
     ensure_user_schema($pdo);
     password_reset_ensure($pdo);   // adds email_verified_at if missing
 
-    // Match an account created with Google (username = email), or a regular account whose email was CONFIRMED.
-    // An email that was only typed at sign-up proves nothing: anyone can type someone else's address, and Google
-    // sign-in must never log the real owner into an account a stranger prepared.
-    $stmt = $pdo->prepare('SELECT * FROM applicant_accounts WHERE username = ? OR (email = ? AND email_verified_at IS NOT NULL)
+    // Match an account created with Google (username = email AND it holds a Google token), or a regular account whose
+    // email was CONFIRMED. An email that was only typed at sign-up proves nothing: anyone can type someone else's
+    // address, and Google sign-in must never log the real owner into an account a stranger prepared. For the same
+    // reason a plain username that merely looks like this email (no Google token) is not trusted.
+    $stmt = $pdo->prepare('SELECT * FROM applicant_accounts WHERE (username = ? AND google_token IS NOT NULL) OR (email = ? AND email_verified_at IS NOT NULL)
                            ORDER BY (username = ?) DESC LIMIT 1');
     $stmt->execute([$email, $email, $email]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -76,6 +77,9 @@ try {
 
         // Google just proved who owns this address: an unconfirmed account that only typed it gives it up
         $pdo->prepare('UPDATE applicant_accounts SET email = NULL WHERE email = ? AND email_verified_at IS NULL')->execute([$email]);
+        // ... and so does a password account that took this address as its USERNAME (accounts made before My Account
+        // refused "@" in a username). It keeps its password, email and applications under a new username.
+        $pdo->prepare('UPDATE applicant_accounts SET username = CONCAT(\'user\', id) WHERE username = ? AND google_token IS NULL')->execute([$email]);
 
         $stmt = $pdo->prepare('INSERT INTO applicant_accounts (firstname, lastname, username, email, email_verified_at, password, google_token, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), ?, ?, NOW(), NOW())');
         $stmt->execute([$firstname, $lastname, $email, $email, $hashedPassword, json_encode($token)]);

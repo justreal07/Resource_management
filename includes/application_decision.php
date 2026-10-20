@@ -26,7 +26,7 @@
  *   - it is left out of every list, count and duplicate check (see person_rules.php)
  *   - Burial: a death recorded when it was filed is cleared again
  *   - Medical: a re-apply permission it used up is given back (new row in the permission log)
- *   - the applicant is told "not approved, you may apply again" (account_helpers.php)
+ *   - the applicant is told "declined, you may apply again" (account_helpers.php)
  * Disapproving needs a reason, chosen in the Disapprove dialog (or on the Update page): one or more of DISAPPROVAL_REASONS
  * and/or a written one. They are saved together as disapproval_remarks (one line each) and, after the decision is saved,
  * emailed to the applicant like the approval details (a walk-in has no account; a failed email never undoes the decision).
@@ -37,6 +37,7 @@
  * Needs database/migrations/migration_disapprove.sql (Approve works without it; Disapprove asks for it).
  */
 require_once __DIR__ . '/budget.php';
+require_once __DIR__ . '/admin_security.php';   // account_password_mark(): a changed password ends the account's other sign-ins
 
 const DECISION_PENDING = 'Pending';
 const DECISION_APPROVED = 'Approved';
@@ -80,10 +81,21 @@ function decision_account_active(int $id, string $role): bool
             if ($hasActiveColumn === null) {
                 $hasActiveColumn = (bool)$pdo->query("SHOW COLUMNS FROM users LIKE 'is_active'")->fetchColumn();
             }
-            $stmt = $pdo->prepare('SELECT ' . ($hasActiveColumn ? 'is_active' : '1') . ' FROM users WHERE id = ? AND role = ?');
+            $stmt = $pdo->prepare('SELECT ' . ($hasActiveColumn ? 'is_active' : '1') . ', password FROM users WHERE id = ? AND role = ?');
             $stmt->execute([$id, $role]);
-            $active = $stmt->fetchColumn();   // false = no such account; 0 = turned off by an admin
-            $checked[$key] = $active !== false && (int)$active === 1;
+            $row = $stmt->fetch(PDO::FETCH_NUM);   // false = no such account; is_active 0 = turned off by an admin
+            $active = $row !== false && (int)$row[0] === 1;
+            if ($active) {
+                // The password changed (or an admin reset it) since this sign-in: whoever else is still signed in must sign in again
+                $mark = account_password_mark((string)$row[1]);
+                $had = $_SESSION['user']['pwv'] ?? null;
+                if ($had === null) {
+                    $_SESSION['user']['pwv'] = $mark;   // a sign-in from before this check existed: remember the password it has now
+                } elseif (!hash_equals($mark, (string)$had)) {
+                    $active = false;
+                }
+            }
+            $checked[$key] = $active;
         } catch (Throwable $e) {
             error_log('decision_account_active: ' . $e->getMessage());
             return true;
@@ -283,7 +295,7 @@ function decision_opd_schedule_problem($checkupDate): ?string
     }
     if ($date < date('Y-m-d')) {
         return 'The patient\'s check-up date (' . date('F j, Y', strtotime($date)) . ') has already passed, so the trip can\'t be scheduled. '
-            . 'Ask the patient for their new check-up date (an admin can change it with Edit), or disapprove the request.';
+            . 'Ask the patient for their new check-up date (an admin can change it with Edit), or decline the request.';
     }
     return null;
 }
@@ -308,7 +320,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
     $id = filter_var($applicantId, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
 
     if (!in_array($decision, ['approve', 'disapprove'], true)) {
-        return decision_result(false, 'invalid', 'Choose Approve or Disapprove.');
+        return decision_result(false, 'invalid', 'Choose Approve or Decline.');
     }
     if ($id === false) {
         return decision_result(false, 'invalid', 'That application could not be found. Go back to the list and try again.');
@@ -345,7 +357,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
     $override = null;       // set when this approval passes the budget (and its reason was given)
     try {
         if ($decision === 'disapprove' && !decision_schema_ready($pdo)) {
-            return decision_result(false, 'setup', 'Applications can\'t be disapproved until the database update is installed. '
+            return decision_result(false, 'setup', 'Applications can\'t be declined until the database update is installed. '
                 . 'Ask the system administrator to run database/migrations/migration_disapprove.sql.');
         }
 
@@ -364,8 +376,8 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
         if (!decision_can($user, $typeId)) {
             return decision_result(false, 'forbidden', $user['role'] === 'staff'
-                ? 'Only an administrator can approve or disapprove Medical and Burial applications.'
-                : 'You don\'t have permission to approve or disapprove applications.', $app);
+                ? 'Only an administrator can approve or decline Medical and Burial applications.'
+                : 'You don\'t have permission to approve or decline applications.', $app);
         }
         if ($peek['status'] !== DECISION_PENDING) {
             return decision_result(false, 'already', 'This application was already processed.', $app);
@@ -419,7 +431,8 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
 
         // Same lock as a new submission for this person (person_lock_name() in person_rules.php), so a
         // disapproval that frees the person can't cross a submission for the same person.
-        // Burial saves all share one lock, because the deceased is checked by name alone.
+        // Burial saves all share one lock, because the deceased is looked for among all Burial applications (name with birthdate or date of death).
+        // OPD has no person to free: a declined request simply stops counting for its check-up day.
         if ($decision === 'disapprove' && !empty($peek['beneficiary_birthdate']) && decision_person_rules_installed($pdo)) {
             $lock = $typeId === 2 ? 'lgu_burial_same_name' : 'lgu_person_' . $peek['beneficiary_birthdate'];
             $stmt = $pdo->prepare('SELECT GET_LOCK(?, 10)');
@@ -520,14 +533,14 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
         return $result;
     }
-    $result = decision_result(true, 'disapproved', $label . ' was disapproved. The applicant may apply again.', $app);
+    $result = decision_result(true, 'disapproved', $label . ' was declined. The applicant may apply again.', $app);
     // Only after the disapproval is saved: an email that fails must not undo it
     if ($opts['send_email'] ?? true) {
         $mail = decision_send_disapproval_email($pdo, $id);
         if ($mail['sent']) {
             $result['message'] .= ' ' . $mail['note'];
         } else {
-            $result['warning'] = $label . ' was disapproved, but ' . $mail['note'];
+            $result['warning'] = $label . ' was declined, but ' . $mail['note'];
         }
     }
     return $result;
@@ -588,7 +601,7 @@ function decision_release_person(PDO $pdo, array $app, int $userId): void
         $pdo->prepare('INSERT INTO medical_reapply_decisions (beneficiary_id, based_on_application_id, reapply_allowed, decided_by, remarks, valid_until)
                        VALUES (?, ?, 1, ?, ?, ?)')
             ->execute([$grant['beneficiary_id'], $grant['based_on_application_id'], $userId,
-                       'Permission given back: Medical application #' . $id . ' was disapproved.', $grant['valid_until']]);
+                       'Permission given back: Medical application #' . $id . ' was declined.', $grant['valid_until']]);
     }
 }
 
@@ -728,7 +741,7 @@ function decision_send_approval_email(PDO $pdo, int $id): array
 function decision_send_disapproval_email(PDO $pdo, int $id): array
 {
     $a = decision_email_row($pdo, $id);
-    $who = decision_email_recipient($a, DECISION_DISAPPROVED, 'reason', 'why it was disapproved.');
+    $who = decision_email_recipient($a, DECISION_DISAPPROVED, 'reason', 'why it was declined.');
     if (!isset($who['to'])) return ['sent' => false, 'note' => $who['note']];
     $to = $who['to'];
     $greetName = $who['name'];
@@ -738,10 +751,10 @@ function decision_send_disapproval_email(PDO $pdo, int $id): array
     $noun = $opd ? 'request' : 'application';
     $reasons = array_values(array_filter(array_map('trim', preg_split('/\R/u', (string)$a['disapproval_remarks']) ?: [])));
     if (!$reasons) {
-        return ['sent' => false, 'note' => 'the reason could not be emailed because none was saved. Tell the applicant why it was disapproved.'];
+        return ['sent' => false, 'note' => 'the reason could not be emailed because none was saved. Tell the applicant why it was declined.'];
     }
-    $subject = 'Disapproved: your ' . ($opd ? 'OPD request' : $program . ' application') . ' (Ref #' . $id . ')';
-    $intro = "Your $program $noun (Ref #$id) for " . decision_person_name($a) . ' was reviewed and could not be approved.';
+    $subject = 'Declined: your ' . ($opd ? 'OPD request' : $program . ' application') . ' (Ref #' . $id . ')';
+    $intro = "Your $program $noun (Ref #$id) for " . decision_person_name($a) . ' was reviewed and has been declined.';
     $heading = count($reasons) === 1 ? 'The reason:' : 'The reasons:';
     $closing = 'Please correct this and submit a new ' . $noun . '. You may apply again right away.';
     $link = app_base_url() . '/user/view_application.php?id=' . $id;

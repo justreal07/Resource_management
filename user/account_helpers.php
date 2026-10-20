@@ -4,29 +4,32 @@
  * profile columns, avatar, notifications (with read/unread) and CSRF protection.
  */
 require_once __DIR__ . '/assistance_config.php';
+require_once __DIR__ . '/../includes/schema.php';
 
 /**
- * Adds the profile/settings columns to applicant_accounts if they are missing.
+ * Adds the profile/settings columns to applicant_accounts if they are missing (an older database).
+ * A database installed from database/lgu_assistance_system.sql has them all, so this only reads and changes nothing.
  * Runs once per session; safe to call on every page.
  */
 function ensure_user_schema(PDO $pdo): void {
     // v2: privacy_accepted_at / privacy_version (when the applicant last agreed to the Data Privacy Notice, includes/privacy.php)
     // v3: birthdate (the applicant's own: their age on the forms is worked out from it, see account_own_birthdate())
     if (!empty($_SESSION['user_schema_v3'])) return;
-    $pdo->exec("ALTER TABLE applicant_accounts
-        ADD COLUMN IF NOT EXISTS email VARCHAR(150) NULL,
-        ADD COLUMN IF NOT EXISTS phone VARCHAR(20) NULL,
-        ADD COLUMN IF NOT EXISTS sex ENUM('Male','Female') NULL,
-        ADD COLUMN IF NOT EXISTS house_no VARCHAR(50) NULL,
-        ADD COLUMN IF NOT EXISTS street VARCHAR(100) NULL,
-        ADD COLUMN IF NOT EXISTS barangay VARCHAR(100) NULL,
-        ADD COLUMN IF NOT EXISTS municipality VARCHAR(100) NULL,
-        ADD COLUMN IF NOT EXISTS province VARCHAR(100) NULL,
-        ADD COLUMN IF NOT EXISTS autofill_enabled TINYINT(1) NOT NULL DEFAULT 1,
-        ADD COLUMN IF NOT EXISTS notifications_seen_at DATETIME NULL,
-        ADD COLUMN IF NOT EXISTS privacy_accepted_at DATETIME NULL,
-        ADD COLUMN IF NOT EXISTS privacy_version VARCHAR(20) NULL,
-        ADD COLUMN IF NOT EXISTS birthdate DATE NULL");
+    schema_add_columns($pdo, 'applicant_accounts', [
+        'email'                 => 'VARCHAR(150) NULL',
+        'phone'                 => 'VARCHAR(20) NULL',
+        'sex'                   => "ENUM('Male','Female') NULL",
+        'house_no'              => 'VARCHAR(50) NULL',
+        'street'                => 'VARCHAR(100) NULL',
+        'barangay'              => 'VARCHAR(100) NULL',
+        'municipality'          => 'VARCHAR(100) NULL',
+        'province'              => 'VARCHAR(100) NULL',
+        'autofill_enabled'      => 'TINYINT(1) NOT NULL DEFAULT 1',
+        'notifications_seen_at' => 'DATETIME NULL',
+        'privacy_accepted_at'   => 'DATETIME NULL',
+        'privacy_version'       => 'VARCHAR(20) NULL',
+        'birthdate'             => 'DATE NULL',
+    ]);
     $_SESSION['user_schema_v3'] = true;
 }
 
@@ -71,10 +74,10 @@ function is_google_account(array $user): bool {
     return !empty($user['google_token']) || (($_SESSION['applicant']['auth_type'] ?? '') === 'google');
 }
 
-/** Public URL of the user's avatar (relative to /user pages). */
+/** URL of the user's avatar (relative to /user pages). The file is shown through avatar_file.php: avatars/ is closed to direct addresses. */
 function avatar_url(?array $user): string {
     if (!empty($user['avatar']) && is_file(__DIR__ . '/../avatars/' . $user['avatar'])) {
-        return '../avatars/' . rawurlencode($user['avatar']);
+        return 'avatar_file.php?f=' . rawurlencode($user['avatar']);
     }
     if (!empty($_SESSION['applicant']['picture'])) {
         return $_SESSION['applicant']['picture'];   // Google profile photo
@@ -122,7 +125,7 @@ function take_flashes(): array {
 /* ============================================================
    NOTIFICATIONS
    Built from the applications themselves:
-   received → approved / not approved (Disapproved: "you may apply again"),
+   received → approved / declined (Declined: "you may apply again"),
    plus "you can apply again" reminders.
    ============================================================ */
 function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): array {
@@ -155,8 +158,8 @@ function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): ar
         ];
 
         if ($a['status'] === 'Approved') {
+            // The approved amount is never shown to the applicant (only that it was approved), like the approval email
             $msg = "Good news! Your $name application #$id has been approved.";
-            if ((float)$a['amount'] > 0) $msg .= ' Approved amount: ₱' . number_format((float)$a['amount'], 2) . '.';
             if (!empty($a['claim_place']) && !empty($a['claim_date'])) {
                 $msg .= ' Claim it on ' . date('M d, Y', strtotime($a['claim_date']))
                     . (!empty($a['claim_time']) ? ', ' . date('g:i A', strtotime($a['claim_time'])) : '') . ' at ' . $a['claim_place'] . '.';
@@ -177,12 +180,12 @@ function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): ar
             // CHANGED: was 'Rejected'. The reason (optional) is the one the admin typed when disapproving.
             $events[] = [
                 'kind' => 'not_approved', 'app_id' => $id, 'type_id' => (int)$a['assistance_type_id'], 'time' => ($a['disapproved_at'] ?? null) ?: $a['created_at'],
-                'title' => 'Application not approved',
-                'message' => "Your application was not approved. You may apply again.",
+                'title' => 'Application declined',
+                'message' => "Your application was declined. You may apply again.",
                 'note' => $a['disapproval_remarks'] ?? null,
                 'icon' => 'fa-times-circle', 'tone' => 'danger',
             ];
-            continue;   // a disapproved application doesn't count as "applied" for the reminders below
+            continue;   // a declined application doesn't count as "applied" for the reminders below
         }
 
         $t = (int)$a['assistance_type_id'];

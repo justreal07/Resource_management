@@ -165,7 +165,7 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                         office approval before a patient receives Medical Assistance again. For this we compare names and birthdates across applications.</li>
                     <li>To tell you about your request through your dashboard and notifications and, when it is decided,
                         by email to the address on your account: when it is approved, where and when to claim the assistance, or the day,
-                        departure time and pick-up point of your OPD trip, and what to bring; when it is not approved, the reason, so you know what to fix.</li>
+                        departure time and pick-up point of your OPD trip, and what to bring; when it is declined, the reason, so you know what to fix.</li>
                     <li>To help you get back into your account if you forget your password: we email a one-time reset link to the email address on your account
                         (or, if there is no email, the office resets it after checking your valid ID).</li>
                     <li>To prepare reports with <strong>totals only</strong> (for example, how many families were helped per barangay), which never name you.</li>

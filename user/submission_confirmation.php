@@ -74,7 +74,7 @@ apply_page_start('Application Submitted', $program, 3);
             </li>
             <li>
                 <span class="ap-tl-icon"><i class="fas fa-bell"></i></span>
-                <div><strong>Decision</strong><p>You'll see <em>Approved</em> or <em>Not approved</em> (you may then apply again) in your notifications and on <a href="my_account.php">My Account</a>.</p></div>
+                <div><strong>Decision</strong><p>You'll see <em>Approved</em> or <em>Declined</em> (you may then apply again) in your notifications and on <a href="my_account.php">My Account</a>.</p></div>
             </li>
             <?php if ((int)$app['assistance_type_id'] === 3 && $app['checkup_date']): ?>
             <li>

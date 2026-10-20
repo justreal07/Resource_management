@@ -47,7 +47,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
                     <button type="button" class="acc-chip-btn" data-notif-filter="new">New <span><?= $unread_before ?></span></button>
                 <?php endif; ?>
                 <button type="button" class="acc-chip-btn" data-notif-filter="approved">Approved <span><?= $kinds['approved'] ?></span></button>
-                <button type="button" class="acc-chip-btn" data-notif-filter="not_approved">Not approved <span><?= $kinds['not_approved'] ?></span></button>
+                <button type="button" class="acc-chip-btn" data-notif-filter="not_approved">Declined <span><?= $kinds['not_approved'] ?></span></button>
                 <button type="button" class="acc-chip-btn" data-notif-filter="submitted">Received <span><?= $kinds['submitted'] ?></span></button>
                 <?php if ($kinds['eligible']): ?>
                     <button type="button" class="acc-chip-btn" data-notif-filter="eligible">Reminders <span><?= $kinds['eligible'] ?></span></button>
@@ -105,7 +105,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
             <ul class="acc-legend">
                 <li><span class="acc-n-icon tone-info"><i class="fas fa-paper-plane"></i></span> Your application was received</li>
                 <li><span class="acc-n-icon tone-success"><i class="fas fa-check-circle"></i></span> Your application was approved</li>
-                <li><span class="acc-n-icon tone-danger"><i class="fas fa-times-circle"></i></span> Your application was not approved</li>
+                <li><span class="acc-n-icon tone-danger"><i class="fas fa-times-circle"></i></span> Your application was declined</li>
                 <li><span class="acc-n-icon tone-gold"><i class="fas fa-calendar-check"></i></span> You can apply again</li>
             </ul>
         </div>

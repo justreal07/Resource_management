@@ -14,4 +14,5 @@ return [
     'DB_NAME' => 'lgu_assistance_system',
     'DB_USER' => 'lgu_app',
     'DB_PASS' => 'CHANGE-ME',
+    // 'APP_DEBUG' => '1',   // only on your own computer: shows PHP errors on the page. Leave it out on a real server.
 ];

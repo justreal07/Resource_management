@@ -3,7 +3,7 @@ require_once '../config.php';
 require_once '../includes/admin_layout.php';   // admin only: others are sent to the sign-in page
 
 /* Who did what and when, newest first. Two sources, shown together:
-     - application_status_history: every Approve / Disapprove (written by application_decision.php)
+     - application_status_history: every Approve / Decline (written by application_decision.php)
      - activity_log: sign-ins, staff accounts, the admin's own settings, exports (includes/admin_security.php) */
 
 $actions = activity_actions();
@@ -86,11 +86,11 @@ $link = function (array $change) use ($group, $actorId, $from, $to, $page): stri
 $filtered = $group !== '' || $actorId > 0 || $from !== '' || $to !== '';
 
 admin_layout_start(['title' => 'Activity Log', 'section' => 'activity']);
-echo ui_page_head('Activity log', 'Who approved or disapproved a request, signed in, or changed an account, and when. Newest first.');
+echo ui_page_head('Activity log', 'Who approved or declined a request, signed in, or changed an account, and when. Newest first.');
 ?>
 <?php if (!$logReady && !$loadError): ?>
     <div class="alert alert-error" role="alert"><?= ui_icon('alert', 'alert-icon') ?><div class="alert-body">
-        Approvals and disapprovals are shown below, but sign-ins and account changes are not being recorded yet, because the database update could not be applied automatically.
+        Approvals and declines are shown below, but sign-ins and account changes are not being recorded yet, because the database update could not be applied automatically.
         Import <strong>database/migrations/migration_admin_tools.sql</strong> in phpMyAdmin, then reload this page.</div></div>
 <?php endif; ?>
 
@@ -133,7 +133,7 @@ echo ui_page_head('Activity log', 'Who approved or disapproved a request, signed
     <?php elseif (!$rows): ?>
         <?= $filtered
             ? ui_state('search', 'Nothing matches these filters', 'Try a wider date range, or choose Everything.', '<a class="btn btn-secondary btn-sm" href="activity_log.php">Clear filters</a>')
-            : ui_state('inbox', 'No activity yet', 'Approvals, disapprovals, sign-ins and account changes will be listed here.') ?>
+            : ui_state('inbox', 'No activity yet', 'Approvals, declines, sign-ins and account changes will be listed here.') ?>
     <?php else: ?>
         <p class="panel-sub activity-count"><?= number_format($total) ?> <?= $total === 1 ? 'entry' : 'entries' ?><?= $filtered ? ' match' : '' ?>. Page <?= $page ?> of <?= $pages ?>.</p>
         <div class="table-wrap">

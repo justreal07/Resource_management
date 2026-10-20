@@ -6,7 +6,7 @@ require_once '../includes/admin_layout.php';
 $applicant_id = isset($_GET['applicant_id']) ? (int)$_GET['applicant_id'] : 0;
 
 if ($applicant_id <= 0) {
-    header("Location: applicants.php");
+    header("Location: dashboard.php");
     exit();
 }
 
@@ -21,7 +21,7 @@ $stmt->execute([$applicant_id]);
 $applicant = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$applicant) {
-    header("Location: applicants.php");
+    header("Location: dashboard.php");
     exit();
 }
 

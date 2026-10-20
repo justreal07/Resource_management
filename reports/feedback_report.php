@@ -34,7 +34,7 @@ function report_build_feedback(PDO $pdo, array $f): array
     if ($failed) return ['error' => true];
     if (!$fbRows) {
         return ['empty' => ui_state('inbox', 'No feedback for ' . $f['label'] . ' yet',
-            'Applicants are asked to rate the service once their application is approved or not approved. Their answers will appear here.')];
+            'Applicants are asked to rate the service once their application is approved or declined. Their answers will appear here.')];
     }
 
     // Totals: "satisfied" = Satisfied or Very satisfied (4-5), "dissatisfied" = 1-2, as in the Client Satisfaction Measurement
@@ -87,7 +87,7 @@ function report_build_feedback(PDO $pdo, array $f): array
             ui_date($r['created_at']),
             'Ref #' . (int)$r['application_id'],
             $types[(int)$r['assistance_type_id']]['short'] ?? 'Assistance',
-            $r['status'] === 'Disapproved' ? 'Not approved' : (string)$r['status'],
+            $r['status'] === 'Disapproved' ? 'Declined' : (string)$r['status'],
             $ratings[(int)$r['rating']][0] ?? (string)$r['rating'],
             (string)$r['comment'],
         ];

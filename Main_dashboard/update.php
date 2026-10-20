@@ -24,7 +24,7 @@ if(!$row){
 
 /* CHANGED (Disapprove): the status/remarks form goes through decision_save_update_form()
    (application_decision.php): role checked on the server, only a Pending application can be
-   approved or disapproved, row lock against two people deciding at once, who/when recorded.
+   approved or declined, row lock against two people deciding at once, who/when recorded.
    A decided application only gets its remarks changed. */
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
     $result = decision_save_update_form($pdo, $row);

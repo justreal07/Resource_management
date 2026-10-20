@@ -112,7 +112,7 @@ echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you c
                 ['label' => 'Accompanied by', 'type' => 'text', 'value' => 'ui_opd_companion'],
                 ['label' => 'Transport needs', 'type' => 'text', 'value' => $needs],
                 ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }],
-            ], ['search' => false, 'wide' => true, 'noun' => 'patient', 'caption' => 'OPD check-ups on ' . $dayText]) ?>
+            ], ['search' => false, 'avatars' => false, 'wide' => true, 'noun' => 'patient', 'caption' => 'OPD check-ups on ' . $dayText]) ?>
         <?php else: ?>
             <?php
             $links = '';

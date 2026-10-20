@@ -87,7 +87,7 @@ $fields = [
                + ['petitioner_name' => true, 'claimant_age' => true, 'relationship' => true, 'purpose' => false],
     'burial'  => $person + ['claimant_age' => true] + $address
                + ['petitioner_name' => true, 'relationship' => true, 'beneficiary_birthdate' => true, 'date_of_death' => true],
-    'opd'     => $person + ['age' => true] + $address
+    'opd'     => $person + ['beneficiary_birthdate' => true] + $address   // the age is worked out from the birthdate (opd_with_age())
                + ['hospital' => true, 'checkup_date' => true, 'diagnosis' => true, 'petitioner_name' => false, 'relationship' => false],   // companion optional
 ][$form_type];
 
@@ -96,7 +96,7 @@ $choice_error = null;
 if ($form_type === 'medical') $choice_error = resolve_choice_post('purpose', MEDICAL_PURPOSES, false);
 if ($form_type === 'opd') $choice_error = resolve_choice_post('diagnosis', OPD_REASONS, true);
 
-$values = posted_fields(array_keys($fields));
+$values = force_service_area(posted_fields(array_keys($fields)));   // GMA, Cavite whatever was sent, as online
 $required = array_keys(array_filter($fields));
 
 $applying_for = '';
@@ -140,13 +140,17 @@ if ($errors) {
         'message' => count($errors) === 1 ? 'Please fix the highlighted field below.' : 'Please fix the ' . count($errors) . ' highlighted fields below.']);
 }
 
-// Medical and Burial: the same person checks as online (null = the office, which sees every Ref #)
-if ($form_type !== 'opd') {
-    $check = checkPersonConflict($pdo, $form_type, $values, null);
-    if (!$check['ok']) {
-        walkin_respond($is_ajax, 409, ['success' => false, 'safe' => true, 'errors' => [$check['field'] => $check['message']],
-            'message' => $check['field'] === 'person' ? $check['message'] : 'Please fix the highlighted field below.']);
-    }
+// OPD: the age is worked out from the birthdate, as of the day the office received the request (the walk-in can be dated back)
+if ($form_type === 'opd') {
+    $values += opd_with_age($values, $application_date);
+}
+
+// The same person checks as online (null = the office, which sees every Ref #): Medical and Burial by person,
+// OPD one request per patient per check-up date
+$check = checkPersonConflict($pdo, $form_type, $values, null);
+if (!$check['ok']) {
+    walkin_respond($is_ajax, 409, ['success' => false, 'safe' => true, 'errors' => [$check['field'] => $check['message']],
+        'message' => $check['field'] === 'person' ? $check['message'] : 'Please fix the highlighted field below.']);
 }
 
 $created_at = $application_date . ' ' . date('H:i:s');
@@ -166,8 +170,11 @@ $insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $
         'petitioner_name' => $v['petitioner_name'], 'relationship' => $v['relationship'],
     ];
     if ($form_type === 'opd') {
-        $row += ['age' => $v['age'], 'hospital' => $v['hospital'], 'checkup_date' => $v['checkup_date'],
+        $row += ['age' => $v['age'] !== '' ? $v['age'] : null, 'hospital' => $v['hospital'], 'checkup_date' => $v['checkup_date'],
                  'diagnosis' => $v['diagnosis'], 'wheelchair' => $v['wheelchair'], 'stretcher' => $v['stretcher']];
+        if ($with_person_columns) {
+            $row['beneficiary_birthdate'] = $v['beneficiary_birthdate'];   // no beneficiary_id: OPD has no person registry
+        }
     } else {
         // Medical: petitioner_name is the claimant; Burial: the deceased
         $row += ['claimant_age' => $v['claimant_age'] !== '' ? $v['claimant_age'] : null, 'purpose' => $v['purpose'] ?? ''];
@@ -184,13 +191,9 @@ $insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $
 $applicant_id = null;
 $blocked = null;   // a person rule stopped it while saving (another application for the same person got in first)
 try {
-    if ($form_type === 'opd') {
-        $applicant_id = $insert(null);
-    } else {
-        // Locks the person, checks again and records what follows (used permission, death), all or nothing
-        $result = submit_with_person_rules($pdo, $form_type, $values, null, $insert);
-        if ($result['ok']) $applicant_id = $result['id']; else $blocked = $result['message'];
-    }
+    // Locks the person (OPD: the check-up day), checks again and records what follows (used permission, death), all or nothing
+    $result = submit_with_person_rules($pdo, $form_type, $values, null, $insert);
+    if ($result['ok']) $applicant_id = $result['id']; else $blocked = $result['message'];
 } catch (Throwable $e) {
     // The details go to the PHP error log; the office sees a plain message
     error_log('submit_admin_applicant.php (' . $form_type . '): ' . $e->getMessage());

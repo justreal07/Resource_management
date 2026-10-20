@@ -157,7 +157,7 @@
             if (btn && !btn.disabled) btn.click(); else say('This application can\'t be approved here.');
         } else if (key === 'd') {
             const btn = root.querySelector('[data-disapprove]');
-            if (btn && !btn.disabled) btn.click(); else say('This application can\'t be disapproved here.');
+            if (btn && !btn.disabled) btn.click(); else say('This application can\'t be declined here.');
         } else if (key === '?') {
             if (shortcuts && UI) UI.openDialog(shortcuts);
         } else if (viewer && key === 'ArrowRight') viewer.step(1);

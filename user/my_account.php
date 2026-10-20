@@ -34,7 +34,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $errors = [];
         if ($p['firstname'] === '' || $p['lastname'] === '') $errors[] = 'First name and last name are required.';
-        if (!preg_match('/^[A-Za-z0-9._@-]{3,100}$/', $p['username'])) $errors[] = 'Username must be 3 or more characters (letters, numbers, . _ - @ only).';
+        if (!preg_match('/^[A-Za-z0-9._@-]{3,100}$/', $p['username'])) {
+            $errors[] = 'Username must be 3 or more characters (letters, numbers, . _ - only).';
+        } elseif (strpos($p['username'], '@') !== false && $p['username'] !== $user['username']) {
+            // A username that is an email address is how a Google account is named. Letting anyone pick one would let a
+            // stranger take the name of someone else's Gmail before that person ever signs in with Google.
+            $errors[] = 'A username cannot contain @. Use letters, numbers, dots, dashes or underscores.';
+        }
         if ($p['email'] !== '' && !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
         // An email already on the account can be changed but not removed: it is how a forgotten password is reset
         if ($p['email'] === '' && trim((string)($user['email'] ?? '')) !== '') $errors[] = 'Your email can be changed but not removed: it is needed to reset your password if you forget it.';
@@ -183,9 +189,9 @@ $stmt = $pdo->prepare("
 $stmt->execute([$account_id]);
 $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// CHANGED (Disapprove): 'Rejected' → 'Disapproved', shown to the applicant as "Not approved"
+// CHANGED (Disapprove): 'Rejected' → 'Disapproved', shown to the applicant as "Declined"
 $counts = ['all' => count($applications), 'Pending' => 0, 'Approved' => 0, 'Disapproved' => 0];
-$status_labels = ['Pending' => 'Pending', 'Approved' => 'Approved', 'Disapproved' => 'Not approved'];
+$status_labels = ['Pending' => 'Pending', 'Approved' => 'Approved', 'Disapproved' => 'Declined'];
 foreach ($applications as $a) {
     if (isset($counts[$a['status']])) $counts[$a['status']]++;
 }
@@ -252,7 +258,7 @@ account_page_start($ctx, 'My Account', 'account', [
 <!-- ============ APPLICATIONS ============ -->
 <section class="acc-panel" data-panel="applications" role="tabpanel">
     <div class="acc-stats">
-        <?php foreach ([['All', 'Total', 'fa-folder', 'navy'], ['Pending', 'Pending', 'fa-hourglass-half', 'amber'], ['Approved', 'Approved', 'fa-check', 'green'], ['Disapproved', 'Not approved', 'fa-times', 'red']] as [$key, $label, $icon, $tone]): ?>
+        <?php foreach ([['All', 'Total', 'fa-folder', 'navy'], ['Pending', 'Pending', 'fa-hourglass-half', 'amber'], ['Approved', 'Approved', 'fa-check', 'green'], ['Disapproved', 'Declined', 'fa-times', 'red']] as [$key, $label, $icon, $tone]): ?>
         <button type="button" class="acc-stat tone-<?= $tone ?>" data-filter-status="<?= $key ?>">
             <span class="acc-stat-icon"><i class="fas <?= $icon ?>"></i></span>
             <span><strong><?= $counts[$key === 'All' ? 'all' : $key] ?></strong><small><?= $label ?></small></span>
@@ -332,9 +338,6 @@ account_page_start($ctx, 'My Account', 'account', [
                         <span><i class="fas fa-hashtag"></i><?= (int)$a['id'] ?></span>
                         <span><i class="far fa-calendar"></i><?= e(date('M d, Y', strtotime($a['created_at']))) ?></span>
                         <span><i class="far fa-user"></i><?= e($person) ?></span>
-                        <?php if ($a['status'] === 'Approved' && (float)$a['amount'] > 0): ?>
-                            <span class="acc-amount"><i class="fas fa-coins"></i>₱<?= number_format((float)$a['amount'], 2) ?></span>
-                        <?php endif; ?>
                     </span>
                 </div>
                 <span class="acc-status s-<?= strtolower($a['status']) ?>"><?= e($status_labels[$a['status']] ?? $a['status']) ?></span>

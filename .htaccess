@@ -1,0 +1,24 @@
+# Keeps the project's inner workings out of the browser.
+# Without this, Apache serves every file under this folder by its address: the whole git history (.git/), the
+# database dumps (database/), the source of includes/ and the saved settings of the site.
+# Pages stay reachable as before; only these folders and file types are closed. (Needs AllowOverride All, XAMPP's default.)
+
+Options -Indexes
+
+# Folders that are never opened by address. The paths are measured from this folder, so css/vendor, js/vendor
+# and the like are not touched. (NC: Windows file names are not case sensitive, so neither is this.)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(\.git|\.github|\.vscode|\.claude|vendor|database|includes|zsetup_guideline)(/|$) - [R=404,NC,L]
+</IfModule>
+
+# File types that are not pages: notes, SQL, settings, lock files, backups, hidden files and the private *.local.php
+<FilesMatch "(?i)(^\.|\.(md|sql|lock|example|json|cmd|yml|yaml|bak|log|ini|dump)$|\.local\.php$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>

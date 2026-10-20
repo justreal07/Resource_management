@@ -92,6 +92,50 @@ function ui_avatar(int $userId, string $name, string $extra = ''): string
     return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true">' . htmlspecialchars(avatar_initials($name), ENT_QUOTES, 'UTF-8') . '</span>';
 }
 
+/**
+ * The profile pictures APPLICANTS chose on the portal (applicant_accounts.avatar, files in avatars/), for the applications
+ * in a list: application id => file name, only for the ones whose account has a picture that is still there.
+ * One query per list (cached). Walk-ins have no account, so no picture. Used beside the name in the office's lists and
+ * the dashboard table; not in reports.
+ */
+function applicant_avatar_files(array $applicationIds): array
+{
+    global $pdo;
+    static $cache = [];   // application id => file name or ''
+    $ids = [];
+    foreach ($applicationIds as $v) {
+        $v = (int)$v;
+        if ($v > 0) $ids[$v] = $v;
+    }
+    $need = array_values(array_diff($ids, array_keys($cache)));
+    foreach ($need as $id) $cache[$id] = '';
+    foreach (array_chunk($need, 400) as $chunk) {
+        try {
+            $stmt = $pdo->prepare('SELECT a.id, ac.avatar FROM applicant a JOIN applicant_accounts ac ON ac.id = a.account_id
+                                   WHERE a.id IN (' . implode(',', array_fill(0, count($chunk), '?')) . ") AND ac.avatar IS NOT NULL AND ac.avatar <> ''");
+            $stmt->execute($chunk);
+            foreach ($stmt->fetchAll(PDO::FETCH_NUM) as $r) {
+                $file = basename((string)$r[1]);
+                if ($file !== '' && is_file(__DIR__ . '/../avatars/' . $file)) $cache[(int)$r[0]] = $file;
+            }
+        } catch (Throwable $e) {
+            error_log('applicant_avatar_files: ' . $e->getMessage());
+        }
+    }
+    return array_intersect_key($cache, $ids);
+}
+
+/** The applicant's own picture beside their name in a list (their initials in the same circle when they have none, and for walk-ins). */
+function ui_applicant_avatar(int $applicationId, string $name, string $extra = ''): string
+{
+    $file = applicant_avatar_files([$applicationId])[$applicationId] ?? '';
+    $class = 'avatar' . ($extra !== '' ? ' ' . $extra : '') . ($file !== '' ? ' avatar-photo' : '');
+    if ($file !== '') {
+        return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true"><img src="../user/avatar_file.php?f=' . htmlspecialchars(rawurlencode($file), ENT_QUOTES, 'UTF-8') . '" alt="" loading="lazy"></span>';
+    }
+    return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true">' . htmlspecialchars(avatar_initials($name), ENT_QUOTES, 'UTF-8') . '</span>';
+}
+
 /** Takes the picture file away (the file only; the caller clears the column). Safe for any name: only our own files are removed. */
 function avatar_delete_file(?string $file): void
 {

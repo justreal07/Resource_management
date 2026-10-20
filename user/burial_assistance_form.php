@@ -41,9 +41,14 @@ $fields = [
 $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
-    $values = posted_fields(array_keys($fields));
+    $values = force_service_area(posted_fields(array_keys($fields)));
+    $own = get_form_prefill($pdo, (int)$account_id, $form_key)['own'];   // the applicant's own age/birthdate, for the hints and the script
+    $claimantName = trim(implode(' ', [$values['first_name'], $values['middle_name'], $values['last_name']]));
+    if (($ownAge = claimant_age_from_account($own, $claimantName)) !== null) {
+        $values['claimant_age'] = $ownAge;   // the claimant is the account holder: their age comes from their saved birthdate, not the box
+    }
     $errors = validate_application($values, array_keys(array_filter($fields)));
-    $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
+    $prefill = ['source' => 'post', 'own' => $own];
 
     if (!$errors) {
         // Was a Burial application already filed for this person? (person_rules.php)
@@ -152,12 +157,12 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     </div>
                     <div class="field span-2">
                         <label for="municipality">Municipality <span class="req">*</span></label>
-                        <input type="text" id="municipality" name="municipality" value="<?= val('municipality') ?>" required<?= invalid('municipality') ?>>
+                        <input type="text" id="municipality" name="municipality" value="<?= e(SERVICE_MUNICIPALITY) ?>" required readonly aria-readonly="true"<?= invalid('municipality') ?>>
                         <?= error_for('municipality') ?>
                     </div>
                     <div class="field span-2">
                         <label for="province">Province <span class="req">*</span></label>
-                        <input type="text" id="province" name="province" value="<?= val('province') ?>" required<?= invalid('province') ?>>
+                        <input type="text" id="province" name="province" value="<?= e(SERVICE_PROVINCE) ?>" required readonly aria-readonly="true"<?= invalid('province') ?>>
                         <?= error_for('province') ?>
                     </div>
                 </div>

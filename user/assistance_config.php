@@ -35,6 +35,10 @@ const FIELD_MAX_LENGTH = [
 const PERSON_NAME_FIELDS = ['first_name', 'middle_name', 'last_name', 'petitioner_name'];
 // Earliest birthdate / date of death accepted
 const OLDEST_DATE = '1900-01-01';
+// The programs are for residents of General Mariano Alvarez, Cavite only. The forms show these two boxes filled in and
+// locked, and the server puts them back whatever was sent (force_service_area()), so no record says "Manila" next to a GMA barangay.
+const SERVICE_MUNICIPALITY = 'General Mariano Alvarez';
+const SERVICE_PROVINCE = 'Cavite';
 
 $ASSISTANCE_PROGRAMS = [
     'medical' => [
@@ -91,12 +95,14 @@ $ASSISTANCE_PROGRAMS = [
         'icon'      => 'fa-stethoscope',
         'tone'      => 'green',
         'frequency' => 'For every check-up your doctor schedules',
-        'cooldown_days' => 0,      // no limit: patients request a vehicle for every check-up their doctor schedules
+        'cooldown_days' => 0,      // no limit on how many: a vehicle for every check-up the doctor schedules (but one request per patient per check-up date: person_rules.php)
         'documents' => [
             'Blue Card Schedule' => 'Photo of the blue card showing your schedule.',
             'Valid ID'           => 'Front and back of a valid government ID.',
         ],
-        'remember'  => ['hospital', 'petitioner_name', 'relationship'],   // the age comes from the birthdate (get_form_prefill())
+        // The patient's birthdate is remembered with the name (the same patient goes for the next check-up). The age is
+        // not asked: it is worked out from the birthdate (opd_with_age()).
+        'remember'  => ['hospital', 'petitioner_name', 'relationship', 'beneficiary_birthdate'],
     ],
 ];
 
@@ -205,8 +211,8 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     }
     if ($source === 'account' && $used_profile) $source = 'profile';
 
-    // Services are for GMA residents, so these are almost always the same
-    $values += $defaults;
+    // Services are for GMA residents: these two are fixed, whatever an old application or the profile says
+    $values = force_service_area($values);
 
     // The age of the person filling in the form, from their birthdate
     if ($own['age'] !== '') {
@@ -214,9 +220,9 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
             // Burial: section 1 is the claimant. Medical: the claimant section, used when filing for another person.
             $values['claimant_age'] = $own['age'];
         }
-        if ($key === 'opd' && same_person_name($values, $own)) {
-            $values['age'] = $own['age'];   // only when the patient on the form is the account holder
-        }
+    }
+    if ($key === 'opd' && $own['birthdate'] !== '' && same_person_name($values, $own)) {
+        $values['beneficiary_birthdate'] = $own['birthdate'];   // only when the patient on the form is the account holder
     }
     // Medical "for another person": the one filling in the form is the claimant
     if ($key === 'medical' && trim((string)($values['petitioner_name'] ?? '')) === '') {
@@ -224,6 +230,24 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     }
 
     return ['values' => $values, 'source' => $source, 'date' => $date, 'own' => $own];
+}
+
+/** The municipality and province are always General Mariano Alvarez, Cavite (see SERVICE_MUNICIPALITY). */
+function force_service_area(array $values): array
+{
+    $values['municipality'] = SERVICE_MUNICIPALITY;
+    $values['province'] = SERVICE_PROVINCE;
+    return $values;
+}
+
+/**
+ * OPD asks for the patient's birthdate, not an age (a typed age is wrong a year later, and it can't tell two patients with
+ * the same name apart). The age the lists and reports show is worked out from it, as of $on (default today).
+ * @return array ['age' => whole years, or '' when the birthdate isn't a real date]
+ */
+function opd_with_age(array $values, string $on = ''): array
+{
+    return ['age' => age_on((string)($values['beneficiary_birthdate'] ?? ''), $on)];
 }
 
 /** Whole years old on $on (default today); '' when the birthdate is not a real date on or before that day. */

@@ -46,7 +46,7 @@ function csv_cell($value, bool $isPhone = false): string
 $person = $typeId === 2 ? 'Claimant' : 'Patient';   // whose name is on the application itself
 $columns = [
     ['Ref #',        function ($a) { return $a['id']; }],
-    ['Status',       function ($a) { return $a['status']; }],
+    ['Status',       function ($a) { return $a['status'] === 'Disapproved' ? 'Declined' : $a['status']; }],
     ['Date filed',   function ($a) { return ui_date($a['created_at'], 'Y-m-d H:i'); }],
     [$person . ' last name',   function ($a) { return $a['last_name'] ?? ''; }],
     [$person . ' first name',  function ($a) { return $a['first_name'] ?? ''; }],
@@ -76,6 +76,7 @@ if ($typeId === 1) {
     );
 } else {
     array_push($columns,
+        ['Patient birthdate',    function ($a) { return ui_date($a['beneficiary_birthdate'] ?? '', 'Y-m-d'); }],
         ['Age',                  function ($a) { return $a['age'] ?? ''; }],
         ['Hospital or clinic',   function ($a) { return $a['hospital'] ?? ''; }],
         ['Check-up date',        function ($a) { return ui_date($a['checkup_date'] ?? '', 'Y-m-d'); }],
@@ -97,9 +98,9 @@ array_push($columns,
     ['Amount released', function ($a) { return isset($a['amount']) && $a['amount'] !== '' && (float)$a['amount'] > 0 ? number_format((float)$a['amount'], 2, '.', '') : ''; }],
     ['Approved on',    function ($a) { return ui_date($a['approved_at'] ?? '', 'Y-m-d H:i'); }],
     ['Approved by',    function ($a) { return !empty($a['approved_by']) ? ui_user_name((int)$a['approved_by']) : ''; }],
-    ['Disapproved on', function ($a) { return ui_date($a['disapproved_at'] ?? '', 'Y-m-d H:i'); }],
-    ['Disapproved by', function ($a) { return !empty($a['disapproved_by']) ? ui_user_name((int)$a['disapproved_by']) : ''; }],
-    ['Reason for disapproval', function ($a) { return $a['disapproval_remarks'] ?? ''; }],
+    ['Declined on', function ($a) { return ui_date($a['disapproved_at'] ?? '', 'Y-m-d H:i'); }],
+    ['Declined by', function ($a) { return !empty($a['disapproved_by']) ? ui_user_name((int)$a['disapproved_by']) : ''; }],
+    ['Reason for declining', function ($a) { return $a['disapproval_remarks'] ?? ''; }],
     ['Remarks',        function ($a) { return $a['remarks'] ?? ''; }]
 );
 
@@ -120,7 +121,8 @@ try {
     exit('The list could not be exported. Please try again, and tell the system administrator if it keeps happening.');
 }
 
-$filename = $types[$typeId]['key'] . '-' . strtolower($status) . '-' . date('Y-m-d') . '.csv';
+$statusWord = $status === 'Disapproved' ? 'declined' : strtolower($status);   // people read Declined; the stored value stays Disapproved
+$filename = $types[$typeId]['key'] . '-' . $statusWord . '-' . date('Y-m-d') . '.csv';
 header('Content-Type: text/csv; charset=UTF-8');
 header('Content-Disposition: attachment; filename="' . $filename . '"');
 header('Cache-Control: no-store');   // the file has personal details: do not keep a copy in a shared cache
@@ -139,4 +141,4 @@ while ($a = $stmt->fetch(PDO::FETCH_ASSOC)) {
 }
 fclose($out);
 
-activity_log('export_csv', 'Exported ' . $types[$typeId]['name'] . ' (' . ($status === 'all' ? 'all applications' : strtolower($status)) . '): ' . $count . ' ' . ($count === 1 ? 'row' : 'rows') . '.');
+activity_log('export_csv', 'Exported ' . $types[$typeId]['name'] . ' (' . ($status === 'all' ? 'all applications' : $statusWord) . '): ' . $count . ' ' . ($count === 1 ? 'row' : 'rows') . '.');

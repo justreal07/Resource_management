@@ -37,7 +37,7 @@ function report_types(): array
 {
     $t = ui_types();
     return ['overview' => 'Overview', 'medical' => $t[1]['name'], 'burial' => $t[2]['name'], 'opd' => $t[3]['name'],
-            'disapproved' => 'Disapproved', 'feedback' => 'Client feedback'];
+            'disapproved' => 'Declined', 'feedback' => 'Client feedback'];
 }
 
 function report_ranges(): array
@@ -181,7 +181,7 @@ function report_notes(array $f): array
     $notes = [];
     if (in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true)) {
         $notes[] = 'Approved applications and the amount released are counted by the date they were approved, when the assistance was released.';
-        $notes[] = 'Pending applications are the ones filed in this period that are still waiting for a decision. Disapproved applications are on the Disapproved tab.';
+        $notes[] = 'Pending applications are the ones filed in this period that are still waiting for a decision. Declined applications are on the Declined tab.';
     }
     return $notes;
 }
@@ -578,7 +578,7 @@ function report_processing_table(PDO $pdo, array $f, ?int $typeId): array
     }
     $total = count($rows) > 1 ? array_merge(['All programs'], $fmt(report_stats($all))) : null;
     return report_table('Decision time', 'How fast applications were decided',
-        'Days from the date filed to the date approved or disapproved, for decisions made in this period.',
+        'Days from the date filed to the date approved or declined, for decisions made in this period.',
         ['Program', 'Decided', 'Average (days)', 'Median (days)', 'Longest (days)'], $rows, [1, 2, 3, 4], $total,
         'No applications were decided in this period.', true, '', false);
 }

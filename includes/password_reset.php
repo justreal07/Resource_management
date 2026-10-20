@@ -16,6 +16,7 @@
  * visitor: the page always gives the same answer, so it cannot be used to find out which usernames exist.
  */
 require_once __DIR__ . '/mailer.php';
+require_once __DIR__ . '/schema.php';   // schema_add_columns(): portable "add the column if it is missing"
 
 const PASSWORD_RESET_MINUTES = 60;        // how long an emailed link works
 const PASSWORD_RESET_PER_ACCOUNT = 3;     // links one account can be sent per hour
@@ -60,9 +61,9 @@ function password_reset_ensure(PDO $pdo): bool
             KEY idx_reset_ip (ip, created_at),
             CONSTRAINT fk_reset_account FOREIGN KEY (account_id) REFERENCES applicant_accounts (id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
-        $pdo->exec("ALTER TABLE applicant_accounts
-            ADD COLUMN IF NOT EXISTS must_change_password TINYINT(1) NOT NULL DEFAULT 0
-            COMMENT '1 = the office set a temporary password: ask for a new one after signing in'");
+        schema_add_columns($pdo, 'applicant_accounts', [
+            'must_change_password' => "TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = the office set a temporary password: ask for a new one after signing in'",
+        ]);
         // Email confirmation (includes/email_verify.php): a reset link is only sent to a confirmed email address
         $pdo->exec("CREATE TABLE IF NOT EXISTS email_verifications (
             id INT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -77,9 +78,9 @@ function password_reset_ensure(PDO $pdo): bool
             KEY idx_verify_account (account_id, created_at),
             CONSTRAINT fk_verify_account FOREIGN KEY (account_id) REFERENCES applicant_accounts (id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
-        $pdo->exec("ALTER TABLE applicant_accounts
-            ADD COLUMN IF NOT EXISTS email_verified_at DATETIME NULL
-            COMMENT 'When the owner proved they can read this email (link or Google sign-in); NULL = not confirmed'");
+        schema_add_columns($pdo, 'applicant_accounts', [
+            'email_verified_at' => "DATETIME NULL COMMENT 'When the owner proved they can read this email (link or Google sign-in); NULL = not confirmed'",
+        ]);
         // An address Google has vouched for is confirmed by definition
         $pdo->exec("UPDATE applicant_accounts SET email_verified_at = COALESCE(created_at, NOW())
                     WHERE email_verified_at IS NULL AND google_token IS NOT NULL AND email IS NOT NULL AND username = email");

@@ -70,7 +70,7 @@ $results = [];
 foreach ($rows as $r) {
     $type = (int)$r['assistance_type_id'];
     $waiting = $r['status'] === 'Pending';
-    $sub = [$typesInfo[$type]['short'], $waiting ? 'Waiting for review' : ($r['status'] === 'Disapproved' ? 'Disapproved' : $r['status']), 'Ref #' . (int)$r['id']];
+    $sub = [$typesInfo[$type]['short'], $waiting ? 'Waiting for review' : ($r['status'] === 'Disapproved' ? 'Declined' : $r['status']), 'Ref #' . (int)$r['id']];
     // The name in petitioner_name depends on the program: Burial = the deceased, Medical = the claimant (unless the patient
     // filed for themself), OPD = who goes along. Shown because a search can match it, and the row would not say why.
     $other = trim((string)$r['petitioner_name']);

@@ -139,18 +139,24 @@ $with_quality = photo_quality_ensure($pdo);
 // (it used to be filled in with the submission time)
 $save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $type_id, $f, $with_person_columns, $with_quality, $photos, $upload_dir, &$saved_files): int {
     if ($form_type === 'opd') {
-        $stmt = $pdo->prepare("INSERT INTO applicant (
-            account_id, assistance_type_id, first_name, middle_name, last_name, house_no, street,
-            barangay, municipality, province, petitioner_name, relationship, sex, contact_number,
-            age, wheelchair, stretcher, diagnosis, checkup_date, hospital
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->execute([
-            $account_id, $type_id, $f['first_name'], $f['middle_name'], $f['last_name'], $f['house_no'], $f['street'],
-            $f['barangay'], $f['municipality'], $f['province'], $f['petitioner_name'], $f['relationship'],
-            $f['sex'], $f['contact_number'], $f['age'],
-            $f['wheelchair'] === 'Yes' ? 'Yes' : 'No', $f['stretcher'] === 'Yes' ? 'Yes' : 'No',
-            $f['diagnosis'], $f['checkup_date'], $f['hospital'],
-        ]);
+        $columns = ['account_id', 'assistance_type_id', 'first_name', 'middle_name', 'last_name', 'house_no', 'street',
+                    'barangay', 'municipality', 'province', 'petitioner_name', 'relationship', 'sex', 'contact_number',
+                    'age', 'wheelchair', 'stretcher', 'diagnosis', 'checkup_date', 'hospital'];
+        // The age is worked out from the patient's birthdate when the form was filled in (opd_with_age()); an application kept in the
+        // session from before that change still has the age it was typed with
+        $values = [$account_id, $type_id, $f['first_name'], $f['middle_name'], $f['last_name'], $f['house_no'], $f['street'],
+                   $f['barangay'], $f['municipality'], $f['province'], $f['petitioner_name'], $f['relationship'],
+                   $f['sex'], $f['contact_number'], ($f['age'] ?? '') !== '' ? $f['age'] : null,
+                   $f['wheelchair'] === 'Yes' ? 'Yes' : 'No', $f['stretcher'] === 'Yes' ? 'Yes' : 'No',
+                   $f['diagnosis'], $f['checkup_date'], $f['hospital']];
+        if ($with_person_columns && is_ymd((string)($f['beneficiary_birthdate'] ?? ''))) {
+            // The patient's birthdate (it tells two patients with one name apart). beneficiary_id stays empty: OPD has no person registry.
+            $columns[] = 'beneficiary_birthdate';
+            $values[] = $f['beneficiary_birthdate'];
+        }
+        $stmt = $pdo->prepare('INSERT INTO applicant (' . implode(', ', $columns) . ') VALUES ('
+            . implode(', ', array_fill(0, count($columns), '?')) . ')');
+        $stmt->execute($values);
     } else {
         // medical & burial use the same columns; beneficiary = the patient (Medical) or the deceased (Burial)
         $columns = ['account_id', 'assistance_type_id', 'first_name', 'middle_name', 'last_name', 'house_no', 'street',

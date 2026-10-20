@@ -1,7 +1,7 @@
 <?php
 /**
  * Client feedback: a short satisfaction survey on a decided application.
- * Once an application is approved or not approved, the applicant may rate the service once,
+ * Once an application is approved or declined, the applicant may rate the service once,
  * 1 to 5, with an optional comment, on their Feedback page (user/feedback.php, in the account menu).
  * The application's own page (user/view_application.php) links there, or shows the rating given.
  * The form sends to user/feedback_submit.php. Admins read the results in Reports > Client feedback
@@ -61,7 +61,7 @@ function feedback_ensure(PDO $pdo): bool
 }
 
 /**
- * This account's decided applications (approved or not approved), most recently decided first,
+ * This account's decided applications (approved or declined), most recently decided first,
  * each with its rating if one was given (rating / comment / rated_at are null when not rated yet).
  * Null when they could not be loaded.
  */

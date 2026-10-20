@@ -42,9 +42,13 @@ $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $purpose_error = resolve_choice_post('purpose', MEDICAL_PURPOSES, $fields['purpose']);
-    $values = posted_fields(array_keys($fields));
+    $values = force_service_area(posted_fields(array_keys($fields)));
     $posted_for = $_POST['applying_for'] ?? '';
     $values['applying_for'] = in_array($posted_for, ['self', 'other'], true) ? $posted_for : '';
+    $own = get_form_prefill($pdo, (int)$account_id, $form_key)['own'];   // the applicant's own age/birthdate, for the hints and the script
+    if ($values['applying_for'] === 'other' && ($ownAge = claimant_age_from_account($own, $values['petitioner_name'])) !== null) {
+        $values['claimant_age'] = $ownAge;   // the claimant is the account holder: their age comes from their saved birthdate, not the box
+    }
 
     $required = array_keys(array_filter($fields));
     if ($values['applying_for'] === 'self') {
@@ -63,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
         $errors['applying_for'] = 'Please choose who the assistance is for.';
     }
     if ($purpose_error) $errors['purpose'] = $purpose_error;
-    $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
+    $prefill = ['source' => 'post', 'own' => $own];
 
     if (!$errors) {
         // Is the patient recorded as deceased, or do they already have a Medical application? (person_rules.php)
@@ -171,6 +175,7 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     <div class="field span-2">
                         <label for="contact_number">Contact number <span class="req">*</span></label>
                         <input type="tel" id="contact_number" name="contact_number" value="<?= val('contact_number') ?>" required inputmode="numeric" autocomplete="tel" minlength="11" pattern="[0-9]{11}" title="Enter exactly 11 digits, e.g. 09171234567" placeholder="09XXXXXXXXX"<?= invalid('contact_number') ?>>
+                        <p class="field-help">The number the office will call about this application. If you are filing for another person, give your own number.</p>
                         <?= error_for('contact_number') ?>
                     </div>
                 </div>
@@ -196,12 +201,12 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     </div>
                     <div class="field span-2">
                         <label for="municipality">Municipality <span class="req">*</span></label>
-                        <input type="text" id="municipality" name="municipality" value="<?= val('municipality') ?>" required<?= invalid('municipality') ?>>
+                        <input type="text" id="municipality" name="municipality" value="<?= e(SERVICE_MUNICIPALITY) ?>" required readonly aria-readonly="true"<?= invalid('municipality') ?>>
                         <?= error_for('municipality') ?>
                     </div>
                     <div class="field span-2">
                         <label for="province">Province <span class="req">*</span></label>
-                        <input type="text" id="province" name="province" value="<?= val('province') ?>" required<?= invalid('province') ?>>
+                        <input type="text" id="province" name="province" value="<?= e(SERVICE_PROVINCE) ?>" required readonly aria-readonly="true"<?= invalid('province') ?>>
                         <?= error_for('province') ?>
                     </div>
                 </div>

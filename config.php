@@ -21,13 +21,40 @@ $dbSetting = function (string $key, string $default) use ($dbLocal): string {
     }
     return (string)$value;
 };
+
+// Errors go to the PHP error log, never onto the visitor's screen: a message with an SQL statement or a file path
+// helps an attacker and means nothing to an applicant. On your own computer, set APP_DEBUG to 1 (environment
+// variable, or 'APP_DEBUG' => '1' in db.local.php) to see them on the page again.
+$appDebug = $dbSetting('APP_DEBUG', '0') === '1';
+ini_set('display_errors', $appDebug ? '1' : '0');
+ini_set('log_errors', '1');
+if (!$appDebug) {
+    // An exception nobody caught (a query that failed on a page without its own try/catch): log it, show a plain message
+    set_exception_handler(function (Throwable $e) {
+        error_log('Uncaught ' . get_class($e) . ': ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+        $json = false;
+        foreach (headers_list() as $h) {
+            if (stripos($h, 'content-type: application/json') === 0) $json = true;
+        }
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: ' . ($json ? 'application/json' : 'text/html') . '; charset=UTF-8');
+        }
+        echo $json ? '{"ok":false,"error":"server"}'
+            : '<p style="font-family:sans-serif;padding:1rem">Something went wrong on our side, and nothing was lost. '
+              . 'Please go back and try again. If it keeps happening, tell the office.</p>';
+    });
+}
+
 $host = $dbSetting('DB_HOST', 'localhost');
 $dbname = $dbSetting('DB_NAME', 'lgu_assistance_system');
 $username = $dbSetting('DB_USER', 'root');
 $password = $dbSetting('DB_PASS', '');
 
 try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8", $username, $password);
+    // utf8mb4, like the tables: plain "utf8" holds only 3-byte characters, so an emoji (or a rare character) typed
+    // in a remark, purpose, comment or announcement made the whole save fail
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname;charset=utf8mb4", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
     // Dates are saved with MySQL NOW(), so make PHP use the same clock as the database
     // (otherwise "x minutes ago", unread notifications and eligibility dates come out wrong)

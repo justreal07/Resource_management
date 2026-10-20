@@ -1,0 +1,9 @@
+# Code that other pages load with require_once. Nothing here is a page, so no browser may open it by address.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>
+Options -Indexes

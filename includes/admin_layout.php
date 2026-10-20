@@ -28,7 +28,7 @@ if (($GLOBALS['pdo'] ?? null) instanceof PDO) {
 /* Every page that uses this layout needs a sign-in: an admin on admin pages, staff or an admin on
    staff pages (the ones with define('UI_AREA', 'staff')). Others go to the sign-in page.
    (It was off at first, so the lists and records of applicants opened without signing in.)
-   Approving and disapproving always require a signed-in admin (or OPD staff, for OPD):
+   Approving and declining always require a signed-in admin (or OPD staff, for OPD):
    application_decision.php checks that on every request, whatever this switch says. */
 const ADMIN_LAYOUT_REQUIRE_LOGIN = true;
 
@@ -96,14 +96,14 @@ function admin_commands(): array
         $cmds[] = ['label' => $item['label'], 'href' => $item['href'], 'icon' => $item['icon'], 'group' => 'Go to', 'words' => ''];
     }
     $pages = ['all' => ['All applications', 'all list'], 'pending' => ['Waiting for review', 'pending to review queue'],
-              'approved' => ['Approved', 'approved done'], 'disapproved' => ['Disapproved', 'disapproved rejected not approved']];
+              'approved' => ['Approved', 'approved done'], 'disapproved' => ['Declined', 'declined disapproved rejected not approved']];
     foreach (ui_types() as $id => $t) {
         if (!decision_can($user, $id) || ($staffSide && $id !== 3)) continue;
         foreach ($pages as $page => [$label, $words]) {
             $cmds[] = ['label' => $t['short'] . ' · ' . $label, 'href' => ui_type_url($id, $page), 'icon' => $t['icon'], 'group' => 'Lists', 'words' => $t['name'] . ' ' . $words];
         }
         $cmds[] = ['label' => 'Review ' . $t['short'] . ' applications', 'href' => ui_review_url(0, $id), 'icon' => 'search', 'group' => 'Actions',
-                   'words' => $t['name'] . ' start reviewing side by side approve disapprove'];
+                   'words' => $t['name'] . ' start reviewing side by side approve decline'];
     }
     if (!$staffSide && $role === 'admin') {
         $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../Main_dashboard/dashboard.php#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant'];
@@ -382,7 +382,7 @@ function admin_layout_start(array $page): void
 
             <?php if ($user && !decision_schema_ready($GLOBALS['pdo'])): ?>
                 <div class="alert alert-warning" role="status"><?= ui_icon('alert', 'alert-icon') ?>
-                    <div class="alert-body"><strong>Database update needed.</strong> Disapprove won't work until the system administrator runs
+                    <div class="alert-body"><strong>Database update needed.</strong> Decline won't work until the system administrator runs
                         <code>database/migrations/migration_disapprove.sql</code> in phpMyAdmin. Approve works as usual.</div>
                 </div>
             <?php endif; ?>

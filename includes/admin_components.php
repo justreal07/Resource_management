@@ -91,7 +91,7 @@ function ui_icon(string $name, string $class = ''): string
 function ui_badge(?string $status): string
 {
     $status = (string)$status;
-    $all = ui_statuses() + ['Disapproved' => ['class' => 'disapproved', 'icon' => 'x-circle', 'label' => 'Disapproved']];
+    $all = ui_statuses() + ['Disapproved' => ['class' => 'disapproved', 'icon' => 'x-circle', 'label' => 'Declined']];
     $s = $all[$status] ?? ['class' => 'neutral', 'icon' => 'info', 'label' => $status !== '' ? $status : 'Unknown'];
     return '<span class="badge badge-' . $s['class'] . '">' . ui_icon($s['icon']) . ui_e($s['label']) . '</span>';
 }
@@ -288,7 +288,7 @@ function ui_name_search(int $typeId, string $current): string
 /** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Disapproved. */
 function ui_type_tabs(int $typeId, string $current, array $counts = []): string
 {
-    $labels = ['overview' => 'Overview', 'all' => 'All applications', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved'];
+    $labels = ['overview' => 'Overview', 'all' => 'All applications', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Declined'];
     $html = '<nav class="tabs" aria-label="' . ui_e(ui_types()[$typeId]['name']) . ' pages"><ul>';
     foreach ($labels as $page => $label) {
         $count = isset($counts[$page]) ? '<span class="tab-count">' . number_format((int)$counts[$page]) . '</span>' : '';
@@ -304,7 +304,7 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     // Export CSV / Print for the list being shown (Overview exports every application). Not on a page that is not a list.
     $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved'][$current] ?? null;
     if ($exportStatus === null) return $nameBar . $tabsHtml;
-    $label = $exportStatus === 'all' ? 'all applications' : strtolower($exportStatus) . ' applications';
+    $label = $exportStatus === 'all' ? 'all applications' : ($exportStatus === 'Disapproved' ? 'declined' : strtolower($exportStatus)) . ' applications';
     // Admins: "Add walk-in" for THIS program. It opens the walk-in window on this very page with the program already
     // chosen (admin_layout_end() adds the window, the form templates and js/admin_dashboard.js when this flag is set).
     $walkIn = '';
@@ -381,6 +381,10 @@ function ui_table(array $rows, array $columns, array $opts = []): string
         return ui_state('inbox', $empty[0], $empty[1] ?? '');
     }
 
+    // The applicant's own profile picture beside each name ('avatars' => false for a table that must not have them)
+    $withAvatars = ($opts['avatars'] ?? true) !== false;
+    if ($withAvatars) applicant_avatar_files(array_column($rows, 'id'));
+
     $html = '';
     $search = $opts['search'] ?? 'Name, Ref # or barangay';
     if ($search !== false) {
@@ -422,6 +426,9 @@ function ui_table(array $rows, array $columns, array $opts = []): string
                         ? '<a class="row-name row-link" href="' . ui_e($c['link']($row)) . '">' . ui_e($name) . '</a>'
                         : '<strong class="row-name">' . ui_e($name) . '</strong>';
                     $content .= isset($row['id']) ? '<span class="ref">Ref #' . (int)$row['id'] . '</span>' : '';
+                    if ($withAvatars && isset($row['id'])) {
+                        $content = '<div class="person-cell">' . ui_applicant_avatar((int)$row['id'], $name) . '<div>' . $content . '</div></div>';
+                    }
                     break;
                 case 'date':
                     $content = $value ? '<time datetime="' . ui_e(date('c', strtotime($value))) . '">' . ui_e(ui_date($value)) . '</time>' : '<span class="muted">Not set</span>';
@@ -678,7 +685,7 @@ function ui_disapprove_button(array $row, int $typeId, array $opts = []): string
     return '<button type="button" class="' . ui_e($opts['class'] ?? 'btn btn-danger btn-sm') . '" data-disapprove="' . (int)$row['id'] . '"'
         . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '"'
         . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '"' . ($walkIn ? ' data-walkin' : '') . '>'
-        . ui_icon('x-circle') . 'Disapprove'
+        . ui_icon('x-circle') . 'Decline'
         . (isset($opts['hint']) ? ' <kbd>' . ui_e($opts['hint']) . '</kbd>' : '') . '</button>';
 }
 
@@ -708,7 +715,7 @@ function ui_disapprove_dialog(string $return = ''): string
     return '<dialog id="disapproveDialog" class="modal" aria-labelledby="disapproveTitle">'
         . '<form method="POST" action="../Main_dashboard/disapprove_applicant.php" novalidate data-disapprove-form>'
         . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e($return !== '' ? $return : ui_current_page()) . '">'
-        . '<div class="modal-header"><h2 id="disapproveTitle">Disapprove this application for <span data-disapprove-name></span>?</h2>'
+        . '<div class="modal-header"><h2 id="disapproveTitle">Decline this application for <span data-disapprove-name></span>?</h2>'
         . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
         . '<div class="modal-body">'
         . '<p>The applicant may apply again. The application is removed from the lists.</p>'
@@ -722,7 +729,7 @@ function ui_disapprove_dialog(string $return = ''): string
         . '</div>'
         . '<div class="modal-footer"><span class="modal-footer-space"></span>'
         . '<button type="button" class="btn btn-secondary" data-dialog-close>Cancel</button>'
-        . '<button type="submit" class="btn btn-danger">' . ui_icon('x-circle') . 'Disapprove &amp; send email</button></div>'
+        . '<button type="submit" class="btn btn-danger">' . ui_icon('x-circle') . 'Decline &amp; send email</button></div>'
         . '</form></dialog>';
 }
 
@@ -1206,7 +1213,7 @@ function ui_record_cards(array $a): array
     $has = function (string $k) use ($a) { return array_key_exists($k, $a) && $a[$k] !== null && $a[$k] !== ''; };
 
     // Application and decision
-    $app = [ui_detail('Status', $a['status'])];
+    $app = [ui_detail('Status', $a['status'] === 'Disapproved' ? 'Declined' : $a['status'])];   // the stored value stays 'Disapproved'; people read 'Declined'
     if ($a['status'] === 'Approved') {
         if ($has('approved_at')) $app[] = ui_detail('Date approved', ui_date($a['approved_at'], 'F j, Y, g:i A'));
         if ($has('approved_by')) $app[] = ui_detail_user('Approved by', (int)$a['approved_by']);
@@ -1231,8 +1238,8 @@ function ui_record_cards(array $a): array
         }
     }
     if ($a['status'] === 'Disapproved') {
-        $app[] = ui_detail('Date disapproved', ui_date($a['disapproved_at'] ?? '', 'F j, Y, g:i A'));
-        $app[] = $has('disapproved_by') ? ui_detail_user('Disapproved by', (int)$a['disapproved_by']) : ui_detail('Disapproved by', '');
+        $app[] = ui_detail('Date declined', ui_date($a['disapproved_at'] ?? '', 'F j, Y, g:i A'));
+        $app[] = $has('disapproved_by') ? ui_detail_user('Declined by', (int)$a['disapproved_by']) : ui_detail('Declined by', '');
         $app[] = ui_detail('Reason (the applicant sees it)', $a['disapproval_remarks'] ?? '', true);
     }
 
@@ -1264,11 +1271,13 @@ function ui_record_cards(array $a): array
         $what[] = ui_detail_card('The deceased', 'burial', $deceased);
         $who[] = ui_detail_card('Address and contact', 'pin', $address);
     } elseif ($type === 3) {
-        $who[] = ui_detail_card('Patient', 'user', [
-            ui_detail('Full name', ui_full_name($a)),
-            ui_detail('Sex', $a['sex'] ?? ''),
-            ui_detail('Age', $a['age'] ?? ''),
-        ]);
+        $patient = [ui_detail('Full name', ui_full_name($a)), ui_detail('Sex', $a['sex'] ?? '')];
+        // The birthdate is asked since the OPD form replaced the typed age with it; older requests only have the age
+        if (array_key_exists('beneficiary_birthdate', $a) && $a['beneficiary_birthdate'] !== null && $a['beneficiary_birthdate'] !== '') {
+            $patient[] = ui_detail('Birthdate', ui_date($a['beneficiary_birthdate'], 'F j, Y'));
+        }
+        $patient[] = ui_detail('Age', $a['age'] ?? '');
+        $who[] = ui_detail_card('Patient', 'user', $patient);
         $who[] = ui_detail_card('Address and contact', 'pin', $address);
         $what[] = ui_detail_card('Check-up and transport', 'van', [
             ui_detail('Hospital or clinic', $a['hospital'] ?? ''),
@@ -1480,7 +1489,7 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
 
     if (!decision_can(decision_user(), $typeId)) {
         return $html . ui_state('lock', decision_user() === null ? 'Sign in to update this application' : 'Only an administrator can update this application',
-            $typeId === 3 ? 'Admins and OPD staff can approve, disapprove and add remarks.' : 'Admins can approve, disapprove and add remarks for Medical and Burial applications.',
+            $typeId === 3 ? 'Admins and OPD staff can approve, decline and add remarks.' : 'Admins can approve, decline and add remarks for Medical and Burial applications.',
             '<a class="btn btn-secondary btn-sm" href="' . ui_e($backHref) . '">Go back</a>');
     }
 
@@ -1491,7 +1500,7 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
         . '<input type="hidden" name="expected_status" value="' . ui_e($row['status']) . '">';
 
     if ($pending) {
-        $choices = ['Pending' => 'Keep pending', 'Approved' => 'Approve', 'Disapproved' => 'Disapprove'];
+        $choices = ['Pending' => 'Keep pending', 'Approved' => 'Approve', 'Disapproved' => 'Decline'];
         $html .= '<fieldset class="status-picker"><legend>Decision</legend><div class="status-options">';
         foreach ($choices as $status => $label) {
             $html .= '<label class="status-option"><input type="radio" name="status" value="' . $status . '"' . ($status === 'Pending' ? ' checked' : '') . ' required>'
@@ -1520,7 +1529,7 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
         . '<textarea name="remarks" id="remarks" rows="4" maxlength="5000" aria-describedby="remarksHelp" placeholder="Notes about this application">'
         . ui_e($row['remarks'] ?? '') . '</textarea>'
         // The applicant sees these remarks on their application and in the "approved" notification (user/view_application.php)
-        . '<p class="field-help" id="remarksHelp" data-remarks-help>The applicant sees these remarks with their application. When you disapprove, this becomes the reason they see.</p></div>'
+        . '<p class="field-help" id="remarksHelp" data-remarks-help>The applicant sees these remarks with their application. When you decline, this becomes the reason they see.</p></div>'
         . '<div class="form-actions"><a class="btn btn-secondary" href="' . ui_e($backHref) . '">Cancel</a>'
         . '<button type="submit" class="btn btn-primary">Save</button></div></form>';
     return $html;
@@ -1540,11 +1549,11 @@ function ui_disapproved_log(array $rows, bool $showType): string
         $columns[] = ['label' => 'Program', 'type' => 'text', 'value' => function ($r) { return ui_types()[(int)$r['assistance_type_id']]['short'] ?? 'Other'; }];
     }
     $columns[] = ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'];
-    $columns[] = ['label' => 'Disapproved', 'type' => 'datetime', 'key' => 'disapproved_at'];
+    $columns[] = ['label' => 'Declined', 'type' => 'datetime', 'key' => 'disapproved_at'];
     $columns[] = ['label' => 'By', 'type' => 'text', 'key' => 'disapproved_by_name'];
     $columns[] = ['label' => 'Reason', 'type' => 'text', 'key' => 'disapproval_remarks', 'class' => 'cell-clip'];
     return ui_table($rows, $columns, [
-        'empty' => ['No disapproved applications', 'Applications that are disapproved are listed here for the record.'],
+        'empty' => ['No declined applications', 'Applications that are declined are listed here for the record.'],
         'search' => 'Name, Ref # or reason',
     ]);
 }

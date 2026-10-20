@@ -1,15 +1,24 @@
 /vendor
 
-# Private settings and keys (Google sign-in, AI chat).
+# Private settings and keys (Google sign-in, AI chat, mail, database).
 # Copy each *.local.php.example to *.local.php and fill in your own values.
 *.local.php
 
-# Uploaded applicant photos and profile pictures hold personal data, so they stay out of git.
-# The .htaccess files are kept because they stop uploaded files from running as code.
+# Everything people upload while using the system is personal data (IDs, certificates, faces), so it stays out of git.
+# The .htaccess files are kept because they stop uploaded files from running as code or being opened by address.
 /documents/*
 !/documents/.htaccess
 /avatars/*
 !/avatars/.htaccess
+/staff_avatars/*
+!/staff_avatars/.htaccess
+/announcement_images/*
+!/announcement_images/.htaccess
 
 # Old copy of the upload folder (the app now saves to /documents/ only)
 /user/documents/
+
+# Database dumps and backups can hold every applicant's details
+/database/*.dump.sql
+/database/backup*
+*.bak

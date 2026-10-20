@@ -2,6 +2,7 @@
 require_once '../config.php';
 require_once 'application_eligibility.php';
 require_once 'assistance_config.php';
+require_once 'person_rules.php';   // the "one request per patient per check-up date" rule
 require_once 'apply_layout.php';
 
 // Check if user is logged in
@@ -23,7 +24,7 @@ $fields = [
     'first_name'      => true,
     'middle_name'     => false,
     'last_name'       => true,
-    'age'             => true,
+    'beneficiary_birthdate' => true,   // the patient's birthdate; the age is worked out from it (opd_with_age())
     'sex'             => true,
     'contact_number'  => true,
     'house_no'        => false,
@@ -42,7 +43,7 @@ $errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $reason_error = resolve_choice_post('diagnosis', OPD_REASONS, $fields['diagnosis']);
-    $values = posted_fields(array_keys($fields));
+    $values = force_service_area(posted_fields(array_keys($fields)));
     // Checkboxes are stored as 'Yes' / 'No' (matches the database columns)
     $values['wheelchair'] = isset($_POST['wheelchair']) ? 'Yes' : 'No';
     $values['stretcher']  = isset($_POST['stretcher']) ? 'Yes' : 'No';
@@ -50,6 +51,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $errors += opd_companion_errors($values);
     if ($reason_error) $errors['diagnosis'] = $reason_error;
     $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
+
+    if (!$errors) {
+        $values += opd_with_age($values);   // the age the office sees, from the birthdate
+        // Is this patient already on the schedule for that day? (person_rules.php)
+        $check = checkPersonConflict($pdo, $form_key, $values, (int)$account_id);
+        if (!$check['ok']) $errors[$check['field']] = $check['message'];
+    }
 
     if (!$errors) {
         // Keep the answers in the session - saved to the database only after the photos are uploaded
@@ -107,10 +115,9 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                         <?= error_for('last_name') ?>
                     </div>
                     <div class="field span-2">
-                        <label for="age">Age <span class="req">*</span></label>
-                        <input type="number" id="age" name="age" value="<?= val('age') ?>" required min="0" max="120" inputmode="numeric" placeholder="Age"<?= invalid('age') ?>>
-                        <?= own_age_hint($prefill, 'age') ?>
-                        <?= error_for('age') ?>
+                        <label for="beneficiary_birthdate">Birthdate <span class="req">*</span></label>
+                        <input type="date" id="beneficiary_birthdate" name="beneficiary_birthdate" value="<?= val('beneficiary_birthdate') ?>" required min="<?= OLDEST_DATE ?>" max="<?= date('Y-m-d') ?>"<?= invalid('beneficiary_birthdate') ?>>
+                        <?= error_for('beneficiary_birthdate') ?>
                     </div>
                     <div class="field span-2">
                         <label>Sex <span class="req">*</span></label>
@@ -148,12 +155,12 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     </div>
                     <div class="field span-2">
                         <label for="municipality">Municipality <span class="req">*</span></label>
-                        <input type="text" id="municipality" name="municipality" value="<?= val('municipality') ?>" required<?= invalid('municipality') ?>>
+                        <input type="text" id="municipality" name="municipality" value="<?= e(SERVICE_MUNICIPALITY) ?>" required readonly aria-readonly="true"<?= invalid('municipality') ?>>
                         <?= error_for('municipality') ?>
                     </div>
                     <div class="field span-2">
                         <label for="province">Province <span class="req">*</span></label>
-                        <input type="text" id="province" name="province" value="<?= val('province') ?>" required<?= invalid('province') ?>>
+                        <input type="text" id="province" name="province" value="<?= e(SERVICE_PROVINCE) ?>" required readonly aria-readonly="true"<?= invalid('province') ?>>
                         <?= error_for('province') ?>
                     </div>
                 </div>

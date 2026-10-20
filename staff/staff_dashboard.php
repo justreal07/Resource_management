@@ -96,8 +96,8 @@ $upcomingPanel = '<section class="panel" aria-labelledby="upcomingTitle"><div cl
    - Patients are people, not requests: the same name in the same barangay is one patient, however
      many check-ups they had. Names are compared like the Medical/Burial person checks (person_rules.php):
      "Ma." = "Maria", "Dela Cruz" = "Delacruz", a left-out middle name is the same person; a different
-     middle initial or Jr./Sr. is another person. OPD has no birthdate, so name and barangay are all there is.
-   - Check-ups are the requests. Disapproved requests are discarded and not counted. */
+     middle initial or Jr./Sr. is another person. Requests filed before the form asked for the patient's birthdate have none, so name and barangay are what this count goes by.
+   - Check-ups are the requests. Declined requests are discarded and not counted. */
 $brgyPeriods = [
     'month' => ['button' => 'This month', 'range' => date('F Y'), 'from' => date('Y-m-01'), 'to' => date('Y-m-t')],
     'year'  => ['button' => 'This year',  'range' => date('Y'),   'from' => date('Y-01-01'), 'to' => date('Y-12-31')],

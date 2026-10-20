@@ -9,7 +9,7 @@
  * (person_rules.php, checkPersonConflict):
  * - Medical Assistance (type 1): applying again for the same patient needs an admin's permission
  * - Burial Assistance (type 2): one application per deceased person
- * - OPD (type 3): no limit
+ * - OPD (type 3): no limit on how many check-ups, but one request per patient per check-up date
  */
 
 require_once '../config.php';

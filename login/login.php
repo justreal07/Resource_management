@@ -58,7 +58,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 // New session id on login so an old/stolen one can't be reused
                 session_regenerate_id(true);
-                $_SESSION['user'] = ['id'=>$user['id'],'username'=>$user['username'],'role'=>$role,'name'=>$user['full_name']];
+                // pwv: a fingerprint of the password this sign-in used; if the password is changed or reset, this sign-in ends (decision_account_active())
+                $_SESSION['user'] = ['id'=>$user['id'],'username'=>$user['username'],'role'=>$role,'name'=>$user['full_name'],'pwv'=>account_password_mark((string)$user['password'])];
                 login_clear_failures($pdo, $username, $ip);
                 try {
                     $pdo->prepare("UPDATE users SET last_login_at = NOW() WHERE id = ?")->execute([$user['id']]);

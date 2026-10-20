@@ -1,46 +1,8 @@
 <?php
-// opd_pending.php
+// OPD applications waiting for review (open one in the Review page to approve or decline).
+// The page itself is includes/program_pages.php: one copy for Medical, Burial and OPD (and the OPD staff side).
 require_once '../config.php';
 require_once '../includes/admin_layout.php';
+require_once '../includes/program_pages.php';
 
-// Fetch ONLY PENDING Outpatient Diagnosis applicants (assistance_type_id = 3)
-// (name parts read separately: CONCAT() with an empty (NULL) middle name gave no name at all)
-// The check-up date is the trip day; the account's email is where the approval email goes (NULL account = walk-in).
-$stmt = $pdo->prepare("
-    SELECT a.id, a.first_name, a.middle_name, a.last_name,
-        CONCAT_WS(', ', NULLIF(TRIM(CONCAT_WS(' ', NULLIF(TRIM(a.house_no), ''), NULLIF(TRIM(a.street), ''))), ''), NULLIF(TRIM(a.barangay), ''), NULLIF(TRIM(a.municipality), ''), NULLIF(TRIM(a.province), '')) AS address,
-        a.contact_number,
-        a.created_at,
-        a.status,
-        a.checkup_date,
-        a.account_id,
-        acc.email AS account_email
-    FROM applicant a
-    LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
-    WHERE a.assistance_type_id = 3 AND a.status = 'Pending'
-    ORDER BY a.created_at DESC
-");
-$stmt->execute();
-$pendingApplicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
-
-admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'opd']);
-echo ui_page_head('OPD requests to review', 'Pending requests, newest first. Open Review to see the photos and details, then approve or disapprove there.');
-echo ui_type_tabs(3, 'pending');
-?>
-<section class="panel" aria-label="OPD requests to review">
-    <?= ui_table($pendingApplicants, [
-        ['label' => 'Patient', 'type' => 'person'],
-        ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
-        ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'],
-        ['label' => 'Check-up date', 'type' => 'date', 'key' => 'checkup_date'],
-        ['label' => 'Address', 'type' => 'text', 'key' => 'address'],
-        ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'],
-    ], [
-        'empty' => ['No OPD requests waiting', 'New requests will appear here.'],
-        'actions' => function ($row) {
-            return ui_row_links(3, $row, true, '../opd/opd_pending.php', true);
-        },
-    ]) ?>
-</section>
-<?php
-admin_layout_end();
+program_list_page(3, 'pending');

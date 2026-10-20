@@ -9,7 +9,7 @@ $stmt->execute();
 $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Initialize user data variables
-$user_stats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'not_approved' => 0];   // CHANGED: 'rejected' → 'not_approved' (status Disapproved)
+$user_stats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'not_approved' => 0];   // CHANGED: 'rejected' → 'not_approved' (status Declined)
 $recent_applications = [];
 $notifications = [];
 $notification_count = 0;
@@ -45,7 +45,7 @@ if(isset($_SESSION['applicant'])) {
     $stmt->execute([$applicant_id]);
     $recent_applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // ppNotifications: received / approved / not approved / "you can apply again", with unread state
+    // ppNotifications: received / approved / declined / "you can apply again", with unread state
     $notifications = get_user_notifications($pdo, (int)$applicant_id, $user['notifications_seen_at'] ?? null);
     $notification_count = count_unread($notifications);
 
@@ -337,7 +337,7 @@ $programs = [
             </div>
             <div class="highlight">
                 <div class="highlight-icon"><i class="fas fa-bell"></i></div>
-                <div><h4>Stay Updated</h4><p>See if your request is pending, approved or not approved.</p></div>
+                <div><h4>Stay Updated</h4><p>See if your request is pending, approved or declined.</p></div>
             </div>
             <div class="highlight">
                 <div class="highlight-icon"><i class="fas fa-comments"></i></div>
@@ -380,7 +380,7 @@ $programs = [
                     ['total',        'Total Applications', $user_stats['total'],        'my_account.php#applications'],
                     ['pending',      'Pending',            $user_stats['pending'],      'my_account.php?filter=pending#applications'],
                     ['approved',     'Approved',           $user_stats['approved'],     'my_account.php?filter=approved#applications'],
-                    ['not-approved', 'Not approved',       $user_stats['not_approved'], 'my_account.php?filter=disapproved#applications'],
+                    ['not-approved', 'Declined',       $user_stats['not_approved'], 'my_account.php?filter=disapproved#applications'],
                 ] as [$cls, $label, $num, $href]): ?>
                 <a class="stat-box <?php echo $cls; ?>" href="<?php echo $href; ?>">
                     <span class="stat-label"><?php echo $label; ?></span>
@@ -404,7 +404,7 @@ $programs = [
                     <li class="done"><span><i class="fas fa-paper-plane"></i></span>Submitted</li>
                     <li class="<?php echo $ls === 'Pending' ? 'current' : 'done'; ?>"><span><i class="fas fa-search"></i></span>Under review</li>
                     <li class="<?php echo $ls === 'Approved' ? 'done' : ($ls === 'Disapproved' ? 'failed' : ''); ?>">
-                        <span><i class="fas <?php echo $ls === 'Disapproved' ? 'fa-times' : 'fa-check'; ?>"></i></span><?php echo $ls === 'Disapproved' ? 'Not approved' : 'Approved'; ?>
+                        <span><i class="fas <?php echo $ls === 'Disapproved' ? 'fa-times' : 'fa-check'; ?>"></i></span><?php echo $ls === 'Disapproved' ? 'Declined' : 'Approved'; ?>
                     </li>
                 </ol>
                 <a href="view_application.php?id=<?php echo (int)$latest_app['id']; ?>" class="btn btn-ghost-light btn-sm">Details <i class="fas fa-arrow-right"></i></a>
@@ -434,7 +434,7 @@ $programs = [
                         </div>
                     </div>
                     <span class="status-badge <?php echo strtolower($app['status']); ?>">
-                        <?php echo htmlspecialchars($app['status'] === 'Disapproved' ? 'Not approved' : $app['status']); ?>
+                        <?php echo htmlspecialchars($app['status'] === 'Disapproved' ? 'Declined' : $app['status']); ?>
                     </span>
                     <a href="view_application.php?id=<?php echo $app['id']; ?>" class="app-view-btn" aria-label="View application #<?php echo $app['id']; ?>">
                         <i class="fas fa-eye"></i>
@@ -622,9 +622,9 @@ $programs = [
                         <ul>
                             <li><strong>Medical Assistance</strong> — one application per patient at a time. To apply again for a patient who already received Medical Assistance, the office must approve it first.</li>
                             <li><strong>Burial Assistance</strong> — one application per deceased person.</li>
-                            <li><strong>OPD Scheduling</strong> — request a schedule for every check-up your doctor gives you.</li>
+                            <li><strong>OPD Scheduling</strong> — request a schedule for every check-up your doctor gives you (one request per patient for each check-up date).</li>
                         </ul>
-                        If an application is not approved, you may apply again right away.
+                        If an application is declined, you may apply again right away.
                     </div>
                 </details>
                 <details class="faq-item">
@@ -637,7 +637,7 @@ $programs = [
                     <summary>How will I know if my application is approved?</summary>
                     <div class="faq-answer">
                         Log in and check your <strong>dashboard</strong> or the <strong>notification bell</strong> at the top of the page.
-                        Your application will show as <em>Pending</em>, <em>Approved</em> or <em>Not approved</em>. If it is not approved, you may apply again right away.
+                        Your application will show as <em>Pending</em>, <em>Approved</em> or <em>Declined</em>. If it is declined, you may apply again right away.
                     </div>
                 </details>
                 <details class="faq-item">
@@ -1369,7 +1369,7 @@ function getFaqResponse(msg) {
         Makikita mo ang status ng iyong application sa iyong <strong>dashboard</strong> pagkatapos mag-login.<br><br>
         🟡 Pending - Inaayos pa ang iyong application<br>
         🟢 Approved - Naaprubahan na ang iyong request<br>
-        🔴 Not approved - Hindi naaprubahan ang request, pero maaari kang mag-apply ulit<br><br>
+        🔴 Declined - Hindi naaprubahan ang request, pero maaari kang mag-apply ulit<br><br>
         Makikita rin ang mga update sa notification bell sa itaas ng page.`;
     }
 

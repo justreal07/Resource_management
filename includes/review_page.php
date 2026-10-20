@@ -36,8 +36,8 @@ function review_next_after(PDO $pdo, array $app): ?int
 /** The page the Approve dialog posts to, for a program (the same files the Pending lists use). */
 function review_approve_action(int $typeId): string
 {
-    if ($typeId === 1) return '../medical/Approved_ALL.php';
-    if ($typeId === 2) return '../burial/All_approved.php';
+    if ($typeId === 1) return '../medical/approve_medical.php';
+    if ($typeId === 2) return '../burial/approve_burial.php';
     return ui_area() === 'staff' ? '../staff/approve_opd.php' : '../opd/approve_opd.php';
 }
 
@@ -112,7 +112,7 @@ function review_page_run(): void
     $typeInfo = ui_types()[$typeId];
     $name = ui_person_name($app);
     $backToList = ui_type_url($typeId, $pending ? 'pending' : 'all');
-    $here = ui_review_url($id, 0, true);   // where Approve / Disapprove come back to
+    $here = ui_review_url($id, 0, true);   // where Approve / Decline come back to
 
     admin_layout_start([
         'title'   => 'Review',
@@ -253,13 +253,13 @@ function review_page_run(): void
             <div><dt><kbd>J</kbd></dt><dd>Next application</dd></div>
             <div><dt><kbd>K</kbd></dt><dd>Previous application</dd></div>
             <div><dt><kbd>A</kbd></dt><dd>Approve (opens the approval details)</dd></div>
-            <div><dt><kbd>D</kbd></dt><dd>Disapprove (asks you to confirm)</dd></div>
+            <div><dt><kbd>D</kbd></dt><dd>Decline (asks you to confirm)</dd></div>
             <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Previous / next photo</dd></div>
             <div><dt><kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></dt><dd>Zoom in, zoom out, fit the photo</dd></div>
             <div><dt><kbd>R</kbd></dt><dd>Turn the photo a quarter turn</dd></div>
             <div><dt><kbd>?</kbd></dt><dd>Show these keys</dd></div>
         </dl>
-        <p class="field-help">Nothing is approved or disapproved by a key alone: A and D only open the same windows the buttons open. The keys don't work while you are typing.</p>
+        <p class="field-help">Nothing is approved or declined by a key alone: A and D only open the same windows the buttons open. The keys don't work while you are typing.</p>
     </div>
     <div class="modal-footer"><span class="modal-footer-space"></span><button type="button" class="btn btn-primary" data-dialog-close>Close</button></div>
 </dialog>

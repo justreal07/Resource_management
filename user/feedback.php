@@ -27,7 +27,7 @@ usort($waiting, function ($a, $b) use ($focus) { return ((int)$b['id'] === $focu
 /** "Burial Assistance · #149" with its decision and a link to the application. */
 function feedback_app_head(array $row, bool $focused): string {
     $p = get_program_by_type($row['assistance_type_id']);
-    $decided = $row['status'] === 'Approved' ? 'Approved' : 'Not approved';
+    $decided = $row['status'] === 'Approved' ? 'Approved' : 'Declined';
     return '<div class="pui-fb-app-head">'
         . '<span class="pui-fb-app-icon"><i class="fas ' . e($p['icon'] ?? 'fa-file-alt') . '" aria-hidden="true"></i></span>'
         . '<div><h3>' . e($p['name'] ?? 'Assistance') . ' <span>#' . (int)$row['id'] . '</span>'

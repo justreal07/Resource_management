@@ -1,5 +1,10 @@
 # Admin Account Setup Guide
 
+> **Out of date.** `admin_init.php` (the default `admin` / `admin123` account) was removed because anyone who opened it
+> could create that admin. Today: open `login/register.php` while the system has no admin yet and create the first admin
+> there with your own password. Staff accounts are added afterwards by a signed-in admin (Add staff account);
+> staff can no longer sign themselves up. The steps below describe the old system.
+
 ## Overview
 This document explains the new admin account system where:
 - **Admin** has a single default account with NO sign-up page (must use initializer)
