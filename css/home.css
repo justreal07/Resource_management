@@ -161,7 +161,6 @@ a { color: var(--navy); }
     font-size: 0.85rem;
 }
 .topbar .container,
-.nav-container { max-width: 1400px; }   /* wider than the page body so the big logos, the menu and the buttons stay on one line; the top bar matches so their edges line up */
 .nav-container { max-width: 1480px; }   /* wider than the page body so the big logos, the menu and the buttons stay on one line; the top bar matches so their edges line up */
 .topbar .container {
     display: flex;
