@@ -91,7 +91,6 @@ auth_page_start('Log in', 'login', function () { ?>
 <?php });
 ?>
     <div class="auth-card-head">
-        <div class="card-icon"><i class="fas fa-sign-in-alt"></i></div>
         <h2>Log in to your account</h2>
         <p>Mabuhay! Sign in to continue.</p>
     </div>
@@ -124,7 +123,7 @@ auth_page_start('Log in', 'login', function () { ?>
             </div>
         </div>
 
-        <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-sign-in-alt"></i> Log in</button>
+        <button type="submit" class="btn btn-primary btn-block">Log in</button>
     </form>
 
     <p class="auth-switch">Don't have an account? <a href="applicant_register.php">Sign up for free</a></p>
