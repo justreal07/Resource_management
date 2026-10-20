@@ -10,7 +10,7 @@ $stmt = $pdo->query("
     WHERE a.assistance_type_id = 2 AND a.status <> 'Disapproved'
     ORDER BY a.created_at DESC
 ");
-$applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Burial Assistance', 'section' => 'burial']);
 echo ui_page_head('All Burial applications', 'Every Burial Assistance application, newest first. Open a name to see the full record.');

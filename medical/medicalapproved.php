@@ -15,7 +15,7 @@ FROM applicant a
 WHERE a.assistance_type_id = 1 AND a.status = 'Approved'
 ORDER BY a.created_at DESC");
 $stmt->execute();
-$applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Medical Assistance', 'section' => 'medical']);
 echo ui_page_head('Approved Medical applications', 'Approved applications and the amount given, newest first.');

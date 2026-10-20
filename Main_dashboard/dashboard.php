@@ -222,14 +222,16 @@ try {
     $loadFailed['barangaymap'] = true;
 }
 
-// Recent activity: new applications and approvals, newest first (disapproved applications are discarded and left out)
+// Recent activity: what the OFFICE did, newest first: approvals (admin or staff) and walk-ins added at the office.
+// Applicants' own online applications are not part of it (they are in the Pending lists, the menu counts and the new-application notice).
+// Disapproved applications are discarded and left out.
 $activity = [];
 try {
     $activity = $pdo->query("
         SELECT * FROM (
             (SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.account_id,
                     'new' AS event, a.created_at AS event_at, NULL AS actor
-             FROM applicant a WHERE a.status <> 'Disapproved' ORDER BY a.created_at DESC LIMIT 10)
+             FROM applicant a WHERE a.status <> 'Disapproved' AND a.account_id IS NULL ORDER BY a.created_at DESC LIMIT 10)
             UNION ALL
             (SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.account_id,
                     'Approved', a.approved_at, u.full_name
@@ -258,7 +260,6 @@ $sorts = [
 $perPageOptions = [10, 25, 50];
 
 // Anything unexpected in the URL falls back to the default
-$perParam = (int)($_GET['per'] ?? 10);
 $filters = [
     'q'      => isset($_GET['q']) && is_string($_GET['q']) ? mb_substr(trim($_GET['q']), 0, 100) : '',
     'type'   => isset($_GET['type']) && is_string($_GET['type']) && isset($typeInfo[(int)$_GET['type']]) ? (int)$_GET['type'] : 0,
@@ -266,8 +267,8 @@ $filters = [
     'barangay' => isset($_GET['barangay']) && is_string($_GET['barangay']) && in_array($_GET['barangay'], BARANGAYS, true) ? $_GET['barangay'] : '',   // from the heat map
     'from'   => ui_ymd($_GET['from'] ?? ''),
     'to'     => ui_ymd($_GET['to'] ?? ''),
-    'sort'   => isset($_GET['sort']) && is_string($_GET['sort']) && isset($sorts[$_GET['sort']]) ? $_GET['sort'] : 'newest',
-    'per'    => in_array($perParam, $perPageOptions, true) ? $perParam : 10,
+    'sort'   => 'newest',   // fixed: no Sort by box any more
+    'per'    => 10,         // fixed: 10 a page, no Rows box any more
     'page'   => max(1, (int)($_GET['page'] ?? 1)),
 ];
 $filterErrors = [];
@@ -584,7 +585,7 @@ admin_layout_start([
                     <?php if (!empty($loadFailed['activity'])): ?>
                         <?= ui_load_error('recent activity', $url([], 'activity')) ?>
                     <?php elseif (!$activity): ?>
-                        <?= ui_state('inbox', 'No activity yet', 'New applications and decisions will appear here.') ?>
+                        <?= ui_state('inbox', 'No activity yet', 'Approvals and walk-ins added by the office will appear here.') ?>
                     <?php else: ?>
                         <ul class="activity-list">
                             <?php foreach ($activity as $ev): ?>
@@ -593,7 +594,7 @@ admin_layout_start([
                                 if ($ev['event'] === 'new') {
                                     $evIcon = 'inbox';
                                     $evClass = 'new';
-                                    $evText = $ev['account_id'] === null ? 'Walk-in application added' : 'Applied online';
+                                    $evText = 'Walk-in application added';   // (only office walk-ins are in this feed)
                                 } else {
                                     $evIcon = $statusInfo[$ev['event']]['icon'] ?? 'info';
                                     $evClass = $statusInfo[$ev['event']]['class'] ?? 'neutral';
@@ -727,7 +728,7 @@ admin_layout_start([
                 </div>
 
                 <form class="filters" method="GET" action="dashboard.php#applications" role="search" data-filter-form novalidate>
-                    <?= $hiddenInputs(['year']) ?>
+                    <?= $hiddenInputs(['year', 'barangay', 'from', 'to']) ?>   <?php /* barangay / from / to come only from a heat-map tile: no boxes for them, but searching keeps them (Clear filters drops them) */ ?>
                     <div class="field field-search">
                         <label for="fQ">Search</label>
                         <div class="input-icon">
@@ -753,41 +754,6 @@ admin_layout_start([
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="field">
-                        <label for="fBarangay">Barangay</label>
-                        <select id="fBarangay" name="barangay">
-                            <option value="">All barangays</option>
-                            <?php foreach (BARANGAYS as $b): ?>
-                                <option value="<?= ui_e($b) ?>"<?= $filters['barangay'] === $b ? ' selected' : '' ?>><?= ui_e($b) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="field">
-                        <label for="fFrom">Filed from</label>
-                        <input type="date" id="fFrom" name="from" value="<?= ui_e($filters['from']) ?>" max="<?= date('Y-m-d') ?>">
-                    </div>
-                    <div class="field">
-                        <label for="fTo">Filed to</label>
-                        <input type="date" id="fTo" name="to" value="<?= ui_e($filters['to']) ?>" max="<?= date('Y-m-d') ?>"
-                            <?= isset($filterErrors['to']) ? 'aria-invalid="true" aria-describedby="fToError"' : '' ?>>
-                        <p class="field-error" id="fToError"<?= isset($filterErrors['to']) ? '' : ' hidden' ?>><?= ui_e($filterErrors['to'] ?? '') ?></p>
-                    </div>
-                    <div class="field">
-                        <label for="fSort">Sort by</label>
-                        <select id="fSort" name="sort">
-                            <?php foreach ($sorts as $key => $s): ?>
-                                <option value="<?= $key ?>"<?= $filters['sort'] === $key ? ' selected' : '' ?>><?= ui_e($s['label']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <div class="field field-narrow">
-                        <label for="fPer">Rows</label>
-                        <select id="fPer" name="per">
-                            <?php foreach ($perPageOptions as $n): ?>
-                                <option value="<?= $n ?>"<?= $filters['per'] === $n ? ' selected' : '' ?>><?= $n ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
                     <div class="filter-actions">
                         <button type="submit" class="btn btn-primary"><?= ui_icon('search') ?>Apply</button>
                         <?php if ($filtersActive): ?>
@@ -802,7 +768,7 @@ admin_layout_start([
                     <?= ui_state('inbox', 'No applications yet', 'Online applications and walk-ins you add will be listed here.',
                         '<button type="button" class="btn btn-primary btn-sm" data-open-add>' . ui_icon('plus') . 'Add walk-in applicant</button>') ?>
                 <?php elseif ($rowCount === 0): ?>
-                    <?= ui_state('search', 'No applications match these filters', 'Check the spelling, try a reference number, or widen the dates.',
+                    <?= ui_state('search', 'No applications match these filters', 'Check the spelling or try a reference number.',
                         '<a class="btn btn-secondary btn-sm" href="' . ui_e($clearFiltersUrl) . '">Clear filters</a>') ?>
                 <?php else: ?>
                     <?php

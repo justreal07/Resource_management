@@ -225,6 +225,65 @@ function ui_page_head(string $title, string $intro = '', string $actionsHtml = '
         . ($actionsHtml !== '' ? '<div class="page-actions">' . $actionsHtml . '</div>' : '') . '</div>';
 }
 
+/** What was typed in the "find an applicant by name" bar of a program page (?name=), trimmed; '' when empty. */
+function ui_name_query(): string
+{
+    $q = $_GET['name'] ?? '';
+    return is_string($q) ? mb_substr(trim((string)preg_replace('/\s+/u', ' ', $q)), 0, 100) : '';
+}
+
+/**
+ * The name search of every program page: keeps only the rows whose applicant name (first, middle and last name)
+ * contains every word typed, in any order and any capitals ("dela cruz juan" finds Juan S. Dela Cruz). Names only: no
+ * Ref #, barangay or reason. The page calls it on the rows it just loaded, so it works with each page's own query;
+ * ui_type_tabs() then shows how many were found and ui_table() says so when none were.
+ */
+function ui_filter_by_name(array $rows): array
+{
+    $q = ui_name_query();
+    if ($q === '') return $rows;
+    $words = array_values(array_filter(preg_split('/[\s,.]+/u', mb_strtolower($q)), 'strlen'));
+    $kept = [];
+    foreach ($rows as $r) {
+        $name = trim(($r['first_name'] ?? '') . ' ' . ($r['middle_name'] ?? '') . ' ' . ($r['last_name'] ?? ''));
+        if ($name === '') $name = (string)($r['name'] ?? $r['full_name'] ?? '');
+        $name = mb_strtolower($name);
+        $all = true;
+        foreach ($words as $w) {
+            if (mb_strpos($name, $w) === false) { $all = false; break; }
+        }
+        if ($all) $kept[] = $r;
+    }
+    $GLOBALS['ui_name_filter'] = ['q' => $q, 'found' => count($kept)];
+    return $kept;
+}
+
+/**
+ * The "Find an applicant by name" bar under a program's title. On a list it narrows that list (the page's rows go through
+ * ui_filter_by_name()); on the Overview, which has no list, it opens All applications with the search.
+ */
+function ui_name_search(int $typeId, string $current): string
+{
+    $q = ui_name_query();
+    $short = ui_types()[$typeId]['short'];
+    $action = $current === 'overview' ? ui_type_url($typeId, 'all') : ui_current_page();
+    $filter = $GLOBALS['ui_name_filter'] ?? null;
+    $html = '<form class="name-search" method="GET" action="' . ui_e($action) . '" role="search">'
+        . '<label for="nameSearch" class="visually-hidden">Find a ' . ui_e($short) . ' applicant by name</label>'
+        . '<div class="input-icon">' . ui_icon('search')
+        . '<input type="search" id="nameSearch" name="name" value="' . ui_e($q) . '" maxlength="100" autocomplete="off" placeholder="Find a ' . ui_e($short) . ' applicant by name"></div>'
+        . '<button type="submit" class="btn btn-primary btn-sm">Find</button>';
+    if ($q !== '' && $current !== 'overview') {
+        $html .= '<a class="btn btn-link btn-sm" href="' . ui_e($action) . '">Clear</a>';
+    }
+    $html .= '</form>';
+    if ($q !== '' && $filter !== null && $current !== 'overview') {
+        $html .= '<p class="name-search-result" role="status"><strong>' . number_format($filter['found']) . '</strong> '
+            . ($filter['found'] === 1 ? 'applicant matches' : 'applicants match') . ' “' . ui_e($filter['q']) . '” in this list.</p>';
+    }
+    return $html;
+}
+
 /** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Disapproved. */
 function ui_type_tabs(int $typeId, string $current, array $counts = []): string
 {
@@ -237,9 +296,13 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     }
     $html .= '</ul></nav>';
 
+    // The name search sits above the tabs, on every page of the program
+    $nameBar = ui_name_search($typeId, $current);
+    $tabsHtml = $html;
+
     // Export CSV / Print for the list being shown (Overview exports every application). Not on a page that is not a list.
     $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved'][$current] ?? null;
-    if ($exportStatus === null) return $html;
+    if ($exportStatus === null) return $nameBar . $tabsHtml;
     $label = $exportStatus === 'all' ? 'all applications' : strtolower($exportStatus) . ' applications';
     // Admins: "Add walk-in" for THIS program. It opens the walk-in window on this very page with the program already
     // chosen (admin_layout_end() adds the window, the form templates and js/admin_dashboard.js when this flag is set).
@@ -249,7 +312,7 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
         $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
             . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
     }
-    return '<div class="tabs-bar">' . $html . '<div class="tabs-tools">' . $walkIn
+    return $nameBar . '<div class="tabs-bar">' . $tabsHtml . '<div class="tabs-tools">' . $walkIn
         . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants.php?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
         . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
         . '<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">' . ui_icon('print') . 'Print</button>'
@@ -308,6 +371,11 @@ function ui_table(array $rows, array $columns, array $opts = []): string
     $plural = function (int $k) use ($noun) { return number_format($k) . ' ' . ($k === 1 ? $noun : $noun . 's'); };
 
     if ($count === 0) {
+        // A name search that found nobody says so (instead of "No applications yet")
+        $searched = (string)($GLOBALS['ui_name_filter']['q'] ?? '');
+        if ($searched !== '') {
+            return ui_state('search', 'No applicant found', 'Nobody named “' . $searched . '” is in this list. Check the spelling, or look on another tab.');
+        }
         $empty = $opts['empty'] ?? ['Nothing here yet', ''];
         return ui_state('inbox', $empty[0], $empty[1] ?? '');
     }

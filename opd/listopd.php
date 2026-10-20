@@ -10,7 +10,7 @@ $stmt = $pdo->query("
     WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved'
     ORDER BY a.checkup_date ASC, a.created_at DESC
 ");
-$applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'opd']);
 echo ui_page_head('All OPD applications', 'Every Outpatient Diagnosis request, by check-up date. Open a name to see the full record.');

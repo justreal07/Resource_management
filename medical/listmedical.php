@@ -10,7 +10,7 @@ $stmt = $pdo->query("
     WHERE a.assistance_type_id = 1 AND a.status <> 'Disapproved'
     ORDER BY a.created_at DESC
 ");
-$applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Medical Assistance', 'section' => 'medical']);
 echo ui_page_head('All Medical applications', 'Every Medical Assistance application, newest first. Open a name to see the full record.');

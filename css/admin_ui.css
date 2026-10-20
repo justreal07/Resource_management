@@ -562,6 +562,11 @@ a:hover { color: var(--c-primary-hover); }
 
 .tabs { overflow-x: auto; border-bottom: 1px solid var(--c-border); }
 /* The program tabs with Export CSV / Print beside them */
+/* "Find an applicant by name" above the tabs of every program page */
+.name-search { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 640px; margin-bottom: 12px; }
+.name-search .input-icon { flex: 1 1 280px; }
+.name-search-result { margin: -4px 0 12px; color: var(--c-text-muted); font-size: var(--fs-sm); }
+.name-search-result strong { color: var(--c-text); }
 .tabs-bar { display: flex; flex-wrap: wrap; align-items: stretch; }
 .tabs-bar .tabs { flex: 1 1 28rem; min-width: 0; }
 .tabs-tools { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 0 0 1px 16px; margin-left: auto; border-bottom: 1px solid var(--c-border); }
