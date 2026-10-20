@@ -16,7 +16,7 @@ FROM applicant a
 LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
 WHERE a.assistance_type_id = 1 AND a.status = 'Pending'
 ORDER BY a.created_at DESC");
-$applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Medical Assistance', 'section' => 'medical']);
 echo ui_page_head('Medical applications to review', 'Pending applications, newest first. Approve asks for the amount and where and when to claim it, then emails the applicant the claim details (not the amount). Disapprove asks you to confirm.');

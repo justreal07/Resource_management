@@ -18,6 +18,7 @@ if (decision_can($user, 3) && decision_schema_ready($pdo)) {
             WHERE a.status = 'Disapproved' AND a.assistance_type_id = 3
             ORDER BY a.disapproved_at DESC, a.id DESC
         ")->fetchAll(PDO::FETCH_ASSOC);
+        $rows = ui_filter_by_name($rows);   // the name search bar (?name=)
     } catch (PDOException $e) {
         error_log('opd_disapproved.php: ' . $e->getMessage());
         $failed = true;

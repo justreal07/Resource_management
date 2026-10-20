@@ -16,7 +16,7 @@ FROM applicant a
 WHERE a.assistance_type_id = 2 AND a.status = 'Approved'
 ORDER BY a.created_at DESC");
 $stmt->execute();
-$applicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Burial Assistance', 'section' => 'burial']);
 echo ui_page_head('Approved Burial applications', 'Approved applications and the amount given, newest first.');

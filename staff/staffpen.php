@@ -24,7 +24,7 @@ $stmt = $pdo->prepare("
     ORDER BY a.created_at DESC
 ");
 $stmt->execute();
-$pendingApplicants = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$pendingApplicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'pending']);   // "To review" in the menu
 echo ui_page_head('OPD requests to review', 'Pending requests, newest first. Approve asks for the departure time (4:00 AM unless changed) and the pick-up point, then emails the applicant the trip schedule for the patient\'s check-up date. Disapprove asks you to confirm.');

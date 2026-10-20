@@ -17,20 +17,7 @@
     /* ---------- Applications filter ---------- */
     const filterForm = document.querySelector('[data-filter-form]');
     if (filterForm) {
-        const from = filterForm.elements.from;
-        const to = filterForm.elements.to;
-        const syncRange = () => { to.min = from.value || ''; };
-        from.addEventListener('change', syncRange);
-        syncRange();
-
-        filterForm.addEventListener('submit', (e) => {
-            if (from.value && to.value && from.value > to.value) {
-                e.preventDefault();
-                UI.showFieldError(to, '"Filed to" must be the same day as "Filed from" or later.');
-                to.focus();
-                return;
-            }
-            UI.clearFieldError(to);
+        filterForm.addEventListener('submit', () => {
             // Leave empty fields out of the address bar (admin_ui.js re-enables them on Back)
             Array.prototype.forEach.call(filterForm.elements, (el) => {
                 if (el.name && el.value === '') el.disabled = true;
