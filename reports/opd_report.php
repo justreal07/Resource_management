@@ -31,7 +31,7 @@ function report_build_opd(PDO $pdo, array $f): array
         if (($a['wheelchair'] ?? '') === 'Yes') $wheelchair++;
         if (($a['stretcher'] ?? '') === 'Yes') $stretcher++;
     }
-    $basisText = $f['basis'] === 'filed' ? 'Filed in this period' : 'Approved in this period';
+    $basisText = 'Approved in this period';
     $cards = [
         ['label' => 'OPD requests', 'value' => number_format($d['filed_total']), 'icon' => 'van', 'note' => 'Filed in this period'],
         ['label' => 'Approved / scheduled', 'value' => number_format(count($approved)), 'status' => 'Approved', 'note' => $basisText],
@@ -131,7 +131,7 @@ function report_build_opd(PDO $pdo, array $f): array
             'Approved requests whose check-up date is in ' . $f['label'] . ', soonest first. The vehicle leaves on the check-up date.',
             ['Trip date', 'Departure', 'Pick-up point', 'Patient', 'Age', 'Sex', 'Hospital', 'Diagnosis', 'Companion', 'Transport needs', 'Contact'],
             $tripRows, [4], null, 'No check-ups are scheduled in this period.'),
-        report_table('Approved OPD requests', 'Approved OPD requests (' . count($rows) . ')', report_sub($f, 'by date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved')),
+        report_table('Approved OPD requests', 'Approved OPD requests (' . count($rows) . ')', report_sub($f, 'by date approved'),
             ['Date filed', 'Date approved', 'Patient', 'Age', 'Sex', 'Hospital', 'Diagnosis', 'Check-up date', 'Accompanied by', 'Relationship', 'Contact', 'Address'],
             $rows, [3], ['Total approved OPD requests', number_format(count($rows))], 'No approved OPD requests in this period.'),
         report_processing_table($pdo, $f, 3),

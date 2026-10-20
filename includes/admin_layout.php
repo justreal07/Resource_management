@@ -22,6 +22,7 @@ require_once __DIR__ . '/admin_components.php';
 if (($GLOBALS['pdo'] ?? null) instanceof PDO) {
     admin_tools_ensure($GLOBALS['pdo']);
     decision_claim_ensure($GLOBALS['pdo']);   // claim details of approved Medical/Burial (application_decision.php)
+    budget_ensure($GLOBALS['pdo']);           // the yearly budget tables (includes/budget.php)
 }
 
 /* Every page that uses this layout needs a sign-in: an admin on admin pages, staff or an admin on
@@ -55,6 +56,7 @@ function admin_nav(): array
         'medical'   => ['href' => ui_type_url(1, 'overview'), 'label' => 'Medical Assistance', 'icon' => 'medical', 'roles' => ['admin'], 'type' => 1],
         'burial'    => ['href' => ui_type_url(2, 'overview'), 'label' => 'Burial Assistance', 'icon' => 'burial', 'roles' => ['admin'], 'type' => 2],
         'opd'       => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['admin'], 'type' => 3],
+        'budget'    => ['href' => '../Main_dashboard/budget.php', 'label' => 'Budget', 'icon' => 'wallet', 'roles' => ['admin']],
         'reports'   => ['href' => '../reports/reports.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['admin']],
         'announcements' => ['href' => '../Main_dashboard/announcements.php', 'label' => 'Announcements', 'icon' => 'megaphone', 'roles' => ['admin']],
         'activity'  => ['href' => '../Main_dashboard/activity_log.php', 'label' => 'Activity Log', 'icon' => 'clock', 'roles' => ['admin']],
@@ -254,6 +256,7 @@ function admin_layout_start(array $page): void
     <symbol id="i-medical" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M12 8v8M8 12h8"/></symbol>
     <symbol id="i-burial" viewBox="0 0 24 24"><path d="M10 3h4v5h4v4h-4v9h-4v-9H6V8h4z"/></symbol>
     <symbol id="i-van" viewBox="0 0 24 24"><path d="M14 17V6H3v11h2M14 9h4l3 4v4h-2M9 17h6"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></symbol>
+    <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h12v3M3 7v11a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2z"/><circle cx="16.5" cy="14.5" r="1"/></symbol>
     <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V11M10 20V5M16 20v-6M3 20h18"/></symbol>
     <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
     <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>

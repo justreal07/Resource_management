@@ -1,7 +1,7 @@
 <?php
 /**
  * Download a report as an Excel file (.xlsx).
- *   export.php?report=medical&range=quarter&year=2026&quarter=2&basis=approved   (the same address as reports.php; its
+ *   export.php?report=medical&range=quarter&year=2026&quarter=2   (the same address as reports.php; its
  *   "Download Excel" button passes the filters on)
  *
  * What is in the file: a Summary sheet (the figures on the number cards), then one sheet for each table of the report, with
@@ -30,7 +30,7 @@ if ($user['role'] !== 'admin') {
 
 admin_tools_ensure($pdo);      // the activity log
 decision_claim_ensure($pdo);   // OPD departure time and pick-up point
-report_budget_ensure($pdo);
+budget_ensure($pdo);
 
 $f = report_filters($_GET);
 $model = report_build($pdo, $f);
@@ -73,7 +73,7 @@ $summary = [
     [['Period', XlsxWriter::S_BOLD], $f['label']],
 ];
 if ($usesBasis) {
-    $summary[] = [['Approved applications counted by', XlsxWriter::S_BOLD], 'Date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved')];
+    $summary[] = [['Approved applications counted by', XlsxWriter::S_BOLD], 'Date approved'];
 }
 $summary[] = [['Prepared by', XlsxWriter::S_BOLD], $preparedBy];
 $summary[] = [['Downloaded', XlsxWriter::S_BOLD], date('F j, Y, g:i A')];
@@ -125,7 +125,7 @@ foreach ($model['tables'] as $t) {
     $xlsx->addSheet($t['sheet'], $sheet);
 }
 
-$filename = 'report-' . $f['report'] . '-' . $f['slug'] . ($usesBasis ? '-by-' . ($f['basis'] === 'filed' ? 'filed' : 'approved') : '') . '.xlsx';
+$filename = 'report-' . $f['report'] . '-' . $f['slug'] . '.xlsx';
 $file = $xlsx->build();
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $filename . '"');

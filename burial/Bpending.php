@@ -20,7 +20,7 @@ ORDER BY a.created_at DESC");
 $applicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Burial Assistance', 'section' => 'burial']);
-echo ui_page_head('Burial applications to review', 'Pending applications, newest first. Approve asks for the amount and where and when to claim it, then emails the applicant the claim details (not the amount). Disapprove asks you to confirm.');
+echo ui_page_head('Burial applications to review', 'Pending applications, newest first. Open Review to see the photos and details, then approve or disapprove there.');
 echo ui_type_tabs(2, 'pending');
 ?>
 <section class="panel" aria-label="Burial applications to review">
@@ -34,10 +34,9 @@ echo ui_type_tabs(2, 'pending');
     ], [
         'empty' => ['No Burial applications to review', 'New applications will appear here.'],
         'actions' => function ($row) {
-            return ui_row_links(2, $row, true, '../burial/Bpending.php', true)
-                . ui_decision_buttons($row, 2, 'All_approved.php');
+            return ui_row_links(2, $row, true, '../burial/Bpending.php', true);
         },
     ]) ?>
 </section>
 <?php
-admin_layout_end(['after' => ui_disapprove_dialog() . ui_approve_dialog(2)]);
+admin_layout_end();

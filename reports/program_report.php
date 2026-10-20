@@ -17,7 +17,7 @@ function report_build_program(PDO $pdo, array $f, int $typeId): array
     [$counts, $amounts] = report_series($b, $approved);
     $sum = report_sum($approved);
     $withAmount = report_with_amount($approved);
-    $basisText = $f['basis'] === 'filed' ? 'Filed in this period' : 'Approved in this period';
+    $basisText = 'Approved in this period';
 
     $cards = [
         ['label' => $name . ' applications', 'value' => number_format($d['filed_total']), 'icon' => $t['icon'], 'note' => 'Filed in this period'],
@@ -61,7 +61,7 @@ function report_build_program(PDO $pdo, array $f, int $typeId): array
     }
 
     $tables = [
-        report_table('Approved ' . $name, 'Approved ' . $name . ' applications (' . count($rows) . ')', $note . ' ' . report_sub($f, 'by date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved')),
+        report_table('Approved ' . $name, 'Approved ' . $name . ' applications (' . count($rows) . ')', $note . ' ' . report_sub($f, 'by date approved'),
             $head, $rows, $numCols, ['Total ' . $name . ' assistance released', ui_peso($sum)], 'No approved ' . $name . ' applications in this period.'),
         report_processing_table($pdo, $f, $typeId),
         report_series_table($f, $b, $counts, $amounts, $what),

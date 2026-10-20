@@ -154,7 +154,7 @@ account_page_start($ctx, "Application #$app_id", 'account', [
         </div></div>
     <?php endif; ?>
     <?php if ($status === 'Disapproved' && $disapproval_reason !== ''): ?>
-        <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong>Reason:</strong> <?= e($disapproval_reason) ?></div></div>
+        <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong>Reason:</strong> <?= nl2br(e($disapproval_reason)) ?></div></div>
     <?php elseif ($status !== 'Disapproved' && !empty($app['remarks'])): ?>
         <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong>Note from the office:</strong> <?= e($app['remarks']) ?></div></div>
     <?php endif; ?>

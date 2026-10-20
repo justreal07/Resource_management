@@ -11,10 +11,9 @@
  * notes (how to read the numbers), empty (HTML shown instead of everything else) and error.
  * A builder returns only the parts it fills in (cards, charts, tables, empty); report_build() adds the title and notes.
  *
- * Which date a number is counted by (the "basis" filter):
- *   approved (default)  an approved application and its amount belong to the day it was APPROVED (applicant.approved_at;
- *                       older records without one fall back to the filing date). That is when the money was released.
- *   filed               they belong to the day the application was FILED (created_at).
+ * Which date a number is counted by: an approved application and its amount belong to the day it was APPROVED
+ * (applicant.approved_at; older records without one fall back to the filing date). That is when the money was released.
+ * There is no other choice (a "count by date filed" option was removed).
  * Pending applications have no other date, so they always count by the day they were filed. Disapproved ones are not in
  * any report but "Disapproved" (by the day they were disapproved), as everywhere else in the system.
  *
@@ -74,7 +73,6 @@ function report_filters(array $get): array
 
     $report = array_key_exists($text('report'), $types) ? $text('report') : 'overview';
     $range = array_key_exists($text('range'), $ranges) ? $text('range') : 'year';
-    $basis = $text('basis') === 'filed' ? 'filed' : 'approved';
     $year = (int)ui_year($text('year'));
     $thisYear = (int)date('Y');
 
@@ -139,7 +137,7 @@ function report_filters(array $get): array
     $last = (clone $endExcl)->modify('-1 day');
 
     return [
-        'report' => $report, 'range' => $range, 'basis' => $basis,
+        'report' => $report, 'range' => $range,
         'year' => $year, 'quarter' => $quarter, 'month' => $month, 'week' => $week, 'from' => $from, 'to' => $to,
         'weekOptions' => $weekOptions,
         'start' => $start->format('Y-m-d'), 'end' => $last->format('Y-m-d'), 'end_excl' => $endExcl->format('Y-m-d'),
@@ -154,7 +152,7 @@ function report_filters(array $get): array
 function report_query(array $f, array $override = []): string
 {
     $f = $override + $f;
-    $q = ['report' => $f['report'], 'range' => $f['range'], 'basis' => $f['basis'], 'year' => $f['year']];
+    $q = ['report' => $f['report'], 'range' => $f['range'], 'year' => $f['year']];
     if ($f['range'] === 'quarter') $q['quarter'] = $f['quarter'];
     if ($f['range'] === 'month') $q['month'] = $f['month'];
     if ($f['range'] === 'week') $q['week'] = $f['week'];
@@ -172,9 +170,9 @@ function report_sub(array $f, string $extra = ''): string
 }
 
 /** SQL for the date an approved application is counted by. */
-function report_approved_on_sql(string $basis, string $alias = 'a'): string
+function report_approved_on_sql(string $alias = 'a'): string
 {
-    return $basis === 'filed' ? "$alias.created_at" : "COALESCE($alias.approved_at, $alias.created_at)";
+    return "COALESCE($alias.approved_at, $alias.created_at)";
 }
 
 /** How to read the numbers, for the line(s) under the filters. */
@@ -182,9 +180,7 @@ function report_notes(array $f): array
 {
     $notes = [];
     if (in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true)) {
-        $notes[] = $f['basis'] === 'filed'
-            ? 'Approved applications and the amount released are counted by the date they were filed.'
-            : 'Approved applications and the amount released are counted by the date they were approved, when the assistance was released.';
+        $notes[] = 'Approved applications and the amount released are counted by the date they were approved, when the assistance was released.';
         $notes[] = 'Pending applications are the ones filed in this period that are still waiting for a decision. Disapproved applications are on the Disapproved tab.';
     }
     return $notes;
@@ -314,7 +310,7 @@ function report_series_table(array $f, array $b, array $counts, array $amounts, 
  */
 function report_load(PDO $pdo, array $f, ?int $typeId = null): array
 {
-    $on = report_approved_on_sql($f['basis']);
+    $on = report_approved_on_sql();
     $typeSql = $typeId !== null ? ' AND a.assistance_type_id = ?' : '';
     $bind = function (array $params) use ($typeId): array {
         if ($typeId !== null) $params[] = $typeId;
@@ -587,94 +583,42 @@ function report_processing_table(PDO $pdo, array $f, ?int $typeId): array
         'No applications were decided in this period.', true, '', false);
 }
 
-/** Creates the budget table the first time (database/migrations/migration_report_budgets.sql). Never inside a transaction. */
-function report_budget_ensure(PDO $pdo): bool
-{
-    static $result = null;
-    if ($result !== null) return $result;
-    if (!empty($_SESSION['report_budgets_ready'])) return $result = true;
-    try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS report_budgets (
-            budget_year SMALLINT UNSIGNED NOT NULL,
-            assistance_type_id INT NOT NULL,
-            amount DECIMAL(12,2) NOT NULL,
-            updated_by INT NULL COMMENT 'users.id of the admin who set it',
-            updated_at DATETIME NOT NULL,
-            PRIMARY KEY (budget_year, assistance_type_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
-        $_SESSION['report_budgets_ready'] = true;
-        return $result = true;
-    } catch (Throwable $e) {
-        error_log('report_budget_ensure: ' . $e->getMessage());
-        return $result = false;
-    }
-}
-
-/** [program id => budget] for a year; programs without one are left out. */
-function report_budgets(PDO $pdo, int $year): array
-{
-    $stmt = $pdo->prepare('SELECT assistance_type_id, amount FROM report_budgets WHERE budget_year = ?');
-    $stmt->execute([$year]);
-    return array_map('floatval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
-}
-
-/** [program id => money released in the year], by date approved. */
-function report_released_by_type(PDO $pdo, int $year): array
-{
-    $on = report_approved_on_sql('approved', 'applicant');
-    $stmt = $pdo->prepare("SELECT assistance_type_id, COALESCE(SUM(amount), 0) FROM applicant
-                           WHERE status = 'Approved' AND $on >= ? AND $on < ? GROUP BY assistance_type_id");
-    $stmt->execute([$year . '-01-01 00:00:00', ($year + 1) . '-01-01 00:00:00']);
-    return array_map('floatval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
-}
-
 /**
  * Budget against money released, per program that gives money (Medical, Burial), for the year of the period.
- * Not changed by the period filter: a budget is for the whole year. The "Set the budget" form is under the table.
- * Returns null when the budget table could not be made (the rest of the report still works).
+ * The budget itself (set, added to, reduced, with its history) lives on the Budget page (includes/budget.php), and "released"
+ * is the same figure it uses: approved amounts of that year by the day approved. A budget is for a whole year, so the period
+ * filter above does not change this table. Returns null when the budget tables can't be read (the rest of the report still works).
  */
 function report_budget_table(PDO $pdo, array $f): ?array
 {
-    if (!report_budget_ensure($pdo)) return null;
+    if (!budget_ensure($pdo)) return null;
     $year = $f['budget_year'];
-    $budgets = report_budgets($pdo, $year);
-    $released = report_released_by_type($pdo, $year);
+    $statuses = budget_statuses($pdo, $year);
     $types = ui_types();
 
     $rows = [];
-    $sumBudget = $sumReleased = $sumBudgeted = 0.0;
-    foreach ([1, 2] as $id) {
-        $budget = $budgets[$id] ?? null;
-        $out = $released[$id] ?? 0.0;
-        $sumReleased += $out;
-        if ($budget !== null) {
-            $sumBudget += $budget;
-            $sumBudgeted += $out;
+    $sumBudget = $sumUsedBudgeted = $sumUsed = 0.0;
+    $anyBudget = false;
+    foreach (budget_types() as $id) {
+        $s = $statuses[$id];
+        $sumUsed += $s['used'];
+        if ($s['budget'] !== null) {
+            $anyBudget = true;
+            $sumBudget += $s['budget'];
+            $sumUsedBudgeted += $s['used'];
         }
-        $rows[] = [$types[$id]['name'], $budget !== null ? ui_peso($budget) : 'Not set', ui_peso($out),
-            $budget !== null ? report_signed_peso($budget - $out) : '—',
-            $budget !== null && $budget > 0 ? round($out / $budget * 100, 1) . '%' : '—'];
+        $rows[] = [$types[$id]['name'], $s['budget'] !== null ? ui_peso($s['budget']) : 'Not set', ui_peso($s['used']),
+            $s['budget'] !== null ? report_signed_peso($s['remaining']) : '—', $s['budget'] !== null ? $s['percent'] . '%' : '—'];
     }
-    $anyBudget = $budgets !== [];
-    $total = ['Total', $anyBudget ? ui_peso($sumBudget) : 'Not set', ui_peso($sumReleased),
-        $anyBudget ? report_signed_peso($sumBudget - $sumBudgeted) : '—',
-        $anyBudget && $sumBudget > 0 ? round($sumBudgeted / $sumBudget * 100, 1) . '%' : '—'];
+    $total = ['Total', $anyBudget ? ui_peso($sumBudget) : 'Not set', ui_peso($sumUsed),
+        $anyBudget ? report_signed_peso($sumBudget - $sumUsedBudgeted) : '—',
+        $anyBudget && $sumBudget > 0 ? round($sumUsedBudgeted / $sumBudget * 100, 1) . '%' : '—'];
 
-    $form = '<details class="budget-form no-print"><summary>Set the budget for ' . $year . '</summary>'
-        . '<form method="post" action="budget_save.php" class="budget-fields" data-busy>' . decision_csrf_field()
-        . '<input type="hidden" name="year" value="' . $year . '">'
-        . '<input type="hidden" name="back" value="' . ui_e(report_query($f)) . '">';
-    foreach ([1, 2] as $id) {
-        $form .= '<div class="field"><label for="budget' . $id . '">' . ui_e($types[$id]['name']) . ' budget (₱)</label>'
-            . '<input type="text" id="budget' . $id . '" name="budget[' . $id . ']" inputmode="decimal" autocomplete="off" placeholder="e.g. 500000" value="'
-            . ui_e(isset($budgets[$id]) ? number_format($budgets[$id], 2, '.', '') : '') . '"></div>';
-    }
-    $form .= '<button type="submit" class="btn btn-primary">Save budget</button></form>'
-        . '<p class="field-help">Leave a box empty to remove that budget. OPD gives no money, so it has none.</p></details>';
-
+    $link = '<p class="panel-note no-print"><a href="../Main_dashboard/budget.php?year=' . $year . '">' . ui_icon('wallet') . 'Open the Budget page</a> to set the ' . $year
+        . ' budget, add to it or reduce it, and see its history.</p>';
     return report_table('Budget use', 'Budget use · ' . $year,
         'Money released in ' . $year . ' (by date approved) against the budget the office set. The period above does not change this table.',
-        ['Program', 'Budget', 'Released', 'Remaining', 'Used'], $rows, [1, 2, 3, 4], $total, '', true, $form);
+        ['Program', 'Budget', 'Released', 'Remaining', 'Used'], $rows, [1, 2, 3, 4], $total, '', true, $link);
 }
 
 /* ============================================================
@@ -784,7 +728,7 @@ function report_people_tables(array $d, array $f): array
             $types[$t]['name'] ?? 'Assistance', ui_date($a['created_at']), report_listed_as($t)];
     }
     return [
-        report_table('Approved', 'Approved applications (' . count($approvedRows) . ')', report_sub($f, 'by date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved')),
+        report_table('Approved', 'Approved applications (' . count($approvedRows) . ')', report_sub($f, 'by date approved'),
             ['Name', 'Age', 'Sex', 'Contact', 'Assistance type', 'Amount', 'Date filed', 'Date approved', 'Listed as'], $approvedRows, [1, 5],
             null, 'No approved applications in this period.'),
         report_table('Pending', 'Pending applications (' . count($pendingRows) . ')', report_sub($f, 'filed in this period, still waiting'),

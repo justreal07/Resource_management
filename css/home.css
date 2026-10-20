@@ -36,7 +36,7 @@
     --shadow-lg: 0 24px 60px rgba(10, 36, 114, 0.18);
 
     --container: 1200px;
-    --header-h: 156px;
+    --header-h: 132px;   /* the 112px logos (same size as the admin menu's seal) + 10px above and below */
 }
 
 /* ============================================
@@ -238,10 +238,11 @@ a { color: var(--navy); }
     min-width: 0;
 }
 .brand-logos { display: flex; align-items: center; flex: none; }
+/* 112px: the same size as the seal in the admin and staff menu (.sidebar-brand img in css/admin_ui.css) */
 .brand-logos img {
     flex: none;
-    width: 136px;
-    height: 136px;
+    width: 112px;
+    height: 112px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #fff;
@@ -272,7 +273,7 @@ a { color: var(--navy); }
 .nav-menu {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     flex-wrap: nowrap;
 }
 .nav-link {
@@ -280,7 +281,7 @@ a { color: var(--navy); }
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 10px;
+    padding: 10px 8px;
     border-radius: 10px;
     color: var(--ink);
     text-decoration: none;
@@ -309,11 +310,12 @@ a { color: var(--navy); }
 .nav-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-left: 18px;
-    padding-left: 20px;
+    gap: 8px;
+    margin-left: 10px;
+    padding-left: 14px;
     border-left: 1px solid var(--line);
 }
+.nav-actions .btn-sm { padding: 10px 14px; }   /* Log in / Sign up: a little narrower, so the menu fits beside the logos */
 
 .nav-toggle {
     display: none;
@@ -1669,12 +1671,16 @@ a { color: var(--navy); }
     .footer-grid { grid-template-columns: 1fr 1fr; }
 }
 
-/* Collapse to the hamburger menu before the header items get squeezed
-   (brand + nav links + login/signup need ~1100px to sit on one line) */
+/* Collapse to the menu button (☰) before the header items get squeezed: the 112px logos, the title,
+   the menu links and Log in / Sign up need about 1290px, so below 1366px wide (a common laptop width)
+   the menu would drop to a second row. The menu button keeps everything on one row instead. */
 @media (max-width: 1180px) {
+    /* Tablets: smaller logos too */
     :root { --header-h: 100px; }
     .brand-logos img { width: 80px; height: 80px; }
     .brand-logos img + img { margin-left: -24px; }
+}
+@media (max-width: 1365px) {
     .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
     .nav-menu {
         position: absolute;
@@ -1709,11 +1715,14 @@ a { color: var(--navy); }
    the site title is never cut off. When the title and the menu don't fit on one line, the menu
    drops to its own row, still lined up with the right edge of the top bar. At normal text size
    everything still fits on one line, so nothing changes. */
-@media (min-width: 1181px) {
+@media (min-width: 1366px) {
     .nav-container { flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
     .brand { flex: 0 0 auto; }
     .brand-text strong,
     .brand-text small { white-space: normal; overflow: visible; text-overflow: clip; }
+    /* The title may wrap onto two lines beside the 112px logos, which leaves the menu room
+       to stay on the same row as the logos */
+    .brand-text { max-width: 12rem; }
     .nav-menu { margin-left: auto; }
 }
 

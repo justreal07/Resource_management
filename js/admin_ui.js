@@ -354,6 +354,53 @@
         if (time && time.value && !time.defaultValue) store.set(claimKey(scope, 'Time'), time.value);
     }
 
+    /* The budget note under the amount (Medical / Burial; ui_budget_note() in includes/budget.php): what is left of this year's
+       budget, and what this approval would leave. When the amount would pass the budget the reason box appears (and is sent);
+       otherwise it stays hidden and disabled. decide_application() checks the budget again on the server. */
+    const budgetMoney = (n) => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    function updateBudgetNote(scope) {
+        const box = scope.querySelector('[data-budget]');
+        if (!box) return;
+        const reasonBox = scope.querySelector('[data-budget-reason]');
+        const reason = reasonBox && reasonBox.querySelector('textarea');
+        const amountEl = scope.querySelector('[data-claim="amount"]');
+        const text = box.querySelector('[data-budget-text]');
+        const total = box.dataset.budgetTotal === '' ? null : Number(box.dataset.budgetTotal);
+        const used = Number(box.dataset.budgetUsed) || 0;
+        const warn = Number(box.dataset.budgetWarn) || 80;
+        const label = box.dataset.budgetYear + ' ' + box.dataset.budgetName + ' budget';
+        const typed = amountEl ? Number(amountEl.value) : 0;
+        const amount = typed > 0 ? typed : 0;
+        let state = 'none';
+        let over = false;
+        if (total !== null) {
+            const after = used + amount;
+            over = after > total + 0.004;
+            const pct = total > 0 ? after / total * 100 : (after > 0 ? 100 : 0);
+            state = over ? 'over' : (pct >= warn ? 'warn' : 'ok');
+            const shown = Math.round(pct * 10) / 10;
+            if (amount > 0) {
+                text.textContent = over
+                    ? 'This approval is ' + budgetMoney(after - total) + ' over the ' + label + ' (' + budgetMoney(Math.max(0, total - used)) + ' left). Give a reason to approve it anyway.'
+                    : 'After this approval: ' + budgetMoney(total - after) + ' left of ' + budgetMoney(total) + ' (' + shown + '% used).';
+            } else {
+                text.textContent = label.charAt(0).toUpperCase() + label.slice(1) + ': '
+                    + (used > total ? budgetMoney(used - total) + ' over ' : budgetMoney(total - used) + ' left of ') + budgetMoney(total)
+                    + ' (' + (Math.round((total > 0 ? used / total * 100 : 0) * 10) / 10) + '% used).';
+            }
+        }
+        box.className = 'budget-note state-' + state;
+        if (reasonBox) reasonBox.hidden = !over;
+        if (reason) reason.disabled = !over;
+    }
+    document.addEventListener('input', (e) => {
+        if (e.target.matches && e.target.matches('[data-claim="amount"]')) {
+            const form = e.target.closest('form');
+            if (form) updateBudgetNote(form);
+        }
+    });
+    document.querySelectorAll('[data-budget]').forEach((box) => { const form = box.closest('form'); if (form) updateBudgetNote(form); });
+
     // Shows a message under each field that isn't right; returns the first such field (or null).
     // The "empty" message of each field is its data-claim-msg.
     function checkClaimFields(scope) {
@@ -364,6 +411,7 @@
                 if (Number(v) > 99999999.99) return 'The amount is too large.';
                 return '';
             }],
+            ['budget_reason', (v, el) => (el.disabled || v ? '' : el.dataset.claimMsg)],   // only when the amount passes the budget
             ['place', required],
             ['date', (v, el) => required(v, el) || (el.min && v < el.min ? 'The claim date has already passed. Choose today or a later date.' : '')],
             ['time', required],
@@ -431,6 +479,7 @@
                 }
 
                 fillRememberedClaim(approveForm);
+                updateBudgetNote(approveForm);   // reset() cleared the amount: back to "what is left"
                 openDialog(approveDialog);
                 // Start at the first needed box still empty (OPD's time is already 4:00 AM; the note is optional)
                 const fields = Array.prototype.slice.call(approveForm.querySelectorAll('[data-claim]:not([data-claim="note"])'));
@@ -457,88 +506,112 @@
         });
     }
 
-    /* ---------- Disapprove (pending lists) ----------
-       CHANGED: replaces Reject. Posts to Main_dashboard/disapprove_applicant.php through the
-       dialog's form (ui_disapprove_dialog in admin_components.php), which carries the form token. */
+    /* ---------- Disapprove (pending lists): the Disapprove dialog ----------
+       ui_disapprove_dialog() in admin_components.php: the reasons to choose from (ui_disapprove_reasons), a box for a
+       written reason, then "Disapprove & send email". At least one reason is needed (decide_application() checks it
+       again). Posts to Main_dashboard/disapprove_applicant.php through the dialog's form, which carries the form token.
+       Always the built-in dialog (not SweetAlert2): it has to hold tick boxes. */
+
+    // Some reason must be ticked or written; otherwise the message appears under the choices. Returns whether one is.
+    function checkDisapproveReason(scope, written) {
+        const err = scope.querySelector('[data-reason-error]');
+        const ok = !!scope.querySelector('[data-reason]:checked') || !!(written && written.value.trim());
+        err.textContent = ok ? '' : 'Choose at least one reason, or write the reason, so the applicant knows what to fix.';
+        err.hidden = ok;
+        return ok;
+    }
+    function hideDisapproveError(scope) {
+        const err = scope.querySelector('[data-reason-error]');
+        err.textContent = '';
+        err.hidden = true;
+    }
+    // The message goes away as soon as a reason is ticked or typed
+    function watchDisapproveReason(scope, written) {
+        const clear = () => checkDisapproveReason(scope, written);
+        scope.querySelectorAll('[data-reason]').forEach((box) => box.addEventListener('change', () => {
+            if (!scope.querySelector('[data-reason-error]').hidden) clear();
+        }));
+        if (written) written.addEventListener('input', () => {
+            if (!scope.querySelector('[data-reason-error]').hidden) clear();
+        });
+    }
+
     const disapproveDialog = $('disapproveDialog');
     if (disapproveDialog) {
         const disapproveForm = disapproveDialog.querySelector('[data-disapprove-form]');
+        const disapproveSubmit = disapproveForm.querySelector('[type="submit"]');
+        const disapproveLabel = disapproveSubmit.innerHTML;
+        const written = disapproveForm.elements.disapproval_remarks;
+        const disapproveHelp = disapproveDialog.querySelector('[data-disapprove-help]');
+        const disapproveHelpText = disapproveHelp.textContent;
         let disapproveOpener = null;
-
-        const disapproveTitle = (name) => 'Disapprove this application for ' + (name || 'this applicant') + '?';
-        // A double-click or a second click while the page is sending does nothing
-        const sendDisapprove = (busyBtn) => {
-            if (disapproveForm.dataset.sending === '1') return;
-            disapproveForm.dataset.sending = '1';
-            setButtonBusy(busyBtn, true, 'Disapproving…');
-            disapproveForm.submit();
-        };
-
-        // SweetAlert2 version: same fields, posted through the same (hidden) form as the built-in dialog
-        function swalDisapprove(btn) {
-            window.Swal.fire(swalOptions({
-                title: disapproveTitle(btn.dataset.name),
-                html: subjectNode({
-                    message: 'The applicant may apply again.',
-                    name: btn.dataset.name,
-                    ref: btn.dataset.ref,
-                    note: 'The application is removed from the lists and kept only on the Disapproved tab.'
-                }),
-                icon: 'warning',
-                input: 'textarea',
-                inputLabel: 'Reason (optional, the applicant sees it)',
-                inputAttributes: { maxlength: '1000' },
-                confirmButtonText: 'Disapprove',
-                customClass: { confirmButton: 'btn btn-danger', input: 'swal-lgu-textarea' }
-            })).then((result) => {
-                if (!result.isConfirmed) return;
-                disapproveForm.reset();
-                disapproveForm.querySelector('[data-disapprove-id]').value = btn.dataset.disapprove;
-                disapproveForm.elements.disapproval_remarks.value = result.value || '';
-                sendDisapprove(btn);
-            });
-        }
+        watchDisapproveReason(disapproveForm, written);
 
         document.querySelectorAll('[data-disapprove]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 if (disapproveForm.dataset.sending === '1') return;
-                if (swalReady()) {
-                    swalDisapprove(btn);
-                    return;
-                }
                 disapproveOpener = btn;
                 disapproveForm.reset();
-                disapproveDialog.querySelector('[data-disapprove-id]').value = btn.dataset.disapprove;
+                hideDisapproveError(disapproveForm);
+                disapproveForm.querySelector('[data-disapprove-id]').value = btn.dataset.disapprove;
                 disapproveDialog.querySelectorAll('[data-disapprove-name]').forEach((el) => { el.textContent = btn.dataset.name; });
                 disapproveDialog.querySelector('[data-disapprove-ref]').textContent = btn.dataset.ref;
+
+                // Where the email goes; without an address, the button only disapproves
+                const email = btn.dataset.email || '';
+                const walkIn = btn.hasAttribute('data-walkin');
+                disapproveDialog.querySelector('[data-disapprove-email]').textContent = walkIn
+                    ? 'No email: walk-in application. Tell the applicant the reason in person.'
+                    : (email || 'No email on the applicant\'s account. They will see the reason when they sign in.');
+                disapproveSubmit.innerHTML = disapproveLabel;
+                disapproveSubmit.disabled = false;
+                if (!email || walkIn) disapproveSubmit.lastChild.textContent = 'Disapprove';
+                disapproveHelp.textContent = !email || walkIn
+                    ? 'The applicant sees the reasons you choose and anything you write here, so they know what to fix before applying again.'
+                    : disapproveHelpText;
+
                 openDialog(disapproveDialog);
-                disapproveDialog.querySelector('textarea').focus();
+                disapproveForm.querySelector('[data-reason]').focus();
             });
         });
         disapproveDialog.addEventListener('close', () => {
             document.body.classList.toggle('has-modal', !!document.querySelector('dialog[open]'));
-            if (disapproveOpener) disapproveOpener.focus();
+            if (disapproveOpener && disapproveForm.dataset.sending !== '1') disapproveOpener.focus();
         });
         disapproveForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            sendDisapprove(disapproveForm.querySelector('[type="submit"]'));
+            if (disapproveForm.dataset.sending === '1') return;   // a double-click sends it once
+            if (!checkDisapproveReason(disapproveForm, written)) {
+                disapproveForm.querySelector('[data-reason]').focus();
+                return;
+            }
+            disapproveForm.dataset.sending = '1';
+            setButtonBusy(disapproveSubmit, true, 'Disapproving…');
+            disapproveForm.submit();
         });
     }
 
     /* ---------- Status update forms: ask before approving or disapproving ---------- */
     document.querySelectorAll('[data-status-form]').forEach((form) => {
-        // CHANGED: choosing Disapprove turns the remarks box into the reason the applicant sees
+        // Choosing Disapprove shows the reasons to choose from, and the remarks box becomes the written reason
         const label = form.querySelector('[data-remarks-label]');
         const help = form.querySelector('[data-remarks-help]');
         const labelText = label ? label.innerHTML : '';
         const helpText = help ? help.textContent : '';
+        const reasonSection = form.querySelector('[data-reason-section]');
+        if (reasonSection) watchDisapproveReason(form, form.elements.remarks);
         // The approval details are shown (and sent) only when Approve is chosen
         const claimSection = form.querySelector('[data-claim-section]');
         const syncRemarks = () => {
             const chosen = form.querySelector('input[name="status"]:checked');
             const disapprove = !!chosen && chosen.value === 'Disapproved';
-            if (label) label.innerHTML = disapprove ? 'Reason <span class="muted">(optional, the applicant sees it)</span>' : labelText;
-            if (help) help.textContent = disapprove ? 'The applicant sees this reason, so they know what to fix before applying again.' : helpText;
+            if (label) label.innerHTML = disapprove ? 'Other reason <span class="muted">(write it here)</span>' : labelText;
+            if (help) help.textContent = disapprove ? 'Choose the reasons above, or write the reason here. The applicant is told all of them (by email, when their account has one), so they know what to fix before applying again.' : helpText;
+            if (reasonSection) {
+                reasonSection.hidden = !disapprove;
+                reasonSection.querySelectorAll('[data-reason]').forEach((box) => { box.disabled = !disapprove; });
+                if (!disapprove) hideDisapproveError(form);
+            }
             if (claimSection) {
                 const approve = !!chosen && chosen.value === 'Approved';
                 claimSection.hidden = !approve;
@@ -563,6 +636,11 @@
             }
             e.preventDefault();
             const disapprove = chosen.value === 'Disapproved';
+            // Disapproving needs a reason: a ticked one or the written one in the remarks box
+            if (disapprove && reasonSection && !checkDisapproveReason(form, form.elements.remarks)) {
+                form.querySelector('[data-reason]').focus();
+                return;
+            }
             // Approving needs the approval details (Medical/Burial: amount and claim details; OPD: the trip)
             let extraLabel = '';
             let extra = '';
@@ -592,7 +670,7 @@
             }
             confirmAction({
                 title: disapprove ? 'Disapprove this application for ' + (form.dataset.name || 'this applicant') + '?' : 'Approve this application?',
-                message: disapprove ? 'The applicant may apply again.' : 'The application moves to the approved list'
+                message: disapprove ? 'The applicant may apply again, and is told the reason.' : 'The application moves to the approved list'
                     + (claimSection ? ', and the applicant is emailed the ' + (extraLabel === 'Departure' ? 'trip schedule.' : 'claim details.') : '.'),
                 name: form.dataset.name,
                 ref: form.dataset.ref,

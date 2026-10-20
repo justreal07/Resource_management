@@ -209,11 +209,18 @@ function activity_actions(): array
         'avatar_changed'          => ['Profile picture changed',    'settings',  'neutral'],
         'password_changed'        => ['Password changed',           'settings',  'neutral'],
         'export_csv'              => ['Exported a list',            'exports',   'neutral'],
+        'export_report'           => ['Downloaded a report',        'exports',   'neutral'],
+        'budget_start'            => ['Set the budget',             'budget',    'approved'],
+        'budget_add'              => ['Added to the budget',        'budget',    'approved'],
+        'budget_reduce'           => ['Reduced the budget',         'budget',    'pending'],
+        'budget_correct'          => ['Corrected the budget',       'budget',    'pending'],
+        'budget_remove'           => ['Removed the budget',         'budget',    'danger'],
+        'budget_override'         => ['Approved over the budget',   'budget',    'danger'],
     ];
 }
 
 function activity_groups(): array
 {
     return ['decisions' => 'Approvals, disapprovals and edits', 'signins' => 'Sign-ins', 'accounts' => 'Staff accounts',
-            'settings' => 'Own settings', 'exports' => 'Exports'];
+            'settings' => 'Own settings', 'exports' => 'Exports', 'budget' => 'Budget'];
 }

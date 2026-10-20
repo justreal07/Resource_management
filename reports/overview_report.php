@@ -26,7 +26,7 @@ function report_build_overview(PDO $pdo, array $f): array
     }
     $approvedN = count($d['approved']);
     $sum = report_sum($d['approved']);
-    $basisText = $f['basis'] === 'filed' ? 'Filed in this period' : 'Approved in this period';
+    $basisText = 'Approved in this period';
 
     $cards = [
         ['label' => 'Applications filed', 'value' => number_format($d['filed_total']), 'icon' => 'inbox', 'note' => 'Filed in this period'],
@@ -59,7 +59,7 @@ function report_build_overview(PDO $pdo, array $f): array
         $withAmount += $x['with'];
         $rows[] = [$t['name'], number_format($x['n']), $x['sum'] > 0 ? ui_peso($x['sum']) : '—', $x['with'] > 0 ? ui_peso($x['sum'] / $x['with']) : '—'];
     }
-    $tables = [report_table('By program', 'Approved applications by program', report_sub($f, 'by date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved')),
+    $tables = [report_table('By program', 'Approved applications by program', report_sub($f, 'by date approved'),
         ['Program', 'Approved', 'Total amount released', 'Average per application'], $rows, [1, 2, 3],
         ['Total', number_format($approvedN), $sum > 0 ? ui_peso($sum) : '—', $withAmount > 0 ? ui_peso($sum / $withAmount) : '—'],
         'No approved applications in this period.')];

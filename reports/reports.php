@@ -8,7 +8,7 @@ require_once '../includes/report_data.php';
 $f = report_filters($_GET);
 $reportTypes = report_types();
 $ranges = report_ranges();
-report_budget_ensure($pdo);   // the budget table is made the first time (here, never mid-transaction)
+budget_ensure($pdo);   // the budget tables are made the first time (here, never mid-transaction)
 
 // Years for the Year picker: every year with an application, this year, and the one chosen
 $yearList = array_map('intval', $pdo->query("SELECT DISTINCT YEAR(created_at) FROM applicant WHERE created_at IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN));
@@ -18,8 +18,7 @@ foreach ([(int)date('Y'), $f['year']] as $y) {
 rsort($yearList);
 [$monthsShort, $monthsLong] = ui_month_labels();
 $quarters = [1 => 'Q1: Jan – Mar', 2 => 'Q2: Apr – Jun', 3 => 'Q3: Jul – Sep', 4 => 'Q4: Oct – Dec'];
-$bases = ['approved' => 'Date approved (when it was released)', 'filed' => 'Date filed'];
-// The "count approved by" choice is about approved applications: the Disapproved and Feedback tabs do not use it
+// Approved applications are counted by the date they were approved (no choice); the Disapproved and Feedback tabs do not use it
 $usesBasis = in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true);
 // A field of the filter bar is shown for some periods only (js/admin_reports.js keeps this in step when the Period changes)
 $hiddenUnless = function (string $forRanges) use ($f): string {
@@ -85,18 +84,7 @@ echo ui_page_head('Reports', 'Totals and lists to print or open in Excel.',
         <label for="rTo">To</label>
         <input type="date" id="rTo" name="to" value="<?= ui_e($f['to']) ?>" min="2000-01-01" max="<?= date('Y-m-d', strtotime('+1 year')) ?>">
     </div>
-    <?php if ($usesBasis): ?>
-        <div class="field">
-            <label for="rBasis">Count approved by</label>
-            <select id="rBasis" name="basis">
-                <?php foreach ($bases as $key => $label): ?>
-                    <option value="<?= $key ?>"<?= $f['basis'] === $key ? ' selected' : '' ?>><?= ui_e($label) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-    <?php else: ?>
-        <input type="hidden" name="basis" value="<?= ui_e($f['basis']) ?>">
-    <?php endif; ?>
+
     <button type="submit" class="btn btn-primary">Show report</button>
 </form>
 
@@ -122,7 +110,7 @@ echo ui_tabs($tabItems, $f['report'], 'Report type');
         <p class="print-office">LGU General Mariano Alvarez, Cavite</p>
         <p class="print-office-sub">Social Assistance Records</p>
         <h2><?= ui_e($model['title']) ?> report</h2>
-        <p><?= ui_e($f['label']) ?><?= $usesBasis ? ' · approved applications counted by date ' . ($f['basis'] === 'filed' ? 'filed' : 'approved') : '' ?></p>
+        <p><?= ui_e($f['label']) ?><?= $usesBasis ? ' · approved applications counted by date approved' : '' ?></p>
         <p class="print-meta">Printed by <?= ui_e($preparedBy) ?> on <?= ui_e(date('F j, Y, g:i A')) ?></p>
     </header>
     <p class="report-range">Showing <strong><?= ui_e($model['title']) ?></strong> for <strong><?= ui_e($f['label']) ?></strong></p>

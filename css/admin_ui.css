@@ -1295,11 +1295,31 @@ td .field-error { margin-top: 4px; }
 .report-notes { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .report-notes li { display: flex; align-items: flex-start; gap: 8px; }
 .report-notes .icon { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--c-primary); }
-/* "Set the budget" under the Budget use table */
-.budget-form { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--c-border); }
-.budget-form summary { min-height: 36px; padding: 6px 0; color: var(--c-primary); font-size: var(--fs-sm); font-weight: 600; cursor: pointer; }
-.budget-fields { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; margin: 8px 0; }
-.budget-fields .field { min-width: 200px; }
+/* Budget (includes/budget.php): the panel on the dashboard and program pages, the Budget page, and the note in the Approve dialog.
+   The state is always in words with an icon; the colour only backs it up. */
+.budget-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
+.budget-item { display: grid; gap: 8px; padding: 14px 16px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.budget-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
+.budget-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
+.budget-name .icon, .budget-state .icon { width: 18px; height: 18px; flex: none; }
+.budget-state { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm); font-weight: 600; }
+.budget-bar { height: 12px; overflow: hidden; background: var(--c-border); border-radius: 999px; }
+.budget-bar span { display: block; height: 100%; background: var(--c-primary); border-radius: 999px; }
+.budget-figures { margin: 0; color: var(--c-text-muted); font-size: var(--fs-sm); }
+.budget-figures strong { color: var(--c-text); }
+.budget-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.budget-item.state-warn { border-color: var(--c-pending-border); }
+.budget-item.state-warn .budget-state { color: var(--c-pending-text); }
+.budget-item.state-warn .budget-bar span { background: var(--c-pending-text); }
+.budget-item.state-over { border-color: var(--c-danger-border); }
+.budget-item.state-over .budget-state { color: var(--c-danger-text); }
+.budget-item.state-over .budget-bar span { background: var(--c-danger-text); }
+.budget-item.state-none .budget-state { color: var(--c-text-muted); }
+.budget-note { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; padding: 10px 12px; color: var(--c-info-text); font-size: var(--fs-sm); background: var(--c-info-bg); border: 1px solid var(--c-info-border); border-radius: var(--radius-sm); }
+.budget-note .icon { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.budget-note p { margin: 0; }
+.budget-note.state-warn { color: var(--c-pending-text); background: var(--c-pending-bg); border-color: var(--c-pending-border); }
+.budget-note.state-over { color: var(--c-danger-text); background: var(--c-danger-bg); border-color: var(--c-danger-border); }
 /* The heading and the signature lines of a printed report: only on paper */
 .print-head, .print-sign { display: none; }
 
@@ -1424,6 +1444,12 @@ td .field-error { margin-top: 4px; }
 .choice-row:has(> .choice > input[aria-invalid="true"]) > .choice > span { border-color: var(--c-danger-text); box-shadow: inset 0 0 0 1px var(--c-danger-text); }
 .choice-text { display: grid; line-height: 1.3; }
 .choice-text small { color: var(--c-text-muted); font-size: var(--fs-sm); font-weight: 400; }
+
+/* The reasons to choose from when disapproving: one choice per line, the whole sentence readable */
+.reason-list { display: grid; gap: 8px; margin-top: 4px; }
+.reason-list .choice > span { align-items: flex-start; font-weight: 500; line-height: 1.35; }
+.reason-list .choice > span::before { margin-top: 1px; }
+.reason-group:has([data-reason-error]:not([hidden])) .reason-list .choice > span { border-color: var(--c-danger-text); }
 
 .doc-checklist { padding: 14px 16px; background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
 .doc-checklist h3 { font-size: var(--fs-base); }

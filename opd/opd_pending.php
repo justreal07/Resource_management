@@ -24,7 +24,7 @@ $stmt->execute();
 $pendingApplicants = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
 
 admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'opd']);
-echo ui_page_head('OPD requests to review', 'Pending requests, newest first. Approve asks for the departure time (4:00 AM unless changed) and the pick-up point, then emails the applicant the trip schedule for the patient\'s check-up date. Disapprove asks you to confirm.');
+echo ui_page_head('OPD requests to review', 'Pending requests, newest first. Open Review to see the photos and details, then approve or disapprove there.');
 echo ui_type_tabs(3, 'pending');
 ?>
 <section class="panel" aria-label="OPD requests to review">
@@ -38,10 +38,9 @@ echo ui_type_tabs(3, 'pending');
     ], [
         'empty' => ['No OPD requests waiting', 'New requests will appear here.'],
         'actions' => function ($row) {
-            return ui_row_links(3, $row, true, '../opd/opd_pending.php', true)
-                . ui_decision_buttons($row, 3, 'approve_opd.php');
+            return ui_row_links(3, $row, true, '../opd/opd_pending.php', true);
         },
     ]) ?>
 </section>
 <?php
-admin_layout_end(['after' => ui_disapprove_dialog() . ui_approve_dialog(3)]);
+admin_layout_end();

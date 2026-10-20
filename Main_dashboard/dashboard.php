@@ -507,6 +507,9 @@ admin_layout_start([
                    Requests aren't stored online, so there is no count to show here. */ ?>
             </section>
 
+            <!-- ============ 1b. BUDGET (this year; the Budget page sets it, includes/budget.php) ============ -->
+            <?= ui_budget_panel($pdo) ?>
+
             <div class="dash-grid">
               <div class="dash-col">
                 <!-- ============ 2. OVERVIEW FOR THE SELECTED YEAR ============ -->

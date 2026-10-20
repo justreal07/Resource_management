@@ -71,7 +71,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
                             </div>
                             <p><?= e($n['message']) ?></p>
                             <?php if (!empty($n['note'])): ?>
-                                <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong>Note from the office:</strong> <?= e($n['note']) ?></div></div>
+                                <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong><?= ($n['kind'] ?? '') === 'not_approved' ? 'Reason:' : 'Note from the office:' ?></strong> <?= nl2br(e($n['note'])) ?></div></div>
                             <?php endif; ?>
                             <a href="<?= e($n['link']) ?>" class="ap-link-btn">
                                 <?= $n['kind'] === 'eligible' ? '<i class="fas fa-file-signature"></i> Apply now' : '<i class="fas fa-eye"></i> View application' ?>

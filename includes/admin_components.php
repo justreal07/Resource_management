@@ -9,6 +9,7 @@
 require_once __DIR__ . '/documents.php';
 require_once __DIR__ . '/avatar.php';   // profile pictures of admin and staff   // document_url() / document_file_path(): the submitted-documents list
 require_once __DIR__ . '/photo_quality.php';   // photo_quality_info(): what the applicant's device said about each photo
+require_once __DIR__ . '/budget.php';          // the budget panel, and the budget note in the Approve dialog
 
 /* ============================================================
    ASSISTANCE TYPES AND STATUSES
@@ -606,7 +607,9 @@ function ui_claim_fields(int $typeId, string $idPrefix, bool $required = true, a
             . '<div class="field"><label for="' . $f('time') . '">Time ' . $req . '</label>'
             . '<input type="time" id="' . $f('time') . '" name="claim_time"' . $r
             . ' data-claim="time" data-claim-msg="Choose the time the applicant will claim the assistance."></div>'
-            . '</div>';
+            . '</div>'
+            // What is left of this year's budget, and the reason box that appears when the amount would pass it
+            . ui_budget_note($GLOBALS['pdo'], $typeId, $idPrefix);
     }
     $requirements = ui_claim_requirements_text($typeId);
     return $html
@@ -671,30 +674,55 @@ function ui_current_page(): string
 function ui_disapprove_button(array $row, int $typeId, array $opts = []): string
 {
     if (($row['status'] ?? 'Pending') !== 'Pending' || !decision_can(decision_user(), $typeId)) return '';
+    $walkIn = array_key_exists('account_id', $row) && $row['account_id'] === null;
     return '<button type="button" class="' . ui_e($opts['class'] ?? 'btn btn-danger btn-sm') . '" data-disapprove="' . (int)$row['id'] . '"'
-        . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '">' . ui_icon('x-circle') . 'Disapprove'
+        . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '"'
+        . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '"' . ($walkIn ? ' data-walkin' : '') . '>'
+        . ui_icon('x-circle') . 'Disapprove'
         . (isset($opts['hint']) ? ' <kbd>' . ui_e($opts['hint']) . '</kbd>' : '') . '</button>';
 }
 
-/** One disapprove dialog per page (used when SweetAlert2 hasn't loaded). Posts to Main_dashboard/disapprove_applicant.php. */
+/**
+ * The reasons to choose from when disapproving (DISAPPROVAL_REASONS): tick boxes, as many as apply. The dialog adds a box
+ * for a written reason, the Update page uses its Remarks box for it. At least one of the two is needed (checked in
+ * admin_ui.js and again by decide_application()). $attrs: extra attributes on the group (the Update page hides it
+ * until Disapprove is chosen).
+ */
+function ui_disapprove_reasons(string $idPrefix, string $attrs = ''): string
+{
+    $html = '<div class="field reason-group" role="group" aria-labelledby="' . $idPrefix . 'ReasonLabel" ' . $attrs . '>'
+        . '<span class="label" id="' . $idPrefix . 'ReasonLabel">Reason <span class="req" aria-hidden="true">*</span> <span class="muted">(choose all that apply)</span></span>'
+        . '<div class="reason-list">';
+    foreach (DISAPPROVAL_REASONS as $key => $sentence) {
+        $html .= '<label class="choice"><input type="checkbox" name="disapproval_reasons[]" value="' . ui_e($key) . '" data-reason><span>' . ui_e($sentence) . '</span></label>';
+    }
+    return $html . '</div><p class="field-error" tabindex="-1" data-reason-error hidden></p></div>';
+}
+
+/**
+ * The Disapprove dialog, one per page: the reasons to choose from, a box for a written reason, then
+ * "Disapprove & send email" (the applicant is emailed the reasons). Posts to Main_dashboard/disapprove_applicant.php.
+ */
 function ui_disapprove_dialog(string $return = ''): string
 {
-    return '<dialog id="disapproveDialog" class="modal modal-sm" aria-labelledby="disapproveTitle">'
-        . '<form method="POST" action="../Main_dashboard/disapprove_applicant.php" data-disapprove-form>'
+    return '<dialog id="disapproveDialog" class="modal" aria-labelledby="disapproveTitle">'
+        . '<form method="POST" action="../Main_dashboard/disapprove_applicant.php" novalidate data-disapprove-form>'
         . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e($return !== '' ? $return : ui_current_page()) . '">'
         . '<div class="modal-header"><h2 id="disapproveTitle">Disapprove this application for <span data-disapprove-name></span>?</h2>'
         . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
         . '<div class="modal-body">'
         . '<p>The applicant may apply again. The application is removed from the lists.</p>'
-        . '<dl class="confirm-subject"><div><dt>Name</dt><dd data-disapprove-name></dd></div><div><dt>Reference</dt><dd data-disapprove-ref></dd></div></dl>'
+        . '<dl class="confirm-subject"><div><dt>Name</dt><dd data-disapprove-name></dd></div><div><dt>Reference</dt><dd data-disapprove-ref></dd></div>'
+        . '<div><dt>Email to</dt><dd data-disapprove-email></dd></div></dl>'
         . '<input type="hidden" name="applicant_id" data-disapprove-id>'
-        . '<div class="field"><label for="disapprovalRemarks">Reason <span class="muted">(optional)</span></label>'
+        . ui_disapprove_reasons('disapprove')
+        . '<div class="field"><label for="disapprovalRemarks">Other reason <span class="muted">(write it here)</span></label>'
         . '<textarea id="disapprovalRemarks" name="disapproval_remarks" rows="3" maxlength="' . DISAPPROVAL_REMARKS_MAX . '" aria-describedby="disapprovalRemarksHelp"></textarea>'
-        . '<p class="field-help" id="disapprovalRemarksHelp">The applicant sees this reason, so they know what to fix before applying again.</p></div>'
+        . '<p class="field-help" id="disapprovalRemarksHelp" data-disapprove-help>The applicant is emailed the reasons you choose and anything you write here, so they know what to fix before applying again.</p></div>'
         . '</div>'
         . '<div class="modal-footer"><span class="modal-footer-space"></span>'
         . '<button type="button" class="btn btn-secondary" data-dialog-close>Cancel</button>'
-        . '<button type="submit" class="btn btn-danger">' . ui_icon('x-circle') . 'Disapprove</button></div>'
+        . '<button type="submit" class="btn btn-danger">' . ui_icon('x-circle') . 'Disapprove &amp; send email</button></div>'
         . '</form></dialog>';
 }
 
@@ -1027,7 +1055,9 @@ function ui_type_overview(int $typeId, array $stats, array $recent, array $month
         ['label' => 'Pending', 'value' => number_format((int)$stats['pending']), 'href' => ui_type_url($typeId, 'pending'), 'status' => 'Pending'],
         ['label' => 'Approved', 'value' => number_format((int)$stats['approved']), 'href' => ui_type_url($typeId, 'approved'), 'status' => 'Approved'],
     ];
-    $html .= ui_stat_cards($cards) . $afterCards;
+    // Medical and Burial release money: their budget, for the admin (the staff side only ever shows OPD)
+    $budget = in_array($typeId, budget_types(), true) && ui_area() === 'admin' ? ui_budget_panel($GLOBALS['pdo'], $typeId) : '';
+    $html .= ui_stat_cards($cards) . $budget . $afterCards;
 
     $html .= '<section class="panel" aria-labelledby="recentTitle"><div class="panel-head"><h3 id="recentTitle">Recent applications</h3>'
         . '<p class="panel-sub">The 10 newest, from any date</p></div>'
@@ -1477,6 +1507,9 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
             . ' emailed to the applicant'
             . (array_key_exists('account_id', $row) && $row['account_id'] === null ? ' (this walk-in has no account, so no email: tell them in person).' : '.') . '</p>'
             . ui_claim_fields($typeId, 'update', false, $row) . '</fieldset>';
+        // Disapproving needs a reason: the boxes here plus the Remarks box below (which becomes the written reason).
+        // admin_ui.js shows this part only for Disapprove.
+        $html .= ui_disapprove_reasons('update', 'data-reason-section hidden');
     } else {
         $html .= '<input type="hidden" name="status" value="' . ui_e($row['status']) . '">'
             . '<p class="alert alert-info" role="note">' . ui_icon('info', 'alert-icon') . '<span class="alert-body">This application was already '

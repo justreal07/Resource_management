@@ -27,14 +27,28 @@
  *   - Burial: a death recorded when it was filed is cleared again
  *   - Medical: a re-apply permission it used up is given back (new row in the permission log)
  *   - the applicant is told "not approved, you may apply again" (account_helpers.php)
+ * Disapproving needs a reason, chosen in the Disapprove dialog (or on the Update page): one or more of DISAPPROVAL_REASONS
+ * and/or a written one. They are saved together as disapproval_remarks (one line each) and, after the decision is saved,
+ * emailed to the applicant like the approval details (a walk-in has no account; a failed email never undoes the decision).
+ *
+ * Medical / Burial approvals are also checked against the yearly budget (includes/budget.php), under a lock per program: an approval
+ * that would pass the budget needs a written reason (budget_reason), which is saved in budget_overrides with the approval.
  *
  * Needs database/migrations/migration_disapprove.sql (Approve works without it; Disapprove asks for it).
  */
+require_once __DIR__ . '/budget.php';
 
 const DECISION_PENDING = 'Pending';
 const DECISION_APPROVED = 'Approved';
 const DECISION_DISAPPROVED = 'Disapproved';
-const DISAPPROVAL_REMARKS_MAX = 1000;
+const DISAPPROVAL_REMARKS_MAX = 1000;   // the written reason ("Other"), not the chosen ones
+// The reasons offered when disapproving: key => the sentence the applicant is emailed and sees. They speak to the applicant.
+const DISAPPROVAL_REASONS = [
+    'inaccurate' => 'The information you gave is not accurate, or it does not match your documents.',
+    'unreadable' => 'One or more of your documents or photos cannot be read: the details are blurry, cut off or not visible.',
+    'incomplete' => 'Required documents are missing or incomplete.',
+    'ineligible' => 'The request does not meet the requirements of this program.',
+];
 const CLAIM_PLACE_MAX = 255;          // claim details: the column sizes (migration_approval_claim.sql)
 const CLAIM_REQUIREMENTS_MAX = 2000;
 const CLAIM_NOTE_MAX = 1000;
@@ -278,12 +292,14 @@ function decision_opd_schedule_problem($checkupDate): ?string
  * Approve or disapprove one Pending application.
  *
  * @param string $decision 'approve' or 'disapprove'
- * @param array  $opts     amount (?float), require_amount (bool), remarks (string, disapproval reason),
+ * @param array  $opts     amount (?float), require_amount (bool), reasons (array of DISAPPROVAL_REASONS keys) and
+ *                         remarks (string, the written reason): a disapproval needs at least one of them,
  *                         claim (array: claim_place, claim_date (not OPD), claim_time, claim_requirements,
  *                         claim_note; needed to approve), send_email (bool, default true),
+ *                         budget_reason (string: why an approval may pass the yearly budget; needed only then),
  *                         expect_type (int: the page only handles this program), user (override for tests)
  * @return array{ok: bool, code: string, message: string, application: ?array, warning: ?string}
- *         code: approved | disapproved | invalid | auth | forbidden | already | amount | claim | remarks | setup | error.
+ *         code: approved | disapproved | invalid | auth | forbidden | already | amount | claim | budget | remarks | setup | error.
  *         message is always safe to show (no SQL, no table names). warning: the approval email was not sent.
  */
 function decide_application(PDO $pdo, $applicantId, string $decision, array $opts = []): array
@@ -318,14 +334,15 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
 
     $remarks = null;
     if ($decision === 'disapprove') {
-        $remarks = trim(preg_replace('/[ \t]+/u', ' ', (string)($opts['remarks'] ?? '')) ?? '');
-        if (mb_strlen($remarks) > DISAPPROVAL_REMARKS_MAX) {
-            return decision_result(false, 'remarks', 'The reason is too long (up to ' . number_format(DISAPPROVAL_REMARKS_MAX) . ' characters).');
-        }
-        $remarks = $remarks === '' ? null : $remarks;
+        $composed = decision_disapproval_compose($opts['reasons'] ?? [], $opts['remarks'] ?? '');
+        if (!$composed['ok']) return decision_result(false, 'remarks', $composed['message']);
+        $remarks = $composed['text'];
     }
 
     $lock = null;
+    $budgetLock = null;     // type id of the program whose budget lock is held (released below, whatever happens)
+    $budgetCheck = null;    // the budget before and after this approval, when the program has a budget to check
+    $override = null;       // set when this approval passes the budget (and its reason was given)
     try {
         if ($decision === 'disapprove' && !decision_schema_ready($pdo)) {
             return decision_result(false, 'setup', 'Applications can\'t be disapproved until the database update is installed. '
@@ -373,6 +390,30 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
             if (!decision_claim_ensure($pdo)) {
                 return decision_result(false, 'setup', 'Applications can\'t be approved until the database update is installed. '
                     . 'Ask the system administrator to run database/migrations/migration_approval_claim.sql.', $app);
+            }
+
+            // The yearly budget (Medical / Burial). One lock per program, held until the approval is saved, so two admins
+            // approving at the same moment each see what the other already used. No budget set = no limit; a budget
+            // table that can't be made or read never stops an approval (budget_statuses() then says "no budget").
+            if ($amount !== null && decision_needs_amount($typeId) && budget_ensure($pdo)) {
+                if (!budget_get_lock($pdo, $typeId)) {
+                    return decision_result(false, 'error', 'The ' . ui_types()[$typeId]['name'] . ' budget is busy right now. Please try again in a moment.', $app);
+                }
+                $budgetLock = $typeId;
+                $budgetCheck = budget_check_approval($pdo, (int)date('Y'), $typeId, $amount);
+                if ($budgetCheck['over']) {
+                    $before = $budgetCheck['before'];
+                    $reason = trim(preg_replace('/\s+/u', ' ', (string)($opts['budget_reason'] ?? '')) ?? '');
+                    if ($reason === '') {
+                        return decision_result(false, 'budget', 'This approval of ' . ui_peso($amount) . ' is ' . ui_peso($budgetCheck['over_by']) . ' over the '
+                            . $before['year'] . ' ' . ui_types()[$typeId]['short'] . ' budget (' . ui_peso(max(0, $before['remaining'])) . ' left of ' . ui_peso($before['budget'])
+                            . '). Give the reason for going over the budget to approve it anyway.', $app);
+                    }
+                    if (mb_strlen($reason) > BUDGET_REASON_MAX) {
+                        return decision_result(false, 'budget', 'The reason for going over the budget is too long (up to ' . BUDGET_REASON_MAX . ' characters).', $app);
+                    }
+                    $override = ['reason' => $reason, 'over_by' => $budgetCheck['over_by'], 'year' => $before['year']];
+                }
             }
         }
 
@@ -428,6 +469,14 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         $pdo->prepare('INSERT INTO application_status_history (applicant_id, old_status, new_status, changed_by, changed_at) VALUES (?, ?, ?, ?, NOW())')
             ->execute([$id, DECISION_PENDING, $newStatus, $user['id']]);
 
+        if ($override !== null) {
+            // Saved with the approval: if this fails, the approval is rolled back too
+            $pdo->prepare('INSERT INTO budget_overrides (application_id, budget_year, assistance_type_id, amount, over_by, reason, approved_by, approved_by_name, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())')
+                ->execute([$id, $override['year'], $typeId, number_format($amount, 2, '.', ''), number_format($override['over_by'], 2, '.', ''), $override['reason'],
+                           $user['id'], mb_substr((string)($_SESSION['user']['name'] ?? $_SESSION['user']['username'] ?? ''), 0, 100) ?: null]);
+        }
+
         if ($decision === 'disapprove') {
             decision_release_person($pdo, $peek, $user['id']);
         }
@@ -441,11 +490,25 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         if ($lock !== null) {
             try { $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$lock]); } catch (Throwable $e) { error_log('decide_application unlock: ' . $e->getMessage()); }
         }
+        if ($budgetLock !== null) budget_release_lock($pdo, $budgetLock);
     }
 
     $label = $app['name'] . ' (Ref #' . $app['id'] . ')';
     if ($decision === 'approve') {
         $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 2) : '') . '.', $app);
+        // What the approval did to the budget: told once, so the admin knows how much is left (or that it went over)
+        if ($budgetCheck !== null && $budgetCheck['before']['budget'] !== null) {
+            $b = $budgetCheck['before'];
+            $name = $b['year'] . ' ' . ui_types()[$typeId]['short'] . ' budget';
+            $after = $budgetCheck['used_after'];
+            $percent = $b['budget'] > 0 ? round($after / $b['budget'] * 100) : 100;
+            if ($override !== null) {
+                $result['message'] .= ' It is ' . ui_peso($override['over_by']) . ' over the ' . $name . '; the reason was recorded on the Budget page.';
+                activity_log('budget_override', $label . ' approved ' . ui_peso($amount) . ', ' . ui_peso($override['over_by']) . ' over the ' . $name . ': ' . $override['reason']);
+            } elseif ($percent >= BUDGET_WARN_PERCENT) {
+                $result['message'] .= ' The ' . $name . ' is now ' . $percent . '% used (' . ui_peso($b['budget'] - $after) . ' left).';
+            }
+        }
         // Only after the approval is saved: an email that fails must not undo it
         if ($claim !== null && ($opts['send_email'] ?? true)) {
             $mail = decision_send_approval_email($pdo, $id);
@@ -457,7 +520,41 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
         return $result;
     }
-    return decision_result(true, 'disapproved', $label . ' was disapproved. The applicant may apply again.', $app);
+    $result = decision_result(true, 'disapproved', $label . ' was disapproved. The applicant may apply again.', $app);
+    // Only after the disapproval is saved: an email that fails must not undo it
+    if ($opts['send_email'] ?? true) {
+        $mail = decision_send_disapproval_email($pdo, $id);
+        if ($mail['sent']) {
+            $result['message'] .= ' ' . $mail['note'];
+        } else {
+            $result['warning'] = $label . ' was disapproved, but ' . $mail['note'];
+        }
+    }
+    return $result;
+}
+
+/**
+ * The reason saved for a disapproval: the chosen reasons (keys of DISAPPROVAL_REASONS, listed in the list's order,
+ * unknown keys ignored) and the written one, one per line. At least one is needed: the applicant is told what to fix.
+ * @param mixed $keys the chosen keys (array), $typed the written reason
+ * @return array{ok: bool, text?: string, message?: string}
+ */
+function decision_disapproval_compose($keys, $typed): array
+{
+    $keys = is_array($keys) ? $keys : [];
+    $lines = [];
+    foreach (DISAPPROVAL_REASONS as $key => $sentence) {
+        if (in_array((string)$key, $keys, true)) $lines[] = $sentence;
+    }
+    $typed = trim(preg_replace('/[ \t]+/u', ' ', (string)$typed) ?? '');
+    if (mb_strlen($typed) > DISAPPROVAL_REMARKS_MAX) {
+        return ['ok' => false, 'message' => 'The written reason is too long (up to ' . number_format(DISAPPROVAL_REMARKS_MAX) . ' characters).'];
+    }
+    if ($typed !== '') $lines[] = $typed;
+    if (!$lines) {
+        return ['ok' => false, 'message' => 'Choose at least one reason, or write the reason, so the applicant knows what to fix before applying again.'];
+    }
+    return ['ok' => true, 'text' => implode("\n", $lines)];
 }
 
 /**
@@ -502,8 +599,51 @@ function decision_person_name(array $row): string
 }
 
 /* ============================================================
-   THE APPROVAL EMAIL
+   THE DECISION EMAILS (approval, disapproval)
    ============================================================ */
+
+/** The application with its program name and the applicant's account (email, name), for an email. False when it can't be read. */
+function decision_email_row(PDO $pdo, int $id)
+{
+    try {
+        $stmt = $pdo->prepare('SELECT a.*, at.name AS type_name, acc.email AS account_email, acc.firstname AS account_firstname, acc.lastname AS account_lastname
+                               FROM applicant a
+                               LEFT JOIN assistance_types at ON at.id = a.assistance_type_id
+                               LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
+                               WHERE a.id = ?');
+        $stmt->execute([$id]);
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('decision_email_row #' . $id . ': ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Who an email about this decided application goes to, or why none can be sent.
+ * $status is the status it must have now, $what names the content ("claim details", "reason"), $tellThem finishes
+ * "Tell the applicant ..." when the application can't be read.
+ * @return array{to?: string, name?: string, note?: string} note: the end of the admin's message when nothing is sent.
+ */
+function decision_email_recipient($a, string $status, string $what, string $tellThem): array
+{
+    require_once __DIR__ . '/mailer.php';
+    if (!$a || $a['status'] !== $status) {
+        return ['note' => 'the ' . $what . ' could not be emailed. Tell the applicant ' . $tellThem];
+    }
+    if ($a['account_id'] === null) {
+        return ['note' => 'no email was sent: this is a walk-in application with no applicant account. Give the applicant the ' . $what . ' in person or by phone.'];
+    }
+    $to = trim((string)$a['account_email']);
+    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+        return ['note' => 'no email was sent: the applicant\'s account has no email address. They can see the ' . $what . ' when they sign in; you may also call them.'];
+    }
+    if (!mail_ready()) {
+        return ['note' => 'no email was sent because email isn\'t set up on this computer (mail.local.php). The applicant can see the ' . $what . ' when they sign in.'];
+    }
+    $greet = trim(preg_replace('/\s+/u', ' ', $a['account_firstname'] . ' ' . $a['account_lastname']) ?? '') ?: decision_person_name($a);
+    return ['to' => $to, 'name' => $greet];
+}
 
 /**
  * Email the approval details of an approved application to the email on the applicant's account:
@@ -513,36 +653,13 @@ function decision_person_name(array $row): string
  */
 function decision_send_approval_email(PDO $pdo, int $id): array
 {
-    require_once __DIR__ . '/mailer.php';
-    try {
-        $stmt = $pdo->prepare('SELECT a.*, at.name AS type_name, acc.email AS account_email, acc.firstname AS account_firstname, acc.lastname AS account_lastname
-                               FROM applicant a
-                               LEFT JOIN assistance_types at ON at.id = a.assistance_type_id
-                               LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
-                               WHERE a.id = ?');
-        $stmt->execute([$id]);
-        $a = $stmt->fetch(PDO::FETCH_ASSOC);
-    } catch (Throwable $e) {
-        error_log('decision_send_approval_email #' . $id . ': ' . $e->getMessage());
-        $a = false;
-    }
+    $a = decision_email_row($pdo, $id);
     $opd = $a && (int)$a['assistance_type_id'] === 3;
     $what = $opd ? 'trip schedule' : 'claim details';
-    if (!$a || $a['status'] !== DECISION_APPROVED) {
-        return ['sent' => false, 'note' => 'the ' . $what . ' could not be emailed. Tell the applicant ' . ($opd ? 'the departure time and pick-up point.' : 'where and when to claim.')];
-    }
-    if ($a['account_id'] === null) {
-        return ['sent' => false, 'note' => 'no email was sent: this is a walk-in application with no applicant account. Give the applicant the ' . $what . ' in person or by phone.'];
-    }
-    $to = trim((string)$a['account_email']);
-    if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
-        return ['sent' => false, 'note' => 'no email was sent: the applicant\'s account has no email address. They can see the ' . $what . ' when they sign in; you may also call them.'];
-    }
-    if (!mail_ready()) {
-        return ['sent' => false, 'note' => 'no email was sent because email isn\'t set up on this computer (mail.local.php). The applicant can see the ' . $what . ' when they sign in.'];
-    }
-
-    $greetName = trim(preg_replace('/\s+/u', ' ', $a['account_firstname'] . ' ' . $a['account_lastname']) ?? '') ?: decision_person_name($a);
+    $who = decision_email_recipient($a, DECISION_APPROVED, $what, $opd ? 'the departure time and pick-up point.' : 'where and when to claim.');
+    if (!isset($who['to'])) return ['sent' => false, 'note' => $who['note']];
+    $to = $who['to'];
+    $greetName = $who['name'];
     $program = $a['type_name'] ?: 'Assistance';
     $time = date('g:i A', strtotime($a['claim_time']));
     if ($opd) {
@@ -603,6 +720,55 @@ function decision_send_approval_email(PDO $pdo, int $id): array
     return ['sent' => true, 'note' => 'The ' . $what . ($opd ? ' was' : ' were') . ' emailed to ' . $to . '.'];
 }
 
+/**
+ * Email the reason(s) of a disapproved application to the email on the applicant's account, so they know what to fix
+ * before applying again. The text is built only from the saved reason (disapproval_remarks), one line each.
+ * @return array{sent: bool, note: string} note: the end of the admin's message ("The reason was emailed to ...").
+ */
+function decision_send_disapproval_email(PDO $pdo, int $id): array
+{
+    $a = decision_email_row($pdo, $id);
+    $who = decision_email_recipient($a, DECISION_DISAPPROVED, 'reason', 'why it was disapproved.');
+    if (!isset($who['to'])) return ['sent' => false, 'note' => $who['note']];
+    $to = $who['to'];
+    $greetName = $who['name'];
+
+    $opd = (int)$a['assistance_type_id'] === 3;
+    $program = $a['type_name'] ?: 'Assistance';
+    $noun = $opd ? 'request' : 'application';
+    $reasons = array_values(array_filter(array_map('trim', preg_split('/\R/u', (string)$a['disapproval_remarks']) ?: [])));
+    if (!$reasons) {
+        return ['sent' => false, 'note' => 'the reason could not be emailed because none was saved. Tell the applicant why it was disapproved.'];
+    }
+    $subject = 'Disapproved: your ' . ($opd ? 'OPD request' : $program . ' application') . ' (Ref #' . $id . ')';
+    $intro = "Your $program $noun (Ref #$id) for " . decision_person_name($a) . ' was reviewed and could not be approved.';
+    $heading = count($reasons) === 1 ? 'The reason:' : 'The reasons:';
+    $closing = 'Please correct this and submit a new ' . $noun . '. You may apply again right away.';
+    $link = app_base_url() . '/user/view_application.php?id=' . $id;
+
+    $text = "Good day, $greetName.\n\n$intro\n\n$heading\n";
+    foreach ($reasons as $r) $text .= "- $r\n";
+    $text .= "\n$closing\n\nYou can also see this in your account: $link\n\n"
+        . "Social Assistance Office\nLGU General Mariano Alvarez, Cavite\n";
+
+    $h = function ($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); };
+    $items = '';
+    foreach ($reasons as $r) $items .= '<li style="margin:4px 0">' . $h($r) . '</li>';
+    $html = '<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#1a1a1a;max-width:560px">'
+        . '<p>Good day, ' . $h($greetName) . '.</p>'
+        . '<p>' . $h($intro) . '</p>'
+        . '<p style="margin-bottom:4px"><strong>' . $h($heading) . '</strong></p><ul style="margin-top:0;padding-left:20px">' . $items . '</ul>'
+        . '<p>' . $h($closing) . '</p>'
+        . '<p>You can also see this in your account: <a href="' . $h($link) . '">' . $h($link) . '</a></p>'
+        . '<p style="color:#555">Social Assistance Office<br>LGU General Mariano Alvarez, Cavite</p></div>';
+
+    if (!mail_send($to, $greetName, $subject, $text, $html)) {
+        return ['sent' => false, 'note' => 'the email to ' . $to . ' could not be sent (no internet, or Gmail refused it). '
+            . 'The applicant can see the reason when they sign in; you may also call them.'];
+    }
+    return ['sent' => true, 'note' => 'The reason was emailed to ' . $to . '.'];
+}
+
 /* ============================================================
    PAGES THAT SEND A DECISION
    ============================================================ */
@@ -649,7 +815,9 @@ function decision_run_endpoint(PDO $pdo, string $decision, array $cfg = []): voi
             decision_claim_ensure($pdo);   // here, before decide_application() opens its transaction
             $opts['amount'] = is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null;
             $opts['claim'] = decision_claim_from_post();
+            $opts['budget_reason'] = is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '';
         } else {
+            $opts['reasons'] = decision_reasons_from_post();
             $opts['remarks'] = is_string($_POST['disapproval_remarks'] ?? null) ? $_POST['disapproval_remarks'] : '';
         }
         $result = decide_application($pdo, $_POST['applicant_id'] ?? null, $decision, $opts);
@@ -662,6 +830,13 @@ function decision_run_endpoint(PDO $pdo, string $decision, array $cfg = []): voi
     $to = $result['ok'] && !$backToReview && isset($cfg['on_success']) ? $cfg['on_success']($result) : decision_return_url($fallback);
     header('Location: ' . $to);
     exit();
+}
+
+/** The reasons ticked in the Disapprove dialog or on the Update page (checkboxes named disapproval_reasons[]). */
+function decision_reasons_from_post(): array
+{
+    $posted = $_POST['disapproval_reasons'] ?? null;
+    return is_array($posted) ? array_values(array_filter($posted, 'is_string')) : [];
 }
 
 /**
@@ -724,8 +899,9 @@ function decision_save_update_form(PDO $pdo, array $row): array
                 'amount'         => is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null,
                 'require_amount' => decision_needs_amount($typeId),
                 'claim'          => decision_claim_from_post(),
+                'budget_reason'  => is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '',
             ])
-            : decide_application($pdo, $row['id'], 'disapprove', ['remarks' => $remarks]);
+            : decide_application($pdo, $row['id'], 'disapprove', ['reasons' => decision_reasons_from_post(), 'remarks' => $remarks]);
         if (!$result['ok']) return ['ok' => false, 'message' => $result['message']];
         if (!empty($result['warning'])) $_SESSION['warning_message'] = $result['warning'];
         if ($choice === DECISION_DISAPPROVED) {
