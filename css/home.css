@@ -36,7 +36,7 @@
     --shadow-lg: 0 24px 60px rgba(10, 36, 114, 0.18);
 
     --container: 1200px;
-    --header-h: 84px;
+    --header-h: 156px;
 }
 
 /* ============================================
@@ -160,6 +160,8 @@ a { color: var(--navy); }
     color: rgba(255, 255, 255, 0.85);
     font-size: 0.85rem;
 }
+.topbar .container,
+.nav-container { max-width: 1400px; }   /* wider than the page body so the big logos, the menu and the buttons stay on one line; the top bar matches so their edges line up */
 .topbar .container {
     display: flex;
     align-items: center;
@@ -231,15 +233,15 @@ a { color: var(--navy); }
 .brand {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     text-decoration: none;
     min-width: 0;
 }
-.brand-logos { display: flex; flex: none; }
+.brand-logos { display: flex; align-items: center; flex: none; }
 .brand-logos img {
     flex: none;
-    width: 62px;
-    height: 62px;
+    width: 136px;
+    height: 136px;
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid #fff;
@@ -248,18 +250,18 @@ a { color: var(--navy); }
     position: relative;
 }
 .brand-logos img:first-child { z-index: 1; }
-.brand-logos img + img { margin-left: -18px; }
-.brand-text { display: flex; flex-direction: column; justify-content: center; line-height: 1.15; min-width: 0; overflow: hidden; }
+.brand-logos img + img { margin-left: -40px; }
+.brand-text { display: flex; flex-direction: column; justify-content: center; align-self: center; gap: 3px; line-height: 1.15; min-width: 0; overflow: hidden; }
 .brand-text strong {
     font-family: 'Poppins', sans-serif;
-    font-size: 1.12rem;
+    font-size: 1.15rem;
     color: var(--navy);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .brand-text small {
-    font-size: 0.78rem;
+    font-size: 0.84rem;
     color: var(--muted);
     font-weight: 500;
     white-space: nowrap;
@@ -278,7 +280,7 @@ a { color: var(--navy); }
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 12px;
+    padding: 10px 10px;
     border-radius: 10px;
     color: var(--ink);
     text-decoration: none;
@@ -308,8 +310,8 @@ a { color: var(--navy); }
     display: flex;
     align-items: center;
     gap: 10px;
-    margin-left: 10px;
-    padding-left: 14px;
+    margin-left: 18px;
+    padding-left: 20px;
     border-left: 1px solid var(--line);
 }
 
@@ -1670,6 +1672,9 @@ a { color: var(--navy); }
 /* Collapse to the hamburger menu before the header items get squeezed
    (brand + nav links + login/signup need ~1100px to sit on one line) */
 @media (max-width: 1180px) {
+    :root { --header-h: 100px; }
+    .brand-logos img { width: 80px; height: 80px; }
+    .brand-logos img + img { margin-left: -24px; }
     .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
     .nav-menu {
         position: absolute;
@@ -1721,6 +1726,7 @@ a { color: var(--navy); }
 }
 
 @media (max-width: 640px) {
+    :root { --header-h: 84px; }
     body { font-size: 1rem; }
     .container { padding: 0 16px; }
     .topbar-info span:not(:first-child) { display: none; }

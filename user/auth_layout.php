@@ -64,9 +64,15 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
             <a href="feedback.php" class="nav-link">Feedback</a>
             <a href="landingpage.php#how-it-works" class="nav-link">How to Apply</a>
             <a href="landingpage.php#faq" class="nav-link">FAQs</a>
+            <?php /* The button for the page the visitor is already on is left out (Log in on the log-in form, Sign up on the sign-up form); the other one stays */
+            $onPage = basename($_SERVER['SCRIPT_NAME'] ?? ''); ?>
             <div class="nav-actions">
-                <a href="applicant_login.php" class="btn btn-sm <?php echo $active === 'login' ? 'btn-primary' : 'btn-outline'; ?>"<?php echo $active === 'login' ? ' aria-current="page"' : ''; ?>><i class="fas fa-sign-in-alt"></i> Log in</a>
-                <a href="applicant_register.php" class="btn btn-sm <?php echo $active === 'register' ? 'btn-primary' : 'btn-outline'; ?>"<?php echo $active === 'register' ? ' aria-current="page"' : ''; ?>><i class="fas fa-user-plus"></i> Sign up</a>
+                <?php if ($onPage !== 'applicant_login.php'): ?>
+                <a href="applicant_login.php" class="btn btn-sm btn-outline"><i class="fas fa-sign-in-alt"></i> Log in</a>
+                <?php endif; ?>
+                <?php if ($onPage !== 'applicant_register.php'): ?>
+                <a href="applicant_register.php" class="btn btn-sm btn-primary"><i class="fas fa-user-plus"></i> Sign up</a>
+                <?php endif; ?>
             </div>
         </nav>
     </div>
