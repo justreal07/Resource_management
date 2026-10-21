@@ -107,8 +107,9 @@ foreach ($sections as $i => $s) {
 }
 $fields = array_merge(...array_column($sections, 2));
 
-// The amount released: on every approved application. Medical and Burial must have one (as when approving); OPD may.
-$showAmount = $status === 'Approved' && array_key_exists('amount', $applicant);
+// The amount released: on approved Medical and Burial applications, which must have one (as when approving). OPD gives no money,
+// so its edit page has no amount box.
+$showAmount = $status === 'Approved' && $typeId !== 3 && array_key_exists('amount', $applicant);
 $amountRequired = $showAmount && decision_needs_amount($typeId);
 $amountText = function ($v): string { return $v === null || $v === '' ? '' : number_format((float)$v, 2, '.', ''); };
 

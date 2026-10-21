@@ -260,31 +260,31 @@ function ui_filter_by_name(array $rows): array
 }
 
 /**
- * The "Find an applicant by name" bar under a program's title. On a list it narrows that list (the page's rows go through
- * ui_filter_by_name()); on the Overview, which has no list, it opens All applications with the search.
+ * The "Find an applicant by name" bar of a program's OVERVIEW page: it opens All applications with the search. The lists have
+ * no bar of their own (each has its "Search this list" box); a list reached with ?name= only shows how many matched and a Clear link.
  */
 function ui_name_search(int $typeId, string $current): string
 {
     $q = ui_name_query();
+    if ($current !== 'overview') {
+        // A list has its own "Search this list" box, so it gets no second bar. It only says what a search made on the
+        // Overview did to it, with a way back to the whole list.
+        if ($q === '') return '';
+        $filter = $GLOBALS['ui_name_filter'] ?? null;
+        $what = $filter !== null
+            ? '<strong>' . number_format($filter['found']) . '</strong> ' . ($filter['found'] === 1 ? 'applicant matches' : 'applicants match') . ' “' . ui_e($filter['q']) . '” in this list.'
+            : 'Showing applicants named “' . ui_e($q) . '”.';
+        return '<p class="name-search-result" role="status">' . $what . ' <a class="btn btn-link btn-sm" href="' . ui_e(ui_current_page()) . '">Clear search</a></p>';
+    }
+    // The Overview has no list: its bar opens All applications with the search
     $short = ui_types()[$typeId]['short'];
-    $action = $current === 'overview' ? ui_type_url($typeId, 'all') : ui_current_page();
-    $filter = $GLOBALS['ui_name_filter'] ?? null;
-    $html = '<form class="name-search" method="GET" action="' . ui_e($action) . '" role="search">'
+    return '<form class="name-search" method="GET" action="' . ui_e(ui_type_url($typeId, 'all')) . '" role="search">'
         . '<label for="nameSearch" class="visually-hidden">Find a ' . ui_e($short) . ' applicant by name</label>'
         . '<div class="input-icon">' . ui_icon('search')
-        . '<input type="search" id="nameSearch" name="name" value="' . ui_e($q) . '" maxlength="100" autocomplete="off" placeholder="Find a ' . ui_e($short) . ' applicant by name"></div>'
-        . '<button type="submit" class="btn btn-primary btn-sm">Find</button>';
-    if ($q !== '' && $current !== 'overview') {
-        $html .= '<a class="btn btn-link btn-sm" href="' . ui_e($action) . '">Clear</a>';
-    }
-    $html .= '</form>';
-    if ($q !== '' && $filter !== null && $current !== 'overview') {
-        $html .= '<p class="name-search-result" role="status"><strong>' . number_format($filter['found']) . '</strong> '
-            . ($filter['found'] === 1 ? 'applicant matches' : 'applicants match') . ' “' . ui_e($filter['q']) . '” in this list.</p>';
-    }
-    return $html;
+        . '<input type="search" id="nameSearch" name="name" maxlength="100" autocomplete="off" placeholder="Find a ' . ui_e($short) . ' applicant by name"></div>'
+        . '<button type="submit" class="btn btn-primary btn-sm">Find</button>'
+        . '</form>';
 }
-
 /** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Disapproved. */
 function ui_type_tabs(int $typeId, string $current, array $counts = []): string
 {
