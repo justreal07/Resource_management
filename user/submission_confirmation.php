@@ -5,7 +5,7 @@ require_once 'apply_layout.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
-    header('Location: applicant_login.php');
+    header('Location: applicant_login');
     exit;
 }
 
@@ -18,7 +18,7 @@ $stmt->execute([$application_id, $account_id]);
 $app = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$app) {
-    header('Location: my_account.php');
+    header('Location: my_account');
     exit;
 }
 
@@ -27,7 +27,7 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
     if ($p['type_id'] === (int)$app['assistance_type_id']) $program = $p;
 }
 if (!$program) {
-    header('Location: my_account.php');
+    header('Location: my_account');
     exit;
 }
 
@@ -55,8 +55,8 @@ apply_page_start('Application Submitted', $program, 3);
         </div>
 
         <div class="ap-actions ap-actions-center no-print">
-            <a href="view_application.php?id=<?= $application_id ?>" class="ap-btn ap-btn-primary"><i class="fas fa-eye"></i> View my application</a>
-            <a href="landingpage.php" class="ap-btn ap-btn-ghost"><i class="fas fa-home"></i> Back to Home</a>
+            <a href="view_application?id=<?= $application_id ?>" class="ap-btn ap-btn-primary"><i class="fas fa-eye"></i> View my application</a>
+            <a href="landingpage" class="ap-btn ap-btn-ghost"><i class="fas fa-home"></i> Back to Home</a>
             <button type="button" class="ap-btn ap-btn-ghost" onclick="window.print()"><i class="fas fa-print"></i> Print slip</button>
         </div>
     </div>
@@ -74,7 +74,7 @@ apply_page_start('Application Submitted', $program, 3);
             </li>
             <li>
                 <span class="ap-tl-icon"><i class="fas fa-bell"></i></span>
-                <div><strong>Decision</strong><p>You'll see <em>Approved</em> or <em>Declined</em> (you may then apply again) in your notifications and on <a href="my_account.php">My Account</a>.</p></div>
+                <div><strong>Decision</strong><p>You'll see <em>Approved</em> or <em>Declined</em> (you may then apply again) in your notifications and on <a href="my_account">My Account</a>.</p></div>
             </li>
             <?php if ((int)$app['assistance_type_id'] === 3 && $app['checkup_date']): ?>
             <li>

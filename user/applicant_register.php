@@ -6,7 +6,7 @@ require_once '../includes/email_verify.php';
 require_once '../includes/privacy.php';
 
 if (isset($_SESSION['applicant'])) {
-    header('Location: landingpage.php');
+    header('Location: landingpage');
     exit;
 }
 
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Next: choose the assistance for the first application (or skip to the home page from there).
             // If they gave an email, the confirmation link is sent after they have been sent on.
             if ($old['email'] !== '') {
-                password_reset_finish_response('choose_assistance.php');
+                password_reset_finish_response('choose_assistance');
                 try {
                     email_verify_send($pdo, (int)$pdo->lastInsertId());
                 } catch (Throwable $e) {
@@ -125,7 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 exit;
             }
-            header('Location: choose_assistance.php');
+            header('Location: choose_assistance');
             exit;
         } catch (PDOException $e) {
             error_log('Registration failed: ' . $e->getMessage());
@@ -287,8 +287,8 @@ auth_page_start('Sign up', 'register', function () { ?>
 
         <div class="auth-form-foot">
             <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create Account</button>
-            <p class="auth-switch">Already have an account? <a href="applicant_login.php">Log in here</a></p>
-            <a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
+            <p class="auth-switch">Already have an account? <a href="applicant_login">Log in here</a></p>
+            <a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
         </div>
     </form>
 <?php

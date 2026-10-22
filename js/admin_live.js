@@ -24,7 +24,7 @@
     const UI = window.AdminUI;
     if (!UI || !UI.cfg || !UI.cfg.userId) return;   // only for someone signed in
 
-    const ENDPOINT = '../Main_dashboard/live_counts.php';   // every admin and staff folder is one level below the project root
+    const ENDPOINT = '../Main_dashboard/live_counts';   // every admin and staff folder is one level below the project root
     const EVERY = 15000;                                // normal wait between checks
     const SLOWEST = 120000;                             // longest wait after repeated errors
 

@@ -45,18 +45,13 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
             <span><i class="fas fa-landmark" aria-hidden="true"></i> Municipality of General Mariano Alvarez, Cavite</span>
             <span><i class="fas fa-phone" aria-hidden="true"></i> (046) 123-4567</span>
         </div>
-        <div class="text-size" role="group" aria-label="Text size">
-            <span class="text-size-label">Text size:</span>
-            <button type="button" data-size="100" aria-label="Normal text">A</button>
-            <button type="button" data-size="112.5" aria-label="Larger text">A</button>
-            <button type="button" data-size="125" aria-label="Largest text">A</button>
-        </div>
+        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
 <header class="site-header ann-header">
     <div class="container ann-header-inner">
-        <a href="landingpage.php" class="brand">
+        <a href="landingpage" class="brand">
             <span class="brand-logos">
                 <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -67,14 +62,14 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
             </span>
         </a>
         <nav class="ann-nav" aria-label="Main">
-            <a href="landingpage.php">Home</a>
-            <a href="announcements.php">Announcements</a>
-            <a href="feedback.php">Feedback</a>
+            <a href="landingpage">Home</a>
+            <a href="announcements">Announcements</a>
+            <a href="feedback">Feedback</a>
             <?php if ($isApplicant): ?>
-                <a href="my_account.php" class="btn btn-primary btn-sm"><i class="fas fa-user" aria-hidden="true"></i> My Account</a>
+                <a href="my_account" class="btn btn-primary btn-sm"><i class="fas fa-user" aria-hidden="true"></i> My Account</a>
             <?php else: ?>
-                <a href="applicant_login.php" class="btn btn-outline btn-sm">Log in</a>
-                <a href="applicant_register.php" class="btn btn-primary btn-sm">Sign up</a>
+                <a href="applicant_login" class="btn btn-outline btn-sm">Log in</a>
+                <a href="applicant_register" class="btn btn-primary btn-sm">Sign up</a>
             <?php endif; ?>
         </nav>
     </div>
@@ -139,7 +134,7 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                     <li>Details of the person the request is for (the patient or the deceased) and of the person applying:
                         names, age, sex, birthdate, address, contact number and relationship.</li>
                     <li>Medical Assistance: the purpose of the request. Burial Assistance: the date of death.
-                        OPD: the preferred hospital, the check-up date, the reason for the check-up or diagnosis, and whether a wheelchair or stretcher is needed.</li>
+                        OPD: the preferred hospital, the check-up date, the reason for the check-up, and whether a wheelchair or stretcher is needed.</li>
                     <li>Photos of your requirements: <?= $h(implode('; ', array_keys($documentNames))) ?>.</li>
                     <li>A short note about how clear each photo is. While you add a photo, your own phone or computer checks whether it looks
                         blurry, too dark, too small or has glare. The check happens on your device and the photo is not sent anywhere for it;
@@ -164,8 +159,8 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
                     <li>To make sure assistance is given fairly: for example, one Burial Assistance per deceased person, and
                         office approval before a patient receives Medical Assistance again. For this we compare names and birthdates across applications.</li>
                     <li>To tell you about your request through your dashboard and notifications and, when it is decided,
-                        by email to the address on your account: when it is approved, where and when to claim the assistance, or the day,
-                        departure time and pick-up point of your OPD trip, and what to bring; when it is declined, the reason, so you know what to fix.</li>
+                        by email to the address on your account: when it is approved, where and when to claim the assistance, or
+                        the day of your OPD trip, and what to bring; when it is declined, the reason, so you know what to fix.</li>
                     <li>To help you get back into your account if you forget your password: we email a one-time reset link to the email address on your account
                         (or, if there is no email, the office resets it after checking your valid ID).</li>
                     <li>To prepare reports with <strong>totals only</strong> (for example, how many families were helped per barangay), which never name you.</li>

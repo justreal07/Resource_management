@@ -48,7 +48,7 @@ function privacy_consent_field(string $context, bool $checked = false, string $e
         . '<label class="pui-consent-label">'
         . '<input type="checkbox" name="privacy_consent" value="1" required' . ($checked ? ' checked' : '')
         . ($error !== '' ? ' aria-invalid="true" aria-describedby="' . $errorId . '"' : '') . '>'
-        . '<span>I have read the <a href="privacy.php" target="_blank" rel="noopener">Data Privacy Notice</a> (opens in a new tab)'
+        . '<span>I have read the <a href="privacy" target="_blank" rel="noopener">Data Privacy Notice</a> (opens in a new tab)'
         . ' and I agree that the LGU of General Mariano Alvarez may collect and use ' . htmlspecialchars($what, ENT_QUOTES, 'UTF-8') . '.</span>'
         . '</label>'
         . ($error !== '' ? '<p class="pui-consent-error" id="' . $errorId . '" role="alert"><i class="fas fa-exclamation-circle" aria-hidden="true"></i> '

@@ -5,10 +5,11 @@ require_once 'person_rules.php';
 require_once 'account_helpers.php';   // ensure_user_schema()
 require_once '../includes/privacy.php';
 require_once '../includes/photo_quality.php';   // the clarity note the applicant's device made for each photo
+require_once '../includes/application_changes.php';   // application_read_uploads(): the photo checks
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
-    header('Location: applicant_login.php');
+    header('Location: applicant_login');
     exit;
 }
 
@@ -16,7 +17,7 @@ if (!isset($_SESSION['applicant'])) {
 $form_type = $_GET['type'] ?? ($_POST['form_type'] ?? '');
 $program = get_program($form_type);
 if (!$program) {
-    header('Location: landingpage.php');
+    header('Location: landingpage');
     exit;
 }
 
@@ -60,56 +61,11 @@ if (!privacy_consent_given()) {
 
 // ============================================================
 // STEP 1: Check every photo BEFORE saving anything
+// (the same check the applicant's "Change documents" page uses: includes/application_changes.php)
 // ============================================================
-$finfo = new finfo(FILEINFO_MIME_TYPE);
-$errors = [];
-$photos = [];   // each: ['doc_name' => ..., 'tmp' => ..., 'ext' => ...]
-
-foreach (array_keys($program['documents']) as $i => $doc_name) {
-    $names = $_FILES['documents']['name'][$i] ?? [];
-    $count = 0;
-
-    foreach ((array)$names as $n => $original) {
-        $error = $_FILES['documents']['error'][$i][$n];
-        if ($error === UPLOAD_ERR_NO_FILE) continue;
-
-        if (++$count > PHOTOS_PER_DOCUMENT) {
-            $errors[] = "$doc_name: only " . PHOTOS_PER_DOCUMENT . " photos are allowed.";
-            break;
-        }
-        if ($error === UPLOAD_ERR_INI_SIZE || $error === UPLOAD_ERR_FORM_SIZE) {
-            $errors[] = "$doc_name: \"$original\" is too large.";
-            continue;
-        }
-        if ($error !== UPLOAD_ERR_OK) {
-            $errors[] = "$doc_name: \"$original\" could not be uploaded. Please try again.";
-            continue;
-        }
-
-        $tmp = $_FILES['documents']['tmp_name'][$i][$n];
-        $size = $_FILES['documents']['size'][$i][$n];
-
-        // Check the real file content, not just the name - photos only
-        $mime = $finfo->file($tmp);
-        if (!isset(PHOTO_ALLOWED_TYPES[$mime]) || @getimagesize($tmp) === false) {
-            $errors[] = "$doc_name: \"$original\" is not a photo. Only JPG, PNG or WEBP images are accepted.";
-            continue;
-        }
-        if ($size > PHOTO_MAX_BYTES) {
-            $errors[] = "$doc_name: \"$original\" is larger than " . (PHOTO_MAX_BYTES / 1024 / 1024) . " MB.";
-            continue;
-        }
-
-        // quality[<document>][] comes in the same order as the photos of that document (js/apply-upload.js);
-        // it is only a hint for the office, so a missing or odd value just means "not checked"
-        $photos[] = ['doc_name' => $doc_name, 'tmp' => $tmp, 'ext' => PHOTO_ALLOWED_TYPES[$mime],
-                     'quality' => photo_quality_parse($_POST['quality'][$i][$n] ?? null)];
-    }
-
-    if ($count === 0) {
-        $errors[] = "Please add a photo of: $doc_name.";
-    }
-}
+$upload = application_read_uploads($program, true);
+$errors = $upload['errors'];
+$photos = $upload['photos'];   // each: ['doc_name' => ..., 'tmp' => ..., 'ext' => ..., 'quality' => ...]
 
 if ($errors) {
     back_with_errors($doc_page, $errors);
@@ -141,14 +97,15 @@ $save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $typ
     if ($form_type === 'opd') {
         $columns = ['account_id', 'assistance_type_id', 'first_name', 'middle_name', 'last_name', 'house_no', 'street',
                     'barangay', 'municipality', 'province', 'petitioner_name', 'relationship', 'sex', 'contact_number',
-                    'age', 'wheelchair', 'stretcher', 'diagnosis', 'checkup_date', 'hospital'];
+                    'age', 'wheelchair', 'stretcher', 'checkup_reason', 'checkup_date', 'hospital'];
         // The age is worked out from the patient's birthdate when the form was filled in (opd_with_age()); an application kept in the
         // session from before that change still has the age it was typed with
         $values = [$account_id, $type_id, $f['first_name'], $f['middle_name'], $f['last_name'], $f['house_no'], $f['street'],
                    $f['barangay'], $f['municipality'], $f['province'], $f['petitioner_name'], $f['relationship'],
                    $f['sex'], $f['contact_number'], ($f['age'] ?? '') !== '' ? $f['age'] : null,
                    $f['wheelchair'] === 'Yes' ? 'Yes' : 'No', $f['stretcher'] === 'Yes' ? 'Yes' : 'No',
-                   $f['diagnosis'], $f['checkup_date'], $f['hospital']];
+                   $f['checkup_reason'] ?? $f['diagnosis'] ?? '',   // an application kept in the session from before the rename has the old key
+                   $f['checkup_date'], $f['hospital']];
         if ($with_person_columns && is_ymd((string)($f['beneficiary_birthdate'] ?? ''))) {
             // The patient's birthdate (it tells two patients with one name apart). beneficiary_id stays empty: OPD has no person registry.
             $columns[] = 'beneficiary_birthdate';
@@ -234,5 +191,5 @@ if ($form_type === 'medical' && strcasecmp(trim((string)($form_data['relationshi
     }
 }
 unset($_SESSION[$form_data_key]);
-header('Location: submission_confirmation.php?id=' . $result['id']);
+header('Location: submission_confirmation?id=' . $result['id']);
 exit;

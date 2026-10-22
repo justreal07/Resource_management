@@ -61,7 +61,7 @@
             const body = new FormData();
             body.append('action', 'mark_all_read');
             body.append('csrf_token', csrf);
-            fetch('notifications_action.php', { method: 'POST', body: body, credentials: 'same-origin' })
+            fetch('notifications_action', { method: 'POST', body: body, credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (res) {
                     if (!res.ok) return;
@@ -216,16 +216,7 @@
         });
     });
 
-    /* ---------- Text size: pages open at the normal size; this enlarges the page for this visit only ---------- */
-    const sizeBtns = $$('.acc-size-picker button');
-    if (sizeBtns.length) {
-        function setSize(size) {
-            document.documentElement.style.fontSize = size + '%';
-            sizeBtns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.size === String(size)); });
-        }
-        sizeBtns.forEach(function (b) { b.addEventListener('click', function () { setSize(b.dataset.size); }); });
-        setSize('100');
-    }
+    /* (Text size picker in Preferences: js/portal-ui.js, same as the top bar's buttons) */
 
     /* ---------- Notification filters ---------- */
     const notifChips = $$('[data-notif-filter]');

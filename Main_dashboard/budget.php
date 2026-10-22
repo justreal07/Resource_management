@@ -17,7 +17,7 @@ $year = (int)ui_year($_GET['year'] ?? null);
 // A change of the budget: checked, saved, then back to the page (so a reload doesn't send it again)
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $postYear = filter_var($_POST['year'] ?? null, FILTER_VALIDATE_INT);
-    $back = 'budget.php?year=' . ($postYear !== false && $postYear >= 2000 && $postYear <= $thisYear + 1 ? $postYear : $year);
+    $back = 'budget?year=' . ($postYear !== false && $postYear >= 2000 && $postYear <= $thisYear + 1 ? $postYear : $year);
     if (!decision_csrf_ok()) {
         $_SESSION['error_message'] = 'This page was open for too long, or you signed in again since it opened. Nothing was changed. Reload the page and try again.';
     } else {
@@ -71,7 +71,7 @@ echo ui_page_head('Budget', 'The yearly budget for Medical and Burial assistance
         <h2 id="changeTitle">Change the budget</h2>
         <p class="panel-sub">Set the starting budget of a year, then add to it or reduce it. Typed a wrong figure, or set it for the wrong program or year? Correct it or remove it. Every change needs a reason and is kept in the history, so nothing is erased: you can always see what was declared before, who changed it and why.</p>
     </div>
-    <form method="POST" action="budget.php?year=<?= $year ?>" id="budgetForm" class="form-grid" data-busy data-has="<?= ui_e(json_encode($has)) ?>">
+    <form method="POST" action="budget?year=<?= $year ?>" id="budgetForm" class="form-grid" data-busy data-has="<?= ui_e(json_encode($has)) ?>">
         <?= decision_csrf_field() ?>
         <div class="field">
             <label for="bYear">Year</label>

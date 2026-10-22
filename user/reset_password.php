@@ -13,7 +13,7 @@ header('Referrer-Policy: no-referrer');
 header('Cache-Control: no-store');
 
 if (isset($_SESSION['applicant'])) {
-    header('Location: landingpage.php');
+    header('Location: landingpage');
     exit;
 }
 
@@ -49,7 +49,7 @@ if ($account && $_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($done === true) {
             $_SESSION['auth_success'] = 'Your password was changed. Please log in with your new password.';
             // Go to the login page now; the "your password was changed" email is sent after
-            password_reset_finish_response('applicant_login.php');
+            password_reset_finish_response('applicant_login');
             password_reset_notify_changed($account);
             exit;
         }
@@ -78,8 +78,8 @@ auth_page_start('Choose a new password', 'login', function () { ?>
             <i class="fas fa-exclamation-circle"></i>
             <div><p>Reset links work once and expire after <?php echo PASSWORD_RESET_MINUTES; ?> minutes. If you asked for more than one, only the newest works.</p></div>
         </div>
-        <a href="forgot_password.php" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Send me a new link</a>
-        <p class="auth-switch"><a href="applicant_login.php">Back to Log in</a></p>
+        <a href="forgot_password" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Send me a new link</a>
+        <p class="auth-switch"><a href="applicant_login">Back to Log in</a></p>
     <?php else: ?>
         <div class="auth-card-head">
             <div class="card-icon"><i class="fas fa-lock"></i></div>
@@ -119,7 +119,7 @@ auth_page_start('Choose a new password', 'login', function () { ?>
             <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-check"></i> Save new password</button>
         </form>
 
-        <p class="auth-switch"><a href="applicant_login.php">Cancel and go back to Log in</a></p>
+        <p class="auth-switch"><a href="applicant_login">Cancel and go back to Log in</a></p>
     <?php endif; ?>
 <?php
 auth_page_end();

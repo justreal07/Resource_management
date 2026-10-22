@@ -42,10 +42,10 @@ try {
         $newest = max($newest, (int)$r['newest']);
         if ($r['status'] === 'Pending') $pending[(int)$r['assistance_type_id']] += $n;
         if ($r['status'] === 'Approved') $approved += $n;
-        if ($r['status'] !== 'Disapproved') $allTotal += $n;
+        if (!in_array($r['status'], ['Disapproved', 'Withdrawn'], true)) $allTotal += $n;   // declined and withdrawn are off every count
     }
 
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM applicant WHERE DATE(created_at) = CURDATE() AND status <> 'Disapproved' AND assistance_type_id IN ($marks)");
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM applicant WHERE DATE(created_at) = CURDATE() AND status NOT IN ('Disapproved', 'Withdrawn') AND assistance_type_id IN ($marks)");
     $stmt->execute($typeIds);
     $today = (int)$stmt->fetchColumn();
 

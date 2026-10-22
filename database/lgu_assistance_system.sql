@@ -96,7 +96,7 @@ CREATE TABLE `applicant` (
   `barangay` varchar(100) NOT NULL,
   `municipality` varchar(100) NOT NULL,
   `province` varchar(100) NOT NULL,
-  `diagnosis` varchar(255) DEFAULT NULL,
+  `checkup_reason` varchar(255) DEFAULT NULL,
   `hospital` varchar(150) DEFAULT NULL,
   `checkup_date` date DEFAULT NULL,
   `purpose` text DEFAULT NULL,
@@ -120,13 +120,18 @@ CREATE TABLE `applicant` (
   `beneficiary_id` int(11) DEFAULT NULL COMMENT 'Person the rules follow: Medical patient / Burial deceased. NULL = OPD, walk-in, or filed before person rules',
   `beneficiary_birthdate` date DEFAULT NULL COMMENT 'Medical: patient birthdate. Burial: birthdate of the deceased',
   `date_of_death` date DEFAULT NULL COMMENT 'Burial only',
-  `person_rule_key` varchar(20) GENERATED ALWAYS AS (case when `beneficiary_id` is null then NULL when `assistance_type_id` = 2 and `status` <> 'Disapproved' then concat('B-',`beneficiary_id`) when `assistance_type_id` = 1 and `status` = 'Pending' then concat('M-',`beneficiary_id`) end) STORED COMMENT 'Unique: one Burial per person (a Disapproved one does not count), one pending Medical per person',
-  `claim_place` varchar(255) DEFAULT NULL COMMENT 'Approved Medical/Burial: where to claim',
+  `claim_place` varchar(255) DEFAULT NULL COMMENT 'Approved Medical/Burial: where to claim. OPD: empty',
   `claim_date` date DEFAULT NULL COMMENT 'Approved Medical/Burial: date to claim',
-  `claim_time` time DEFAULT NULL COMMENT 'Approved Medical/Burial: time to claim',
+  `claim_time` time DEFAULT NULL COMMENT 'Approved Medical/Burial: time to claim. OPD: empty',
   `claim_requirements` text DEFAULT NULL COMMENT 'Hard copies to bring or submit when claiming',
   `claim_note` text DEFAULT NULL COMMENT 'Optional extra note in the approval email',
   `approval_email_sent_at` datetime DEFAULT NULL COMMENT 'When the approval email was sent; NULL = not sent',
+  `withdrawn_at` datetime DEFAULT NULL COMMENT 'When the applicant withdrew this Pending application (status Withdrawn)',
+  `withdrawal_reason` varchar(500) DEFAULT NULL COMMENT 'Optional reason the applicant gave for withdrawing',
+  `edited_at` datetime DEFAULT NULL COMMENT 'When the applicant last edited this application online; NULL = never',
+  `edit_count` int(11) NOT NULL DEFAULT 0 COMMENT 'How many times the applicant saved an edit of the details or the documents',
+  `updated_at` datetime(6) NOT NULL DEFAULT current_timestamp(6) ON UPDATE current_timestamp(6) COMMENT 'Changes whenever the row changes: the edit page uses it to notice a change made since it was opened',
+  `person_rule_key` varchar(20) GENERATED ALWAYS AS (case when `beneficiary_id` is null then NULL when `assistance_type_id` = 2 and `status` not in ('Disapproved','Withdrawn') then concat('B-',`beneficiary_id`) when `assistance_type_id` = 1 and `status` = 'Pending' then concat('M-',`beneficiary_id`) end) STORED COMMENT 'Unique: one Burial per person (a Declined or Withdrawn one does not count), one pending Medical per person',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_person_rule` (`person_rule_key`),
   KEY `idx_disapproved_at` (`disapproved_at`),
@@ -146,7 +151,7 @@ CREATE TABLE `applicant` (
   CONSTRAINT `chk_applicant_wheelchair` CHECK (`wheelchair` in ('Yes','No')),
   CONSTRAINT `chk_applicant_stretcher` CHECK (`stretcher` in ('Yes','No')),
   CONSTRAINT `chk_applicant_death_after_birth` CHECK (`date_of_death` is null or `beneficiary_birthdate` is null or `date_of_death` >= `beneficiary_birthdate`),
-  CONSTRAINT `chk_applicant_status` CHECK (`status` in ('Pending','Approved','Disapproved'))
+  CONSTRAINT `chk_applicant_status` CHECK (`status` in ('Pending','Approved','Disapproved','Withdrawn'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 

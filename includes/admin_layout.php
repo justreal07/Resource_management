@@ -45,22 +45,22 @@ if (ADMIN_LAYOUT_REQUIRE_LOGIN && decision_user() === null) {
 /** The sign-in page for this side (staff pages open it on the Staff tab). */
 function ui_login_url(): string
 {
-    return '../login/login.php?role=' . ui_area();
+    return '../login/login?role=' . ui_area();
 }
 
 /** Menu items. 'roles' lists who may see each one. */
 function admin_nav(): array
 {
     return [
-        'dashboard' => ['href' => '../Main_dashboard/dashboard.php', 'label' => 'Dashboard', 'icon' => 'home', 'roles' => ['admin']],
+        'dashboard' => ['href' => '../Main_dashboard/dashboard', 'label' => 'Dashboard', 'icon' => 'home', 'roles' => ['admin']],
         'medical'   => ['href' => ui_type_url(1, 'overview'), 'label' => 'Medical Assistance', 'icon' => 'medical', 'roles' => ['admin'], 'type' => 1],
         'burial'    => ['href' => ui_type_url(2, 'overview'), 'label' => 'Burial Assistance', 'icon' => 'burial', 'roles' => ['admin'], 'type' => 2],
         'opd'       => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['admin'], 'type' => 3],
-        'budget'    => ['href' => '../Main_dashboard/budget.php', 'label' => 'Budget', 'icon' => 'wallet', 'roles' => ['admin']],
-        'reports'   => ['href' => '../reports/reports.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['admin']],
-        'announcements' => ['href' => '../Main_dashboard/announcements.php', 'label' => 'Announcements', 'icon' => 'megaphone', 'roles' => ['admin']],
-        'activity'  => ['href' => '../Main_dashboard/activity_log.php', 'label' => 'Activity Log', 'icon' => 'clock', 'roles' => ['admin']],
-        'settings'  => ['href' => '../Main_dashboard/admin_settings.php', 'label' => 'Admin Settings', 'icon' => 'settings', 'roles' => ['admin']],
+        'budget'    => ['href' => '../Main_dashboard/budget', 'label' => 'Budget', 'icon' => 'wallet', 'roles' => ['admin']],
+        'reports'   => ['href' => '../reports/reports', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['admin']],
+        'announcements' => ['href' => '../Main_dashboard/announcements', 'label' => 'Announcements', 'icon' => 'megaphone', 'roles' => ['admin']],
+        'activity'  => ['href' => '../Main_dashboard/activity_log', 'label' => 'Activity Log', 'icon' => 'clock', 'roles' => ['admin']],
+        'settings'  => ['href' => '../Main_dashboard/admin_settings', 'label' => 'Admin Settings', 'icon' => 'settings', 'roles' => ['admin']],
     ];
 }
 
@@ -73,8 +73,8 @@ function staff_nav(): array
     return [
         'opd'     => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['staff', 'admin']],
         'pending' => ['href' => ui_type_url(3, 'pending'), 'label' => 'To review', 'icon' => 'clock', 'roles' => ['staff', 'admin'], 'type' => 3],
-        'reports' => ['href' => '../staff/opd_staff_report.php', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
-        'account' => ['href' => '../staff/my_account.php', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff']],
+        'reports' => ['href' => '../staff/opd_staff_report', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
+        'account' => ['href' => '../staff/my_account', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff']],
     ];
 }
 
@@ -96,7 +96,8 @@ function admin_commands(): array
         $cmds[] = ['label' => $item['label'], 'href' => $item['href'], 'icon' => $item['icon'], 'group' => 'Go to', 'words' => ''];
     }
     $pages = ['all' => ['All applications', 'all list'], 'pending' => ['Waiting for review', 'pending to review queue'],
-              'approved' => ['Approved', 'approved done'], 'disapproved' => ['Declined', 'declined disapproved rejected not approved']];
+              'approved' => ['Approved', 'approved done'], 'disapproved' => ['Declined', 'declined disapproved rejected not approved'],
+              'withdrawn' => ['Withdrawn', 'withdrawn cancelled canceled applicant took back']];
     foreach (ui_types() as $id => $t) {
         if (!decision_can($user, $id) || ($staffSide && $id !== 3)) continue;
         foreach ($pages as $page => [$label, $words]) {
@@ -106,15 +107,15 @@ function admin_commands(): array
                    'words' => $t['name'] . ' start reviewing side by side approve decline'];
     }
     if (!$staffSide && $role === 'admin') {
-        $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../Main_dashboard/dashboard.php#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant'];
-        $cmds[] = ['label' => 'Add staff account', 'href' => '../login/register.php', 'icon' => 'user-plus', 'group' => 'Actions', 'words' => 'new staff admin user account register'];
+        $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../Main_dashboard/dashboard#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant'];
+        $cmds[] = ['label' => 'Add staff account', 'href' => '../login/register', 'icon' => 'user-plus', 'group' => 'Actions', 'words' => 'new staff admin user account register'];
     }
     // The look of the pages: not a page but something the command bar does itself (js/admin_theme.js); 'theme' stands in for 'href'
     // (few extra words on purpose: every word is searched as a part of a word, so a long list would show these rows for unrelated names)
     $cmds[] = ['label' => 'Dark theme', 'href' => '', 'theme' => 'dark', 'icon' => 'moon', 'group' => 'Actions', 'words' => 'dark mode night'];
     $cmds[] = ['label' => 'Light theme', 'href' => '', 'theme' => 'light', 'icon' => 'sun', 'group' => 'Actions', 'words' => 'light mode day'];
     $cmds[] = ['label' => 'Match this computer’s theme', 'href' => '', 'theme' => 'auto', 'icon' => 'settings', 'group' => 'Actions', 'words' => 'automatic auto system device follow'];
-    $cmds[] = ['label' => 'Log out', 'href' => '../login/admin_logout.php', 'icon' => 'logout', 'group' => 'Actions', 'words' => 'sign out logout exit'];
+    $cmds[] = ['label' => 'Log out', 'href' => '../login/admin_logout', 'icon' => 'logout', 'group' => 'Actions', 'words' => 'sign out logout exit'];
     return $cmds;
 }
 
@@ -228,7 +229,7 @@ function admin_layout_start(array $page): void
     }
     $myId = (int)($user['id'] ?? 0);   // for the profile picture
     // The person's own page: the admin's settings, or the staff member's account page
-    $myPage = $role === 'admin' ? '../Main_dashboard/admin_settings.php' : '../staff/my_account.php';
+    $myPage = $role === 'admin' ? '../Main_dashboard/admin_settings' : '../staff/my_account';
     $waiting = admin_pending_counts();
     $nav = ui_area() === 'staff' ? staff_nav() : admin_nav();
     ?>
@@ -358,7 +359,7 @@ function admin_layout_start(array $page): void
                     <?= ui_avatar($myId, (string)$userName) ?>
                     <span class="user-chip-text"><strong><?= ui_e($userName) ?></strong><span class="role-badge"><?= ui_e($roleLabel) ?></span></span>
                 </a>
-                <a class="btn btn-secondary btn-logout" href="../login/admin_logout.php"><?= ui_icon('logout') ?>Log out</a>
+                <a class="btn btn-secondary btn-logout" href="../login/admin_logout"><?= ui_icon('logout') ?>Log out</a>
             <?php else: ?>
                 <a class="btn btn-primary btn-logout" href="<?= ui_e(ui_login_url()) ?>"><?= ui_icon('login') ?>Sign in</a>
             <?php endif; ?>
@@ -412,10 +413,10 @@ function admin_layout_end(array $opts = []): void
         if (!isset($GLOBALS['ASSISTANCE_PROGRAMS']) && isset($ASSISTANCE_PROGRAMS)) $GLOBALS['ASSISTANCE_PROGRAMS'] = $ASSISTANCE_PROGRAMS;
         $typeInfo = [];
         foreach (ui_types() as $id => $t) $typeInfo[$id] = $t;
-        $opts['after'] = ($opts['after'] ?? '') . walkin_form_html($typeInfo, '../Main_dashboard/submit_admin_applicant.php');
+        $opts['after'] = ($opts['after'] ?? '') . walkin_form_html($typeInfo, '../Main_dashboard/submit_admin_applicant');
         $opts['scripts'] = array_merge($opts['scripts'] ?? [], ['../js/admin_dashboard.js']);
         $opts['config'] = array_merge([
-            'viewUrl'   => '../Main_dashboard/view_applicant.php?applicant_id=',
+            'viewUrl'   => '../Main_dashboard/view_applicant?applicant_id=',
             'documents' => [1 => array_keys(get_program('medical')['documents']), 2 => array_keys(get_program('burial')['documents']),
                             3 => array_keys(get_program('opd')['documents'])],
         ], $opts['config'] ?? []);

@@ -61,7 +61,7 @@ account_page_start($ctx, 'My Documents', 'documents', [
                 <small class="ap-muted">Submitted <?= e(date('M d, Y', strtotime($i['applied_at']))) ?> · <?= count($g['docs']) ?> file<?= count($g['docs']) === 1 ? '' : 's' ?></small>
             </div>
             <span class="acc-status s-<?= strtolower($i['status']) ?>"><?= e($i['status']) ?></span>
-            <a href="view_application.php?id=<?= (int)$app_id ?>" class="ap-link-btn">View application <i class="fas fa-chevron-right"></i></a>
+            <a href="view_application?id=<?= (int)$app_id ?>" class="ap-link-btn">View application <i class="fas fa-chevron-right"></i></a>
         </header>
         <div class="acc-gallery">
             <?php foreach ($g['docs'] as $d):
@@ -96,7 +96,7 @@ account_page_start($ctx, 'My Documents', 'documents', [
     <i class="far fa-folder-open"></i>
     <h4>No documents yet</h4>
     <p>The photos you upload with your applications will appear here.</p>
-    <a href="landingpage.php#programs" class="ap-btn ap-btn-primary"><i class="fas fa-plus"></i> Start an application</a>
+    <a href="landingpage#programs" class="ap-btn ap-btn-primary"><i class="fas fa-plus"></i> Start an application</a>
 </div>
 <?php endif; ?>
 

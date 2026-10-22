@@ -30,17 +30,17 @@ function ui_types(): array
 {
     return [
         1 => ['key' => 'medical', 'name' => 'Medical Assistance', 'short' => 'Medical', 'icon' => 'medical', 'dir' => 'medical',
-              'pages' => ['overview' => 'medical_assistance_dashboard.php', 'all' => 'listmedical.php', 'pending' => 'Mpending.php',
-                          'approved' => 'medicalapproved.php', 'disapproved' => 'medical_disapproved.php', 'view' => 'view_medical_applicants.php']],
+              'pages' => ['overview' => 'medical_assistance_dashboard', 'all' => 'listmedical', 'pending' => 'Mpending',
+                          'approved' => 'medicalapproved', 'disapproved' => 'medical_disapproved', 'withdrawn' => 'medical_withdrawn', 'view' => 'view_medical_applicants']],
         2 => ['key' => 'burial', 'name' => 'Burial Assistance', 'short' => 'Burial', 'icon' => 'burial', 'dir' => 'burial',
-              'pages' => ['overview' => 'burial_assistance_dashboard.php', 'all' => 'listburial.php', 'pending' => 'Bpending.php',
-                          'approved' => 'burialapproved.php', 'disapproved' => 'burial_disapproved.php', 'view' => 'view_burial_applicant.php']],
+              'pages' => ['overview' => 'burial_assistance_dashboard', 'all' => 'listburial', 'pending' => 'Bpending',
+                          'approved' => 'burialapproved', 'disapproved' => 'burial_disapproved', 'withdrawn' => 'burial_withdrawn', 'view' => 'view_burial_applicant']],
         3 => ['key' => 'opd', 'name' => 'Outpatient Diagnosis', 'short' => 'OPD', 'icon' => 'van', 'dir' => 'opd',
-              'pages' => ['overview' => 'opd_dashboard.php', 'all' => 'listopd.php', 'pending' => 'opd_pending.php',
-                          'approved' => 'opdapproved.php', 'disapproved' => 'opd_disapproved.php', 'view' => 'view_opd_applicant.php'],
+              'pages' => ['overview' => 'opd_dashboard', 'all' => 'listopd', 'pending' => 'opd_pending',
+                          'approved' => 'opdapproved', 'disapproved' => 'opd_disapproved', 'withdrawn' => 'opd_withdrawn', 'view' => 'view_opd_applicant'],
               // The OPD staff side (staff/) has its own copy of each page
-              'staff_pages' => ['overview' => 'staff_dashboard.php', 'all' => 'listopd.php', 'pending' => 'staffpen.php',
-                                'approved' => 'opdapproved.php', 'disapproved' => 'opddisapproved.php', 'view' => 'view_opd_applicant.php']],
+              'staff_pages' => ['overview' => 'staff_dashboard', 'all' => 'listopd', 'pending' => 'staffpen',
+                                'approved' => 'opdapproved', 'disapproved' => 'opddisapproved', 'withdrawn' => 'opdwithdrawn', 'view' => 'view_opd_applicant']],
     ];
 }
 
@@ -70,7 +70,7 @@ function ui_statuses(): array
 /** SQL condition that leaves out discarded (Disapproved) applications: "AND <this>". */
 function ui_active_sql(string $alias = ''): string
 {
-    return ($alias !== '' ? $alias . '.' : '') . "status <> 'Disapproved'";
+    return ($alias !== '' ? $alias . '.' : '') . "status NOT IN ('Disapproved', 'Withdrawn')";
 }
 
 /* ============================================================
@@ -88,10 +88,21 @@ function ui_icon(string $name, string $class = ''): string
     return '<svg class="icon ' . $class . '" aria-hidden="true" focusable="false"><use href="#i-' . $name . '"></use></svg>';
 }
 
+/** The status badge of a list row; a waiting application the applicant changed after filing also gets an "Edited" tag. */
+function ui_status_cell(array $row): string
+{
+    $html = ui_badge($row['status'] ?? '');
+    if (($row['status'] ?? '') === 'Pending' && !empty($row['edited_at'])) {
+        $html .= ' <span class="badge badge-edited" title="The applicant changed this application on ' . ui_e(ui_date($row['edited_at'], 'M j, Y, g:i A')) . '">' . ui_icon('info') . 'Edited</span>';
+    }
+    return $html;
+}
+
 function ui_badge(?string $status): string
 {
     $status = (string)$status;
-    $all = ui_statuses() + ['Disapproved' => ['class' => 'disapproved', 'icon' => 'x-circle', 'label' => 'Declined']];
+    $all = ui_statuses() + ['Disapproved' => ['class' => 'disapproved', 'icon' => 'x-circle', 'label' => 'Declined'],
+        'Withdrawn' => ['class' => 'withdrawn', 'icon' => 'x-circle', 'label' => 'Withdrawn']];   // withdrawn = the applicant's own choice: not 'Declined'
     $s = $all[$status] ?? ['class' => 'neutral', 'icon' => 'info', 'label' => $status !== '' ? $status : 'Unknown'];
     return '<span class="badge badge-' . $s['class'] . '">' . ui_icon($s['icon']) . ui_e($s['label']) . '</span>';
 }
@@ -285,10 +296,30 @@ function ui_name_search(int $typeId, string $current): string
         . '<button type="submit" class="btn btn-primary btn-sm">Find</button>'
         . '</form>';
 }
-/** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Disapproved. */
+/** How many applications of a program the applicants withdrew themselves (null when it can't be counted, e.g. before the database update). */
+function ui_withdrawn_count(int $typeId): ?int
+{
+    global $pdo;
+    static $cache = [];
+    if (array_key_exists($typeId, $cache)) return $cache[$typeId];
+    try {
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = ? AND status = 'Withdrawn'");
+        $stmt->execute([$typeId]);
+        return $cache[$typeId] = (int)$stmt->fetchColumn();
+    } catch (Throwable $e) {
+        return $cache[$typeId] = null;
+    }
+}
+
+/** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Declined, Withdrawn. */
 function ui_type_tabs(int $typeId, string $current, array $counts = []): string
 {
-    $labels = ['overview' => 'Overview', 'all' => 'All applications', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Declined'];
+    $labels = ['overview' => 'Overview', 'all' => 'All applications', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Declined', 'withdrawn' => 'Withdrawn'];
+    // How many the applicants withdrew: the count on that tab (the other tabs are not counted here)
+    if (!isset($counts['withdrawn'])) {
+        $withdrawn = ui_withdrawn_count($typeId);
+        if ($withdrawn !== null) $counts['withdrawn'] = $withdrawn;
+    }
     $html = '<nav class="tabs" aria-label="' . ui_e(ui_types()[$typeId]['name']) . ' pages"><ul>';
     foreach ($labels as $page => $label) {
         $count = isset($counts[$page]) ? '<span class="tab-count">' . number_format((int)$counts[$page]) . '</span>' : '';
@@ -302,7 +333,7 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     $tabsHtml = $html;
 
     // Export CSV / Print for the list being shown (Overview exports every application). Not on a page that is not a list.
-    $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved'][$current] ?? null;
+    $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved', 'withdrawn' => 'Withdrawn'][$current] ?? null;
     if ($exportStatus === null) return $nameBar . $tabsHtml;
     $label = $exportStatus === 'all' ? 'all applications' : ($exportStatus === 'Disapproved' ? 'declined' : strtolower($exportStatus)) . ' applications';
     // Admins: "Add walk-in" for THIS program. It opens the walk-in window on this very page with the program already
@@ -314,7 +345,7 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
             . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
     }
     return $nameBar . '<div class="tabs-bar">' . $tabsHtml . '<div class="tabs-tools">' . $walkIn
-        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants.php?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
+        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
         . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
         . '<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">' . ui_icon('print') . 'Print</button>'
         . '</div></div>';
@@ -488,8 +519,9 @@ function ui_back_link(string $fallbackHref, string $fallbackLabel): array
 {
     $ref = $_SERVER['HTTP_REFERER'] ?? '';
     $parts = $ref !== '' ? parse_url($ref) : false;
-    if ($parts && ($parts['host'] ?? '') === ($_SERVER['HTTP_HOST'] ?? '') && preg_match('#\.php$#', $parts['path'] ?? '')
-        && basename($parts['path']) !== basename($_SERVER['SCRIPT_NAME'] ?? '')) {
+    // A page of ours is addressed with or without ".php" (see .htaccess); a file such as a .css or .png is not a page
+    if ($parts && ($parts['host'] ?? '') === ($_SERVER['HTTP_HOST'] ?? '') && preg_match('#/[^/.]+(\.php)?$#', $parts['path'] ?? '')
+        && basename($parts['path'], '.php') !== basename($_SERVER['SCRIPT_NAME'] ?? '', '.php')) {
         return [$ref, 'Back'];
     }
     return [$fallbackHref, $fallbackLabel];
@@ -506,7 +538,7 @@ function ui_review_url(int $id = 0, int $typeId = 0, bool $advance = false): str
     $q = [];
     if ($id > 0) $q['id'] = $id; elseif ($typeId > 0) $q['type'] = $typeId;
     if ($advance) $q['advance'] = 1;
-    return (ui_area() === 'staff' ? '../staff/review.php' : '../Main_dashboard/review.php') . ($q ? '?' . http_build_query($q) : '');
+    return (ui_area() === 'staff' ? '../staff/review' : '../Main_dashboard/review') . ($q ? '?' . http_build_query($q) : '');
 }
 
 /**
@@ -527,7 +559,7 @@ function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPag
     if ($withEdit) {
         $q = ['id' => (int)$row['id']];
         if ($returnPage !== '') $q['redirect'] = $returnPage;
-        $html .= '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/edit_applicant.php?' . ui_e(http_build_query($q)) . '">'
+        $html .= '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/edit_applicant?' . ui_e(http_build_query($q)) . '">'
             . ui_icon('edit') . 'Edit<span class="visually-hidden"> ' . ui_e($name) . '</span></a>';
     }
     return $html;
@@ -536,7 +568,7 @@ function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPag
 /** Staff side: the Update button (status and remarks, staff/Opdupdate.php). Staff use it where admins have Edit. */
 function ui_staff_update_link(array $row): string
 {
-    return '<a class="btn btn-secondary btn-sm" href="../staff/Opdupdate.php?' . ui_e(http_build_query(['id' => (int)$row['id']])) . '">'
+    return '<a class="btn btn-secondary btn-sm" href="../staff/Opdupdate?' . ui_e(http_build_query(['id' => (int)$row['id']])) . '">'
         . ui_icon('edit') . 'Update<span class="visually-hidden"> ' . ui_e(ui_person_name($row)) . ', Ref #' . (int)$row['id'] . '</span></a>';
 }
 
@@ -571,8 +603,7 @@ function ui_approve_button(array $row, string $action, int $typeId, array $opts 
  * The approval details: the Approve dialog and the Update page. Saved and checked again by
  * decide_application(); the same text goes into the approval email.
  *   Medical / Burial: the amount (required and saved, but never put in the email), where, date and time to claim.
- *   OPD: the trip day is the patient's check-up date (shown, not typed: it is the day on the staff schedule),
- *        the departure time (4:00 AM unless changed) and the pick-up point.
+ *   OPD: only the trip day, which is the patient's check-up date (shown, not typed: it is the day on the staff schedule).
  *   All: the hard copies to bring (filled in from the program's required documents) and an optional note.
  * $idPrefix keeps the ids unique on the page. $required = false on the Update page, where they are needed
  * only when Approve is chosen. $row (Update page): the application, for the OPD trip day.
@@ -595,11 +626,6 @@ function ui_claim_fields(int $typeId, string $idPrefix, bool $required = true, a
             . '<strong aria-labelledby="' . $f('scheduleLabel') . '" data-claim-schedule>' . ui_e($row ? ui_opd_schedule_day($row) : '') . '</strong>'
             . '<p class="field-help">The patient\'s check-up date, from the request.</p>'
             . '<p class="field-error" tabindex="-1" data-claim-schedule-problem' . ($problem === null ? ' hidden' : '') . '>' . ui_e((string)$problem) . '</p></div>'
-            . '<div class="field"><label for="' . $f('time') . '">Departure time ' . $req . '</label>'
-            . '<input type="time" id="' . $f('time') . '" name="claim_time" value="' . OPD_DEPARTURE_DEFAULT . '"' . $r . ' aria-describedby="' . $f('timeHelp') . '"'
-            . ' data-claim="time" data-claim-msg="Choose the departure time.">'
-            . '<p class="field-help" id="' . $f('timeHelp') . '">4:00 AM unless the vehicle leaves at another time.</p></div>'
-            . $place('Pick-up point', 'Where the patient boards the vehicle', 'Enter the pick-up point, where the patient boards the vehicle.')
             . '</div>';
     } else {
         $html = '<div class="form-grid">'
@@ -667,11 +693,11 @@ function ui_approve_dialog(int $typeId, string $return = ''): string
         . '</form></dialog>';
 }
 
-/** This page as a link from any admin or staff folder ("../medical/Mpending.php"), for coming back after an action. */
+/** This page as a link from any admin or staff folder ("../medical/Mpending"), for coming back after an action. */
 function ui_current_page(): string
 {
     $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_NAME'] ?? ''));
-    return '../' . basename(dirname($script)) . '/' . basename($script);
+    return '../' . basename(dirname($script)) . '/' . basename($script, '.php');
 }
 
 /**
@@ -713,7 +739,7 @@ function ui_disapprove_reasons(string $idPrefix, string $attrs = ''): string
 function ui_disapprove_dialog(string $return = ''): string
 {
     return '<dialog id="disapproveDialog" class="modal" aria-labelledby="disapproveTitle">'
-        . '<form method="POST" action="../Main_dashboard/disapprove_applicant.php" novalidate data-disapprove-form>'
+        . '<form method="POST" action="../Main_dashboard/disapprove_applicant" novalidate data-disapprove-form>'
         . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e($return !== '' ? $return : ui_current_page()) . '">'
         . '<div class="modal-header"><h2 id="disapproveTitle">Decline this application for <span data-disapprove-name></span>?</h2>'
         . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
@@ -1173,19 +1199,6 @@ function ui_opd_companion(array $r): string
 }
 
 /**
- * OPD: when and where the vehicle leaves, set when the request was approved ("4:00 AM, Municipal Hall").
- * The day is the check-up date. The list must select claim_time and claim_place.
- */
-function ui_opd_departure(array $r): string
-{
-    if (($r['status'] ?? '') !== 'Approved') return 'Set when approved';
-    $time = trim((string)($r['claim_time'] ?? ''));
-    if ($time === '') return 'Not set';   // approved before departure times were recorded
-    $place = trim((string)($r['claim_place'] ?? ''));
-    return date('g:i A', strtotime($time)) . ($place !== '' ? ', ' . $place : '');
-}
-
-/**
  * Medical: did the patient file for themself? ("For myself" on the online and walk-in forms, saved as relationship
  * "Self".) Then they are also the claimant, and there is no separate claimant to show.
  */
@@ -1214,17 +1227,20 @@ function ui_record_cards(array $a): array
 
     // Application and decision
     $app = [ui_detail('Status', $a['status'] === 'Disapproved' ? 'Declined' : $a['status'])];   // the stored value stays 'Disapproved'; people read 'Declined'
+    // The applicant changed their details or photos after filing (only possible while waiting): the office should know before deciding
+    if ($has('edited_at')) {
+        $app[] = ui_detail('Edited by the applicant', 'Last on ' . ui_date($a['edited_at'], 'F j, Y, g:i A') . ' (' . (int)($a['edit_count'] ?? 1) . (((int)($a['edit_count'] ?? 1)) === 1 ? ' change' : ' changes') . ' since it was filed)');
+    }
     if ($a['status'] === 'Approved') {
         if ($has('approved_at')) $app[] = ui_detail('Date approved', ui_date($a['approved_at'], 'F j, Y, g:i A'));
         if ($has('approved_by')) $app[] = ui_detail_user('Approved by', (int)$a['approved_by']);
         if ($has('amount') && (float)$a['amount'] > 0) $app[] = ui_detail('Amount released', ui_peso($a['amount']));
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date
         // Approval details typed when approving, the same ones the approval email gave
-        // (OPD: the trip leaves on the patient's check-up date)
-        if ($has('claim_place')) {
+        // (OPD: the trip is on the patient's check-up date; no pick-up point or departure time is kept any more)
+        if ($has('claim_requirements')) {
             if ($type === 3) {
-                $app[] = ui_detail('Trip', ui_opd_schedule_day($a) . ($has('claim_time') ? ', departure ' . date('g:i A', strtotime($a['claim_time'])) : ''));
-                $app[] = ui_detail('Pick-up point', $a['claim_place']);
+                $app[] = ui_detail('Trip day', ui_opd_schedule_day($a));
             } else {
                 $app[] = ui_detail('Where to claim', $a['claim_place']);
                 $app[] = ui_detail('Claim date and time', ui_date($a['claim_date'] ?? '', 'l, F j, Y')
@@ -1236,6 +1252,10 @@ function ui_record_cards(array $a): array
                 ? 'Sent ' . ui_date($a['approval_email_sent_at'], 'M j, Y, g:i A')
                 : (array_key_exists('account_id', $a) && $a['account_id'] === null ? 'Not sent (walk-in, no account)' : 'Not sent'));
         }
+    }
+    if ($a['status'] === 'Withdrawn') {   // the applicant took it back; nobody in the office decided anything
+        $app[] = ui_detail('Withdrawn by the applicant', ui_date($a['withdrawn_at'] ?? '', 'F j, Y, g:i A'));
+        $app[] = ui_detail('Reason given', trim((string)($a['withdrawal_reason'] ?? '')) !== '' ? $a['withdrawal_reason'] : 'No reason given', true);
     }
     if ($a['status'] === 'Disapproved') {
         $app[] = ui_detail('Date declined', ui_date($a['disapproved_at'] ?? '', 'F j, Y, g:i A'));
@@ -1267,7 +1287,6 @@ function ui_record_cards(array $a): array
         $deceased = [ui_detail('Full name of the deceased', $a['petitioner_name'] ?? '')];
         if (array_key_exists('beneficiary_birthdate', $a)) $deceased[] = ui_detail('Birthdate', ui_date($a['beneficiary_birthdate'], 'F j, Y'));
         if (array_key_exists('date_of_death', $a)) $deceased[] = ui_detail('Date of death', ui_date($a['date_of_death'], 'F j, Y'));
-        $deceased[] = ui_detail('Purpose of assistance', $a['purpose'] ?? '', true);
         $what[] = ui_detail_card('The deceased', 'burial', $deceased);
         $who[] = ui_detail_card('Address and contact', 'pin', $address);
     } elseif ($type === 3) {
@@ -1282,7 +1301,7 @@ function ui_record_cards(array $a): array
         $what[] = ui_detail_card('Check-up and transport', 'van', [
             ui_detail('Hospital or clinic', $a['hospital'] ?? ''),
             ui_detail('Check-up date', ui_date($a['checkup_date'] ?? '', 'F j, Y')),
-            ui_detail('Diagnosis or complaint', $a['diagnosis'] ?? '', true),
+            ui_detail('Reason for check-up', $a['checkup_reason'] ?? '', true),
             ui_detail('Accompanied by', ui_opd_companion($a)),   // optional: "No companion" when the patient goes alone
             ui_detail('Wheelchair', $a['wheelchair'] ?? 'No'),
             ui_detail('Stretcher', $a['stretcher'] ?? 'No'),
@@ -1312,7 +1331,7 @@ function ui_record_cards(array $a): array
         $who[] = ui_detail_card('Address and contact', 'pin', $address);
         $request = [ui_detail('Purpose of assistance', $a['purpose'] ?? '', true)];
         if ($has('hospital')) $request[] = ui_detail('Hospital', $a['hospital']);
-        if ($has('diagnosis')) $request[] = ui_detail('Diagnosis', $a['diagnosis'], true);
+        if ($has('checkup_reason')) $request[] = ui_detail('Reason for check-up', $a['checkup_reason'], true);
         if ($has('checkup_date')) $request[] = ui_detail('Check-up date', ui_date($a['checkup_date'], 'F j, Y'));
         $what[] = ui_detail_card('Request', 'medical', $request);
     }
@@ -1347,6 +1366,7 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         . ui_detail('Filed by', array_key_exists('account_id', $a) ? ($a['account_id'] === null ? 'Walk-in, added by the office' : 'Applicant, online') : '')
         . ui_detail('Contact number', $a['contact_number'] ?? '')
         . ui_detail('Documents', count($documents) === 1 ? '1 uploaded' : count($documents) . ' uploaded')
+        . ($has('edited_at') ? ui_detail('Edited by applicant', ui_date($a['edited_at'], 'M j, Y, g:i A')) : '')
         . '</dl></div>';
 
     ['who' => $who, 'what' => $what] = ui_record_cards($a);
@@ -1434,7 +1454,7 @@ function ui_medical_reapply_panel(array $a): string
     // The decision is made from an approved application (that is what the rule is about)
     if ($a['status'] === 'Approved' && !$deceased) {
         $return = ui_current_page() . '?' . http_build_query(array_intersect_key($_GET, ['id' => 1, 'applicant_id' => 1]));
-        $html .= '<form method="POST" action="../medical/reapply_decision.php" novalidate data-reapply-form'
+        $html .= '<form method="POST" action="../medical/reapply_decision" novalidate data-reapply-form'
             . ' data-name="' . ui_e(ui_full_name($a)) . '" data-ref="Ref #' . (int)$a['id'] . '">'
             . decision_csrf_field()
             . '<input type="hidden" name="return" value="' . ui_e($return) . '">'
@@ -1538,6 +1558,24 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
 /* ============================================================
    DISAPPROVED LOG (admin: every program; OPD staff: OPD)
    ============================================================ */
+
+/** Withdrawn applications (the applicant took them back while waiting), newest first, with the reason they gave, if any. */
+function ui_withdrawn_log(array $rows, bool $showType): string
+{
+    $columns = [
+        ['label' => 'Applicant', 'type' => 'person', 'link' => function ($r) { return ui_type_url((int)$r['assistance_type_id'], 'view', ['id' => (int)$r['id']]); }],
+    ];
+    if ($showType) {
+        $columns[] = ['label' => 'Program', 'type' => 'text', 'value' => function ($r) { return ui_types()[(int)$r['assistance_type_id']]['short'] ?? 'Other'; }];
+    }
+    $columns[] = ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'];
+    $columns[] = ['label' => 'Withdrawn', 'type' => 'datetime', 'key' => 'withdrawn_at'];
+    $columns[] = ['label' => 'Reason given', 'type' => 'text', 'value' => function ($r) { return trim((string)($r['withdrawal_reason'] ?? '')) !== '' ? $r['withdrawal_reason'] : 'No reason given'; }, 'class' => 'cell-clip'];
+    return ui_table($rows, $columns, [
+        'empty' => ['No withdrawn applications', 'Applications the applicants take back while they are waiting are listed here for the record.'],
+        'search' => 'Name, Ref # or reason',
+    ]);
+}
 
 /** Disapproved applications, newest first, with who disapproved them and why. */
 function ui_disapproved_log(array $rows, bool $showType): string

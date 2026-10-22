@@ -57,7 +57,7 @@ function email_verify_send(PDO $pdo, int $accountId): bool
     }
 
     $name = trim($account['firstname'] . ' ' . $account['lastname']);
-    [$subject, $text, $html] = email_verify_message($name, $base . '/user/verify_email.php?token=' . $secret);
+    [$subject, $text, $html] = email_verify_message($name, $base . '/user/verify_email?token=' . $secret);
     return mail_send($email, $name, $subject, $text, $html);
 }
 

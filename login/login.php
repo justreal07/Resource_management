@@ -4,8 +4,8 @@ require_once '../includes/admin_security.php';   // activity log, wrong-password
 
 // Where each role goes after signing in
 $dashboards = [
-    'admin' => '../Main_dashboard/dashboard.php',
-    'staff' => '../staff/staff_dashboard.php',
+    'admin' => '../Main_dashboard/dashboard',
+    'staff' => '../staff/staff_dashboard',
 ];
 
 // Already signed in? No need to show the form again.
@@ -144,7 +144,7 @@ auth_side(
 
             <p class="login-help">
                 <?php if ($noAdminYet): ?>
-                    No admin account yet? <a href="register.php">Create the first one here</a>
+                    No admin account yet? <a href="register">Create the first one here</a>
                 <?php else: ?>
                     No account yet? Please ask your admin to create one for you.
                 <?php endif; ?>

@@ -5,7 +5,7 @@ require_once '../config.php';
 require_once '../includes/application_decision.php';
 
 decision_run_endpoint($pdo, 'approve', [
-    'fallback'       => '../medical/Mpending.php',
+    'fallback'       => '../medical/Mpending',
     'require_amount' => true,
     'expect_type'    => 1,
 ]);

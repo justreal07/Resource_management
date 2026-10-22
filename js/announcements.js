@@ -10,14 +10,7 @@
     const $$ = (sel, root) => Array.prototype.slice.call((root || document).querySelectorAll(sel));
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    /* ---------- Text size: opens at the normal size; the buttons enlarge this visit only (not remembered) ---------- */
-    const sizeButtons = $$('.text-size button');
-    function applySize(size) {
-        document.documentElement.style.fontSize = size + '%';
-        sizeButtons.forEach((b) => b.setAttribute('aria-pressed', b.dataset.size === String(size)));
-    }
-    applySize('100');
-    sizeButtons.forEach((b) => b.addEventListener('click', () => applySize(b.dataset.size)));
+    /* (Text size buttons: js/portal-ui.js, same on every applicant page) */
 
     /* ---------- Category: apply on change ---------- */
     $$('[data-auto-submit]').forEach((select) => select.addEventListener('change', () => select.form.submit()));

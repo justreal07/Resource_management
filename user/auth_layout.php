@@ -30,19 +30,14 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
             <span><i class="fas fa-phone"></i> (046) 123-4567</span>
             <span><i class="far fa-clock"></i> Mon – Fri, 8:00 AM – 5:00 PM</span>
         </div>
-        <div class="text-size" role="group" aria-label="Text size">
-            <span class="text-size-label">Text size:</span>
-            <button type="button" data-size="100" aria-label="Normal text">A</button>
-            <button type="button" data-size="112.5" aria-label="Larger text">A</button>
-            <button type="button" data-size="125" aria-label="Largest text">A</button>
-        </div>
+        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
 <!-- HEADER / NAVBAR -->
 <header class="site-header" id="siteHeader">
     <div class="container nav-container">
-        <a href="landingpage.php" class="brand">
+        <a href="landingpage" class="brand">
             <span class="brand-logos">
                 <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -58,20 +53,20 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
         </button>
 
         <nav class="nav-menu" id="navMenu" aria-label="Main">
-            <a href="landingpage.php" class="nav-link">Home</a>
-            <a href="landingpage.php#programs" class="nav-link">Programs</a>
-            <a href="announcements.php" class="nav-link">Announcements</a>
-            <a href="feedback.php" class="nav-link">Feedback</a>
-            <a href="landingpage.php#how-it-works" class="nav-link">How to Apply</a>
-            <a href="landingpage.php#faq" class="nav-link">FAQs</a>
+            <a href="landingpage" class="nav-link">Home</a>
+            <a href="landingpage#programs" class="nav-link">Programs</a>
+            <a href="announcements" class="nav-link">Announcements</a>
+            <a href="feedback" class="nav-link">Feedback</a>
+            <a href="landingpage#how-it-works" class="nav-link">How to Apply</a>
+            <a href="landingpage#faq" class="nav-link">FAQs</a>
             <?php /* The button for the page the visitor is already on is left out (Log in on the log-in form, Sign up on the sign-up form); the other one stays */
             $onPage = basename($_SERVER['SCRIPT_NAME'] ?? ''); ?>
             <div class="nav-actions">
                 <?php if ($onPage !== 'applicant_login.php'): ?>
-                <a href="applicant_login.php" class="btn btn-sm btn-outline"><i class="fas fa-sign-in-alt"></i> Log in</a>
+                <a href="applicant_login" class="btn btn-sm btn-outline"><i class="fas fa-sign-in-alt"></i> Log in</a>
                 <?php endif; ?>
                 <?php if ($onPage !== 'applicant_register.php'): ?>
-                <a href="applicant_register.php" class="btn btn-sm btn-primary"><i class="fas fa-user-plus"></i> Sign up</a>
+                <a href="applicant_register" class="btn btn-sm btn-primary"><i class="fas fa-user-plus"></i> Sign up</a>
                 <?php endif; ?>
             </div>
         </nav>
@@ -113,16 +108,7 @@ function auth_page_end(): void {
 
 <?php portal_scripts(); ?>
 <script>
-// Text size: opens at the normal size; the buttons enlarge this visit only (not remembered, like the landing page)
-(function() {
-    const buttons = document.querySelectorAll('.text-size button');
-    function applySize(size) {
-        document.documentElement.style.fontSize = size + '%';
-        buttons.forEach(b => b.setAttribute('aria-pressed', b.dataset.size === String(size)));
-    }
-    applySize('100');
-    buttons.forEach(b => b.addEventListener('click', function() { applySize(this.dataset.size); }));
-})();
+// (Text size buttons: js/portal-ui.js)
 
 // Header shadow + mobile menu
 const siteHeader = document.getElementById('siteHeader');
@@ -171,7 +157,7 @@ document.querySelectorAll('form[data-auth-form]').forEach(function(form) {
 /** "Continue with Google" button. $from tells google_login_init.php which page to return errors to. */
 function google_button(string $from, string $label): void {
     ?>
-    <a href="google_login_init.php?from=<?php echo $from; ?>" class="btn-google">
+    <a href="google_login_init?from=<?php echo $from; ?>" class="btn-google">
         <svg viewBox="0 0 24 24" aria-hidden="true">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>

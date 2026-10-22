@@ -1,7 +1,7 @@
 <?php
 /**
- * Client feedback: a short satisfaction survey on a decided application.
- * Once an application is approved or declined, the applicant may rate the service once,
+ * Client feedback: a short satisfaction survey on an approved application.
+ * Only after the office APPROVES an application may the applicant rate the service (once),
  * 1 to 5, with an optional comment, on their Feedback page (user/feedback.php, in the account menu).
  * The application's own page (user/view_application.php) links there, or shows the rating given.
  * The form sends to user/feedback_submit.php. Admins read the results in Reports > Client feedback
@@ -61,8 +61,9 @@ function feedback_ensure(PDO $pdo): bool
 }
 
 /**
- * This account's decided applications (approved or declined), most recently decided first,
- * each with its rating if one was given (rating / comment / rated_at are null when not rated yet).
+ * This account's approved applications, most recently approved first, each with its rating if one was given
+ * (rating / comment / rated_at are null when not rated yet). A declined application is listed only when it already
+ * has a rating (given before only approved ones could be rated); it is never offered for a new one. Withdrawn never.
  * Null when they could not be loaded.
  */
 function feedback_list(PDO $pdo, int $accountId): ?array
@@ -73,7 +74,7 @@ function feedback_list(PDO $pdo, int $accountId): ?array
                    f.rating, f.comment, f.created_at AS rated_at
             FROM applicant a
             LEFT JOIN feedback f ON f.application_id = a.id
-            WHERE a.account_id = ? AND a.status IN ('Approved', 'Disapproved')
+            WHERE a.account_id = ? AND (a.status = 'Approved' OR (a.status = 'Disapproved' AND f.id IS NOT NULL))
             ORDER BY decided_at DESC, a.id DESC
         ");
         $stmt->execute([$accountId]);
@@ -98,7 +99,7 @@ function feedback_for_application(PDO $pdo, int $applicationId): ?array
 }
 
 /**
- * Saves a rating. Only the account's own application, only once it is decided, only once.
+ * Saves a rating. Only the account's own application, only once it is approved, only once.
  * @return array{ok: bool, message: string}
  */
 function feedback_save(PDO $pdo, int $accountId, int $applicationId, $rating, string $comment): array
@@ -119,8 +120,8 @@ function feedback_save(PDO $pdo, int $accountId, int $applicationId, $rating, st
         if (!$app) {
             return ['ok' => false, 'message' => 'We could not find that application in your account.'];
         }
-        if (!in_array($app['status'], ['Approved', 'Disapproved'], true)) {
-            return ['ok' => false, 'message' => 'You can rate an application once the office has decided on it.'];
+        if ($app['status'] !== 'Approved') {
+            return ['ok' => false, 'message' => 'You can rate an application once the office has approved it.'];
         }
         $stmt = $pdo->prepare("INSERT INTO feedback (application_id, account_id, assistance_type_id, rating, comment, created_at)
                                VALUES (?, ?, ?, ?, ?, NOW())");
@@ -142,7 +143,7 @@ function feedback_save(PDO $pdo, int $accountId, int $applicationId, $rating, st
 function feedback_form_html(array $app): string
 {
     $id = (int)$app['id'];
-    $html = '<form class="pui-fb" method="post" action="feedback_submit.php">'
+    $html = '<form class="pui-fb" method="post" action="feedback_submit">'
         . csrf_field()
         . '<input type="hidden" name="application_id" value="' . $id . '">'
         . '<fieldset class="pui-fb-scale"><legend>How satisfied are you with our service on this request?</legend><div class="pui-fb-faces">';

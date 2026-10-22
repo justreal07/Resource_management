@@ -6,13 +6,13 @@ require_once '../user/person_rules.php';   // validate_application() and the cho
 // Editing a record is for administrators (the lists only show Edit to them). This page saves changes,
 // so it checks the sign-in itself, whatever ADMIN_LAYOUT_REQUIRE_LOGIN says.
 if (($_SESSION['user']['role'] ?? '') !== 'admin') {
-    header('Location: ../login/login.php?role=admin');
+    header('Location: ../login/login?role=admin');
     exit;
 }
 
 // Get applicant ID from query string
 if (!isset($_GET['id'])) {
-    header('Location: dashboard.php');
+    header('Location: dashboard');
     exit;
 }
 $id = intval($_GET['id']);
@@ -20,8 +20,8 @@ $id = intval($_GET['id']);
 // Where to go after saving or Cancel. Only a page of this system is accepted (e.g. ../medical/Mpending.php),
 // so a link can't send the user to another website.
 $redirect = isset($_GET['redirect']) && is_string($_GET['redirect'])
-    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/)?[A-Za-z_]+\.php(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
-    ? $_GET['redirect'] : 'dashboard.php';
+    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/)?[A-Za-z_]+(\.php)?(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
+    ? $_GET['redirect'] : 'dashboard';
 
 // Fetch applicant data
 $stmt = $pdo->prepare('SELECT * FROM applicant WHERE id = ?');
@@ -70,7 +70,7 @@ $defs = [
     'purpose'        => ['Purpose of assistance', 'textarea', false, 2000],
     'hospital'       => ['Hospital or clinic', 'text', true, 150],
     'checkup_date'   => ['Check-up date', 'date', true],
-    'diagnosis'      => ['Diagnosis or complaint', 'textarea', true, 255],
+    'checkup_reason' => ['Reason for check-up', 'textarea', true, 255],
     'applying_for'   => ['Who filed the application', 'filedby', true],   // Medical only; not a column: relationship "Self" = the patient
     'wheelchair'     => ['Needs a wheelchair', 'yesno', false],
     'stretcher'      => ['Needs a stretcher', 'yesno', false],
@@ -89,7 +89,7 @@ $sections = [
     ],
     'burial' => [
         ['Claimant', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'claimant_age', 'relationship'], 'The person who filed the application.'],
-        ['The deceased', 'burial', ['petitioner_name', 'beneficiary_birthdate', 'date_of_death', 'purpose'],
+        ['The deceased', 'burial', ['petitioner_name', 'beneficiary_birthdate', 'date_of_death'],
          'Who the burial assistance is for. A change here also corrects the person record (one Burial application per deceased person).'],
         ['Address and contact', 'pin', $address, $aboutAddress],
     ],
@@ -97,7 +97,7 @@ $sections = [
         ['Patient', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'beneficiary_birthdate', 'age'],
          'Who the check-up is for, as written on the valid ID. When a birthdate is saved, the age is worked out from it (as of the day the request was filed). A patient can have one request for each check-up date.'],
         ['Address and contact', 'pin', $address, $aboutAddress],
-        ['Check-up and transport', 'van', ['hospital', 'checkup_date', 'diagnosis', 'petitioner_name', 'relationship', 'wheelchair', 'stretcher'],
+        ['Check-up and transport', 'van', ['hospital', 'checkup_date', 'checkup_reason', 'petitioner_name', 'relationship', 'wheelchair', 'stretcher'],
          'Where and when the check-up is, and what the patient needs for the trip.'],
     ],
 ][$formKey];
@@ -238,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $identityChanged = (bool)array_intersect($changed, $identityFields);
     // OPD: moving a waiting or approved request to another day, or changing who the patient is, must not put the same patient
     // on the schedule twice for one day (checked below under the day's lock)
-    $opdMoved = $formKey === 'opd' && $status !== 'Disapproved'
+    $opdMoved = $formKey === 'opd' && !in_array($status, ['Disapproved', 'Withdrawn'], true)
         && (bool)array_intersect($changed, ['checkup_date', 'first_name', 'middle_name', 'last_name', 'beneficiary_birthdate']);
 
     if (!$errors && !$changed) {
@@ -391,7 +391,7 @@ function edit_field(string $f, array $def, string $value, ?string $error, string
             $control = '<input type="number" ' . $common . ' value="' . ui_e($value) . '"' . ($inRange ? ' min="0" max="120"' : '') . ' step="1" inputmode="numeric">';
             break;
         case 'textarea':
-            $control = '<textarea ' . $common . ' rows="' . ($f === 'diagnosis' ? 2 : 3) . '"' . ($max ? ' maxlength="' . $max . '"' : '') . '>' . ui_e($value) . '</textarea>';
+            $control = '<textarea ' . $common . ' rows="' . ($f === 'checkup_reason' ? 2 : 3) . '"' . ($max ? ' maxlength="' . $max . '"' : '') . '>' . ui_e($value) . '</textarea>';
             break;
         default:   // text, tel
             $list = $f === 'relationship' ? ' list="relationshipList"' : ($f === 'hospital' ? ' list="hospitalList"' : '');

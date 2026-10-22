@@ -6,7 +6,7 @@
  *   search.php?q=0917123        (6+ digits) a contact number
  * Read-only JSON, at most 8 results. Same visibility as the lists: an admin finds every program, OPD staff only OPD
  * (and are sent to the staff pages). A waiting application opens in the review page, any other in its record.
- * Disapproved ones are found too (marked as such): they are off the lists, but someone may ask about them.
+ * Disapproved and Withdrawn ones are found too (marked as such): they are off the lists, but someone may ask about them.
  */
 require_once '../config.php';
 require_once '../includes/application_decision.php';
@@ -55,7 +55,7 @@ if (preg_match('/^#?(\d{1,5})$/', $q, $m)) {
 try {
     $stmt = $pdo->prepare("SELECT a.id, a.assistance_type_id, a.status, a.first_name, a.middle_name, a.last_name, a.petitioner_name, a.relationship
                            FROM applicant a WHERE " . implode(' AND ', $where) . "
-                           ORDER BY FIELD(a.status, 'Pending', 'Approved', 'Disapproved'), a.created_at DESC, a.id DESC LIMIT 8");
+                           ORDER BY FIELD(a.status, 'Pending', 'Approved', 'Disapproved', 'Withdrawn'), a.created_at DESC, a.id DESC LIMIT 8");
     $stmt->execute($params);
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {

@@ -15,7 +15,7 @@ require_once '../includes/announcements.php';
 
 // Admins only, even if the layout's sign-in switch is ever turned off
 if (($_SESSION['user']['role'] ?? '') !== 'admin') {
-    header('Location: ../login/login.php?role=admin');
+    header('Location: ../login/login?role=admin');
     exit();
 }
 
@@ -55,19 +55,19 @@ if ($ready && ($editId || $isNew)) {
     admin_layout_start(['title' => 'Announcements', 'section' => 'announcements']);
 echo '<link rel="stylesheet" href="' . ui_e(ann_asset('../css/announcements.css')) . '">';   // the card's look, shared with the public page
     if ($loadError) {
-        echo ui_load_error('this announcement', 'announcements.php?id=' . (int)$editId);
+        echo ui_load_error('this announcement', 'announcements?id=' . (int)$editId);
         admin_layout_end();
         exit();
     }
     if ($editId && !$row) {
         echo ui_state('alert', 'Announcement not found', 'It may have been removed. Go back to the list.',
-            '<a class="btn btn-secondary btn-sm" href="announcements.php">Back to announcements</a>', 'state-error');
+            '<a class="btn btn-secondary btn-sm" href="announcements">Back to announcements</a>', 'state-error');
         admin_layout_end();
         exit();
     }
     if ($row && $row['deleted_at'] !== null) {
         echo ui_state('archive', 'This announcement was deleted', 'Restore it from the Deleted filter to change it again.',
-            '<a class="btn btn-secondary btn-sm" href="announcements.php?status=deleted">Show deleted announcements</a>');
+            '<a class="btn btn-secondary btn-sm" href="announcements?status=deleted">Show deleted announcements</a>');
         admin_layout_end();
         exit();
     }
@@ -106,10 +106,10 @@ echo '<link rel="stylesheet" href="' . ui_e(ann_asset('../css/announcements.css'
         $row ? 'Ref #' . (int)$row['id'] . ' · created ' . ann_date($row['created_at'], true) . ($row['created_name'] ? ' by ' . $row['created_name'] : '')
                . ' · last changed ' . ann_date($row['updated_at'], true) . ($row['updated_name'] ? ' by ' . $row['updated_name'] : '')
              : 'Write it, check the preview on the right, then save it as a draft or publish it.',
-        '<a class="btn btn-secondary" href="announcements.php">' . ui_icon('chevron-left') . 'Back to the list</a>');
+        '<a class="btn btn-secondary" href="announcements">' . ui_icon('chevron-left') . 'Back to the list</a>');
     ?>
 <div class="ann-editor-grid">
-    <form class="panel ann-form" id="annForm" method="POST" action="announcement_action.php" enctype="multipart/form-data" novalidate
+    <form class="panel ann-form" id="annForm" method="POST" action="announcement_action" enctype="multipart/form-data" novalidate
           data-ann-form data-new="<?= $row ? '0' : '1' ?>">
         <?= decision_csrf_field() ?>
         <input type="hidden" name="action" value="save">
@@ -204,7 +204,7 @@ echo '<link rel="stylesheet" href="' . ui_e(ann_asset('../css/announcements.css'
                     <?= ann_icon('trash') ?>Delete</button>
             <?php endif; ?>
             <span class="modal-footer-space"></span>
-            <a class="btn btn-secondary" href="announcements.php">Cancel</a>
+            <a class="btn btn-secondary" href="announcements">Cancel</a>
             <button type="submit" class="btn btn-primary" data-ann-save><?= ui_icon('check-circle') ?>Save</button>
         </div>
     </form>
@@ -263,7 +263,7 @@ $dateCell = function (?string $value): string {
 };
 $link = function (array $change = []) use ($filters): string {
     $q = array_filter(array_merge($filters, $change), function ($v) { return $v !== '' && $v !== 1 && $v !== null; });
-    return 'announcements.php' . ($q ? '?' . http_build_query($q) : '');
+    return 'announcements' . ($q ? '?' . http_build_query($q) : '');
 };
 
 $rows = [];
@@ -315,8 +315,8 @@ if ($ready) {
 admin_layout_start(['title' => 'Announcements', 'section' => 'announcements']);
 echo '<link rel="stylesheet" href="' . ui_e(ann_asset('../css/announcements.css')) . '">';   // the card's look, shared with the public page
 echo ui_page_head('Announcements', 'News and notices for the public. Published ones appear on the Announcements page of the portal.',
-    $ready ? '<a class="btn btn-primary" href="announcements.php?new=1">' . ui_icon('plus') . 'New announcement</a>'
-             . '<a class="btn btn-secondary" href="../user/announcements.php" target="_blank" rel="noopener">' . ann_icon('arrow') . 'See the public page</a>' : '');
+    $ready ? '<a class="btn btn-primary" href="announcements?new=1">' . ui_icon('plus') . 'New announcement</a>'
+             . '<a class="btn btn-secondary" href="../user/announcements" target="_blank" rel="noopener">' . ann_icon('arrow') . 'See the public page</a>' : '');
 
 if (!$ready) {
     echo ui_state('alert', 'Announcements need a database update', 'Ask the system administrator to run database/migrations/migration_announcements.sql in phpMyAdmin, then open this page again.', '', 'state-error');
@@ -325,7 +325,7 @@ if (!$ready) {
 }
 ?>
 <section class="panel" aria-label="Announcements">
-    <form class="filters" method="GET" action="announcements.php" role="search" data-busy>
+    <form class="filters" method="GET" action="announcements" role="search" data-busy>
         <div class="field field-search">
             <label for="annQ">Search</label>
             <div class="input-icon"><?= ui_icon('search') ?>
@@ -353,7 +353,7 @@ if (!$ready) {
         <div class="filter-actions">
             <button type="submit" class="btn btn-primary"><?= ui_icon('search') ?>Show</button>
             <?php if ($filters['q'] !== '' || $filters['status'] !== '' || $filters['category'] !== ''): ?>
-                <a class="btn btn-link" href="announcements.php">Clear filters</a>
+                <a class="btn btn-link" href="announcements">Clear filters</a>
             <?php endif; ?>
         </div>
     </form>
@@ -362,10 +362,10 @@ if (!$ready) {
         <?= ui_load_error('the announcements', $link()) ?>
     <?php elseif (!$rows && $filters['q'] === '' && $filters['status'] === '' && $filters['category'] === ''): ?>
         <?= ui_state('inbox', 'No announcements yet', 'Write the first one: it can be a draft until you are ready.',
-            '<a class="btn btn-primary btn-sm" href="announcements.php?new=1">' . ui_icon('plus') . 'New announcement</a>') ?>
+            '<a class="btn btn-primary btn-sm" href="announcements?new=1">' . ui_icon('plus') . 'New announcement</a>') ?>
     <?php elseif (!$rows): ?>
         <?= ui_state('search', 'No announcements match these filters', 'Check the spelling, or choose another status or category.',
-            '<a class="btn btn-secondary btn-sm" href="announcements.php">Clear filters</a>') ?>
+            '<a class="btn btn-secondary btn-sm" href="announcements">Clear filters</a>') ?>
     <?php else: ?>
         <p class="result-summary" role="status">
             <?= number_format($total) ?> <?= $total === 1 ? 'announcement' : 'announcements' ?>
@@ -392,7 +392,7 @@ if (!$ready) {
                             <?php if ($deleted): ?>
                                 <strong class="row-name"><?= ui_e($r['title']) ?></strong>
                             <?php else: ?>
-                                <a class="row-name row-link" href="announcements.php?id=<?= (int)$r['id'] ?>"><?= ui_e($r['title']) ?></a>
+                                <a class="row-name row-link" href="announcements?id=<?= (int)$r['id'] ?>"><?= ui_e($r['title']) ?></a>
                             <?php endif; ?>
                             <span class="ref">Ref #<?= (int)$r['id'] ?></span>
                             <?php if ((int)$r['is_pinned'] === 1): ?><span class="ann-badge ann-pinned"><?= ann_icon('pin') ?>Pinned</span><?php endif; ?>
@@ -408,13 +408,13 @@ if (!$ready) {
                         </td>
                         <td class="cell-action"><div class="row-actions">
                             <?php if ($deleted): ?>
-                                <form method="POST" action="announcement_action.php" data-ann-action="restore" data-title="<?= ui_e($r['title']) ?>">
+                                <form method="POST" action="announcement_action" data-ann-action="restore" data-title="<?= ui_e($r['title']) ?>">
                                     <?= decision_csrf_field() ?><input type="hidden" name="action" value="restore"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                                     <button type="submit" class="btn btn-secondary btn-sm"><?= ui_icon('refresh') ?>Restore<span class="visually-hidden"> <?= ui_e($r['title']) ?></span></button>
                                 </form>
                             <?php else: ?>
-                                <a class="btn btn-secondary btn-sm" href="announcements.php?id=<?= (int)$r['id'] ?>"><?= ui_icon('edit') ?>Edit<span class="visually-hidden"> <?= ui_e($r['title']) ?></span></a>
-                                <form method="POST" action="announcement_action.php" data-ann-action="delete" data-title="<?= ui_e($r['title']) ?>">
+                                <a class="btn btn-secondary btn-sm" href="announcements?id=<?= (int)$r['id'] ?>"><?= ui_icon('edit') ?>Edit<span class="visually-hidden"> <?= ui_e($r['title']) ?></span></a>
+                                <form method="POST" action="announcement_action" data-ann-action="delete" data-title="<?= ui_e($r['title']) ?>">
                                     <?= decision_csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$r['id'] ?>">
                                     <button type="submit" class="btn btn-danger btn-sm"><?= ann_icon('trash') ?>Delete<span class="visually-hidden"> <?= ui_e($r['title']) ?></span></button>
                                 </form>

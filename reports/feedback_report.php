@@ -1,7 +1,7 @@
 <?php
 // Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
 if (!defined('REPORT_ENGINE')) {
-    header('Location: reports.php?report=feedback');
+    header('Location: reports?report=feedback');
     exit;
 }
 // Client feedback report: the satisfaction survey applicants answer after their application is decided
@@ -34,7 +34,7 @@ function report_build_feedback(PDO $pdo, array $f): array
     if ($failed) return ['error' => true];
     if (!$fbRows) {
         return ['empty' => ui_state('inbox', 'No feedback for ' . $f['label'] . ' yet',
-            'Applicants are asked to rate the service once their application is approved or declined. Their answers will appear here.')];
+            'Applicants are asked to rate the service once the office approves their application. Their answers will appear here.')];
     }
 
     // Totals: "satisfied" = Satisfied or Very satisfied (4-5), "dissatisfied" = 1-2, as in the Client Satisfaction Measurement

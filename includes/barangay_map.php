@@ -65,7 +65,7 @@ function barangay_counts(PDO $pdo, string $from, string $to): array
     $other = ['total' => 0, 'names' => []];
 
     $stmt = $pdo->prepare("SELECT TRIM(barangay) AS b, assistance_type_id AS t, COUNT(*) AS n
-                           FROM applicant WHERE created_at >= ? AND created_at < ? AND status <> 'Disapproved'
+                           FROM applicant WHERE created_at >= ? AND created_at < ? AND status NOT IN ('Disapproved', 'Withdrawn')
                            GROUP BY TRIM(barangay), assistance_type_id");
     $stmt->execute([$from, $to]);
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {

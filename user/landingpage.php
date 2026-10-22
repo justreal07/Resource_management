@@ -9,7 +9,7 @@ $stmt->execute();
 $types = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Initialize user data variables
-$user_stats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'not_approved' => 0];   // CHANGED: 'rejected' → 'not_approved' (status Declined)
+$user_stats = ['total' => 0, 'pending' => 0, 'approved' => 0, 'not_approved' => 0, 'withdrawn' => 0];   // CHANGED: 'rejected' → 'not_approved' (status Declined)
 $recent_applications = [];
 $notifications = [];
 $notification_count = 0;
@@ -31,7 +31,8 @@ if(isset($_SESSION['applicant'])) {
     $user_stats['pending'] = $status_counts['Pending'] ?? 0;
     $user_stats['approved'] = $status_counts['Approved'] ?? 0;
     $user_stats['not_approved'] = $status_counts['Disapproved'] ?? 0;
-    $user_stats['total'] = $user_stats['pending'] + $user_stats['approved'] + $user_stats['not_approved'];
+    $user_stats['withdrawn'] = $status_counts['Withdrawn'] ?? 0;   // the applicant's own withdrawal: not a Declined one
+    $user_stats['total'] = $user_stats['pending'] + $user_stats['approved'] + $user_stats['not_approved'] + $user_stats['withdrawn'];
 
     // Get recent applications (last 5)
     $stmt = $pdo->prepare("
@@ -79,7 +80,7 @@ $programs = [
     1 => [
         'name'      => 'Medical Assistance',
         'short'     => 'Hospital bills & medicines',
-        'url'       => 'Medical%20Assistance.php?id=1',
+        'url'       => 'Medical%20Assistance?id=1',
         'img'       => '../asset/medical-illustration.svg',
         'icon'      => 'fa-briefcase-medical',
         'tone'      => 'tone-red',
@@ -89,7 +90,7 @@ $programs = [
     2 => [
         'name'      => 'Burial Assistance',
         'short'     => 'Funeral & burial expenses',
-        'url'       => 'burial_assistance_form.php?id=2',
+        'url'       => 'burial_assistance_form?id=2',
         'img'       => '../asset/burial-illustration.svg',
         'icon'      => 'fa-hand-holding-heart',
         'tone'      => 'tone-blue',
@@ -99,7 +100,7 @@ $programs = [
     3 => [
         'name'      => 'OPD Scheduling',
         'short'     => 'Check-ups & diagnostics',
-        'url'       => 'opdform.php?id=3',
+        'url'       => 'opdform?id=3',
         'img'       => '../asset/opd-illustration.svg',
         'icon'      => 'fa-stethoscope',
         'tone'      => 'tone-green',
@@ -133,19 +134,14 @@ $programs = [
             <span><i class="fas fa-phone"></i> (046) 123-4567</span>
             <span><i class="far fa-clock"></i> Mon – Fri, 8:00 AM – 5:00 PM</span>
         </div>
-        <div class="text-size" role="group" aria-label="Text size">
-            <span class="text-size-label">Text size:</span>
-            <button type="button" data-size="100" aria-label="Normal text">A</button>
-            <button type="button" data-size="112.5" aria-label="Larger text">A</button>
-            <button type="button" data-size="125" aria-label="Largest text">A</button>
-        </div>
+        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
 <!-- HEADER / NAVBAR -->
 <header class="site-header" id="siteHeader">
     <div class="container nav-container">
-        <a href="landingpage.php" class="brand">
+        <a href="landingpage" class="brand">
             <span class="brand-logos">
                 <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -161,11 +157,11 @@ $programs = [
         </button>
 
         <nav class="nav-menu" id="navMenu" aria-label="Main">
-            <a href="landingpage.php" class="nav-link active">Home</a>
+            <a href="landingpage" class="nav-link active">Home</a>
             <a href="#programs" class="nav-link">Programs</a>
-            <a href="announcements.php" class="nav-link">Announcements</a>
+            <a href="announcements" class="nav-link">Announcements</a>
             <?php /* Rate our service (user/feedback.php); signed out, it asks to log in first and then opens */ ?>
-            <a href="feedback.php" class="nav-link">Feedback</a>
+            <a href="feedback" class="nav-link">Feedback</a>
             <a href="#how-it-works" class="nav-link">How to Apply</a>
             <a href="#faq" class="nav-link">FAQs</a>
             <a href="#contact" class="nav-link">Contact</a>
@@ -184,7 +180,7 @@ $programs = [
                             <?php if($notification_count): ?>
                                 <button type="button" class="panel-link" id="markAllRead"><i class="fas fa-check-double"></i> Mark all read</button>
                             <?php else: ?>
-                                <a href="user_notifications.php">View All</a>
+                                <a href="user_notifications">View All</a>
                             <?php endif; ?>
                         </div>
                         <div class="notification-list">
@@ -199,7 +195,7 @@ $programs = [
                                     </div>
                                 </a>
                                 <?php endforeach; ?>
-                                <a href="user_notifications.php" class="panel-foot">See all notifications <i class="fas fa-arrow-right"></i></a>
+                                <a href="user_notifications" class="panel-foot">See all notifications <i class="fas fa-arrow-right"></i></a>
                             <?php else: ?>
                                 <div class="no-notifications">
                                     <i class="far fa-bell-slash"></i>
@@ -225,20 +221,20 @@ $programs = [
                                 <span>@<?php echo htmlspecialchars($user['username']); ?></span>
                             </div>
                         </div>
-                        <a href="my_account.php"><i class="fas fa-user"></i> My Account</a>
-                        <a href="my_documents.php"><i class="fas fa-folder-open"></i> My Documents</a>
-                        <a href="user_notifications.php"><i class="fas fa-bell"></i> Notifications</a>
+                        <a href="my_account"><i class="fas fa-user"></i> My Account</a>
+                        <a href="my_documents"><i class="fas fa-folder-open"></i> My Documents</a>
+                        <a href="user_notifications"><i class="fas fa-bell"></i> Notifications</a>
                         <div class="dropdown-divider"></div>
-                        <a href="my_account.php#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
-                        <a href="my_account.php#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
-                        <a href="my_account.php#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
+                        <a href="my_account#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
+                        <a href="my_account#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
+                        <a href="my_account#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
                         <a href="#tour" role="button" data-tour-start><i class="fas fa-route"></i> Take a tour</a>
-                        <a href="applicant_logout.php" class="logout-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                        <a href="applicant_logout" class="logout-link"><i class="fas fa-sign-out-alt"></i> Logout</a>
                     </div>
                 </div>
             <?php else: ?>
-                <a href="applicant_login.php" class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt"></i> Log in</a>
-                <a href="applicant_register.php" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Sign up</a>
+                <a href="applicant_login" class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt"></i> Log in</a>
+                <a href="applicant_register" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Sign up</a>
             <?php endif; ?>
             </div>
         </nav>
@@ -274,13 +270,13 @@ $programs = [
                 <p class="hero-lead"><span data-greeting-fil>Magandang araw!</span> Apply for assistance, upload your requirements and follow your application — all in one place, anytime.</p>
                 <div class="hero-cta">
                     <a href="#programs" class="btn btn-gold"><i class="fas fa-file-signature"></i> Apply for Assistance</a>
-                    <a href="my_account.php" class="btn btn-ghost-light"><i class="fas fa-search"></i> Track My Applications</a>
+                    <a href="my_account" class="btn btn-ghost-light"><i class="fas fa-search"></i> Track My Applications</a>
                 </div>
             <?php else: ?>
                 <h1>Tulong para sa bawat <span class="accent">pamilyang GMA</span>.</h1>
                 <p class="hero-lead">Request Medical, Burial and OPD assistance from your municipal government online — no long lines, and you can follow your application every step of the way.</p>
                 <div class="hero-cta">
-                    <a href="applicant_register.php" class="btn btn-gold"><i class="fas fa-user-plus"></i> Create Free Account</a>
+                    <a href="applicant_register" class="btn btn-gold"><i class="fas fa-user-plus"></i> Create Free Account</a>
                     <a href="#programs" class="btn btn-ghost-light"><i class="fas fa-th-large"></i> View Programs</a>
                 </div>
             <?php endif; ?>
@@ -305,7 +301,7 @@ $programs = [
                     </a>
                     <?php endforeach; ?>
                 </div>
-                <a href="my_documents.php" class="btn btn-outline btn-block btn-sm"><i class="fas fa-folder-open"></i> My Documents</a>
+                <a href="my_documents" class="btn btn-outline btn-block btn-sm"><i class="fas fa-folder-open"></i> My Documents</a>
             <?php else: ?>
                 <h3>Get help in 3 easy steps</h3>
                 <p>Mabilis at madali — no need to visit the office first.</p>
@@ -315,8 +311,8 @@ $programs = [
                     <li><span class="num">3</span><div><strong>Track your status</strong><span>Get notified once it's reviewed.</span></div></li>
                 </ol>
                 <div class="hero-card-actions">
-                    <a href="applicant_login.php" class="btn btn-outline btn-sm">Log in</a>
-                    <a href="applicant_register.php" class="btn btn-primary btn-sm">Sign up</a>
+                    <a href="applicant_login" class="btn btn-outline btn-sm">Log in</a>
+                    <a href="applicant_register" class="btn btn-primary btn-sm">Sign up</a>
                 </div>
             <?php endif; ?>
         </aside>
@@ -354,7 +350,7 @@ $programs = [
         <div class="dashboard-card reveal">
             <div class="dashboard-top">
                 <div class="welcome-user">
-                    <a href="my_account.php#profile" class="welcome-avatar" title="Change profile photo">
+                    <a href="my_account#profile" class="welcome-avatar" title="Change profile photo">
                         <img src="<?php echo htmlspecialchars($avatar_path); ?>" alt="">
                         <span><i class="fas fa-camera"></i></span>
                     </a>
@@ -370,18 +366,19 @@ $programs = [
                     </div>
                 </div>
                 <div class="dashboard-actions">
-                    <a href="user_notifications.php" class="btn btn-ghost-light btn-sm"><i class="fas fa-bell"></i> Updates<?php if($notification_count): ?> <span class="pill"><?php echo $notification_count; ?></span><?php endif; ?></a>
-                    <a href="my_account.php" class="btn btn-gold btn-sm"><i class="fas fa-external-link-alt"></i> View Full Dashboard</a>
+                    <a href="user_notifications" class="btn btn-ghost-light btn-sm"><i class="fas fa-bell"></i> Updates<?php if($notification_count): ?> <span class="pill"><?php echo $notification_count; ?></span><?php endif; ?></a>
+                    <a href="my_account" class="btn btn-gold btn-sm"><i class="fas fa-external-link-alt"></i> View Full Dashboard</a>
                 </div>
             </div>
 
-            <div class="stats-grid">
-                <?php foreach ([
-                    ['total',        'Total Applications', $user_stats['total'],        'my_account.php#applications'],
-                    ['pending',      'Pending',            $user_stats['pending'],      'my_account.php?filter=pending#applications'],
-                    ['approved',     'Approved',           $user_stats['approved'],     'my_account.php?filter=approved#applications'],
-                    ['not-approved', 'Declined',       $user_stats['not_approved'], 'my_account.php?filter=disapproved#applications'],
-                ] as [$cls, $label, $num, $href]): ?>
+            <div class="stats-grid<?php echo $user_stats['withdrawn'] > 0 ? ' has-withdrawn' : ''; ?>">
+                <?php foreach (array_filter([
+                    ['total',        'Total Applications', $user_stats['total'],        'my_account#applications'],
+                    ['pending',      'Pending',            $user_stats['pending'],      'my_account?filter=pending#applications'],
+                    ['approved',     'Approved',           $user_stats['approved'],     'my_account?filter=approved#applications'],
+                    ['not-approved', 'Declined',       $user_stats['not_approved'], 'my_account?filter=disapproved#applications'],
+                    $user_stats['withdrawn'] > 0 ? ['withdrawn', 'Withdrawn', $user_stats['withdrawn'], 'my_account?filter=withdrawn#applications'] : null,
+                ]) as [$cls, $label, $num, $href]): ?>
                 <a class="stat-box <?php echo $cls; ?>" href="<?php echo $href; ?>">
                     <span class="stat-label"><?php echo $label; ?></span>
                     <span class="stat-number" data-count="<?php echo (int)$num; ?>"><?php echo (int)$num; ?></span>
@@ -403,11 +400,11 @@ $programs = [
                 <ol class="tracker-steps">
                     <li class="done"><span><i class="fas fa-paper-plane"></i></span>Submitted</li>
                     <li class="<?php echo $ls === 'Pending' ? 'current' : 'done'; ?>"><span><i class="fas fa-search"></i></span>Under review</li>
-                    <li class="<?php echo $ls === 'Approved' ? 'done' : ($ls === 'Disapproved' ? 'failed' : ''); ?>">
-                        <span><i class="fas <?php echo $ls === 'Disapproved' ? 'fa-times' : 'fa-check'; ?>"></i></span><?php echo $ls === 'Disapproved' ? 'Declined' : 'Approved'; ?>
+                    <li class="<?php echo $ls === 'Approved' ? 'done' : (in_array($ls, ['Disapproved', 'Withdrawn'], true) ? 'failed' : ''); ?>">
+                        <span><i class="fas <?php echo $ls === 'Disapproved' ? 'fa-times' : ($ls === 'Withdrawn' ? 'fa-ban' : 'fa-check'); ?>"></i></span><?php echo $ls === 'Disapproved' ? 'Declined' : ($ls === 'Withdrawn' ? 'Withdrawn' : 'Approved'); ?>
                     </li>
                 </ol>
-                <a href="view_application.php?id=<?php echo (int)$latest_app['id']; ?>" class="btn btn-ghost-light btn-sm">Details <i class="fas fa-arrow-right"></i></a>
+                <a href="view_application?id=<?php echo (int)$latest_app['id']; ?>" class="btn btn-ghost-light btn-sm">Details <i class="fas fa-arrow-right"></i></a>
             </div>
             <?php endif; ?>
         </div>
@@ -419,7 +416,7 @@ $programs = [
             <div class="card-head">
                 <h3><i class="fas fa-history"></i> Recent Applications</h3>
                 <?php if(!empty($recent_applications)): ?>
-                    <a href="my_account.php#applications" class="link-arrow">View all <i class="fas fa-arrow-right"></i></a>
+                    <a href="my_account#applications" class="link-arrow">View all <i class="fas fa-arrow-right"></i></a>
                 <?php endif; ?>
             </div>
             <?php if(!empty($recent_applications)): ?>
@@ -434,9 +431,9 @@ $programs = [
                         </div>
                     </div>
                     <span class="status-badge <?php echo strtolower($app['status']); ?>">
-                        <?php echo htmlspecialchars($app['status'] === 'Disapproved' ? 'Declined' : $app['status']); ?>
+                        <?php echo htmlspecialchars($app['status'] === 'Disapproved' ? 'Declined' : $app['status']); /* Pending, Approved, Withdrawn as stored */ ?>
                     </span>
-                    <a href="view_application.php?id=<?php echo $app['id']; ?>" class="app-view-btn" aria-label="View application #<?php echo $app['id']; ?>">
+                    <a href="view_application?id=<?php echo $app['id']; ?>" class="app-view-btn" aria-label="View application #<?php echo $app['id']; ?>">
                         <i class="fas fa-eye"></i>
                     </a>
                 </div>
@@ -457,7 +454,7 @@ $programs = [
             <div class="recent-card reveal">
                 <div class="card-head">
                     <h3><i class="fas fa-bell"></i> Latest Updates</h3>
-                    <a href="user_notifications.php" class="link-arrow">See all <i class="fas fa-arrow-right"></i></a>
+                    <a href="user_notifications" class="link-arrow">See all <i class="fas fa-arrow-right"></i></a>
                 </div>
                 <?php if($notifications): ?>
                 <ul class="mini-updates">
@@ -481,7 +478,7 @@ $programs = [
 
             <?php if($profile_percent < 100): ?>
             <!-- PROFILE PROMPT -->
-            <a href="my_account.php#profile" class="profile-prompt reveal">
+            <a href="my_account#profile" class="profile-prompt reveal">
                 <span class="pp-ring" style="--p: <?php echo $profile_percent; ?>"><span><?php echo $profile_percent; ?>%</span></span>
                 <span>
                     <strong>Complete your profile</strong>
@@ -544,7 +541,7 @@ $programs = [
                         <?php endif; ?>
                         <a href="<?php echo $p['url']; ?>" class="btn btn-primary btn-block program-cta">Apply Now <i class="fas fa-arrow-right"></i></a>
                     <?php else: ?>
-                        <a href="applicant_login.php" class="btn btn-primary btn-block program-cta"><i class="fas fa-sign-in-alt"></i> Log in to Apply <i class="fas fa-arrow-right"></i></a>
+                        <a href="applicant_login" class="btn btn-primary btn-block program-cta"><i class="fas fa-sign-in-alt"></i> Log in to Apply <i class="fas fa-arrow-right"></i></a>
                     <?php endif; ?>
                 </div>
             </article>
@@ -641,6 +638,15 @@ $programs = [
                     </div>
                 </details>
                 <details class="faq-item">
+                    <summary>Can I change or cancel my application after I submit it?</summary>
+                    <div class="faq-answer">
+                        Yes, <strong>while it is still Pending</strong> (the office has not decided yet). Open the application from <em>My Account</em>
+                        to correct your details, change a wrong photo, or <strong>withdraw</strong> it if you no longer need the assistance.
+                        An edited application keeps its place in the line, and the office can see that you edited it. After the office decides,
+                        it can no longer be changed online: please call the office.
+                    </div>
+                </details>
+                <details class="faq-item">
                     <summary>Will OPD automatically admit me to a hospital?</summary>
                     <div class="faq-answer">
                         No. OPD is for check-up and evaluation first. Admission depends on the doctor's assessment.
@@ -651,7 +657,7 @@ $programs = [
                     <div class="faq-answer">
                         Yes. Only authorized office staff can see your application and documents, and we use them only to process your request.
                         We never sell your information. You have the right to see, correct and ask us to delete it.
-                        Read our <a href="privacy.php">Data Privacy Notice</a> to learn more.
+                        Read our <a href="privacy">Data Privacy Notice</a> to learn more.
                     </div>
                 </details>
             </div>
@@ -673,7 +679,7 @@ $programs = [
                 <?php if($is_logged_in): ?>
                 <button type="button" class="btn btn-gold btn-block" onclick="openChat()"><i class="fas fa-comment-dots"></i> Chat with Assistant</button>
                 <?php else: ?>
-                <a href="applicant_login.php" class="btn btn-gold btn-block"><i class="fas fa-sign-in-alt"></i> Sign in to chat with our Assistant</a>
+                <a href="applicant_login" class="btn btn-gold btn-block"><i class="fas fa-sign-in-alt"></i> Sign in to chat with our Assistant</a>
                 <?php endif; ?>
                 <button type="button" class="btn btn-ghost-light btn-block" data-tour-start><i class="fas fa-route"></i> Take a guided tour</button>
             </aside>
@@ -692,7 +698,7 @@ $programs = [
                 </div>
                 <div class="btn-row">
                     <a href="#programs" class="btn btn-gold"><i class="fas fa-file-signature"></i> Start Application</a>
-                    <a href="my_documents.php" class="btn btn-ghost-light"><i class="fas fa-folder-open"></i> My Documents</a>
+                    <a href="my_documents" class="btn btn-ghost-light"><i class="fas fa-folder-open"></i> My Documents</a>
                 </div>
             <?php else: ?>
                 <div>
@@ -700,8 +706,8 @@ $programs = [
                     <p>Create your account in minutes and submit your first request today.</p>
                 </div>
                 <div class="btn-row">
-                    <a href="applicant_register.php" class="btn btn-gold"><i class="fas fa-user-plus"></i> Create Account</a>
-                    <a href="applicant_login.php" class="btn btn-ghost-light"><i class="fas fa-sign-in-alt"></i> I already have an account</a>
+                    <a href="applicant_register" class="btn btn-gold"><i class="fas fa-user-plus"></i> Create Account</a>
+                    <a href="applicant_login" class="btn btn-ghost-light"><i class="fas fa-sign-in-alt"></i> I already have an account</a>
                 </div>
             <?php endif; ?>
         </div>
@@ -754,7 +760,7 @@ $programs = [
 <footer class="site-footer">
     <div class="container footer-grid">
         <div class="footer-brand">
-            <a href="landingpage.php" class="brand">
+            <a href="landingpage" class="brand">
                 <span class="brand-logos">
                     <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                     <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -782,16 +788,16 @@ $programs = [
         <div>
             <h4>Quick Links</h4>
             <ul class="footer-links">
-                <li><a href="landingpage.php">Home</a></li>
-                <li><a href="announcements.php">Announcements</a></li>
-                <li><a href="feedback.php">Feedback</a></li>
+                <li><a href="landingpage">Home</a></li>
+                <li><a href="announcements">Announcements</a></li>
+                <li><a href="feedback">Feedback</a></li>
                 <li><a href="#how-it-works">How to Apply</a></li>
                 <li><a href="#faq">FAQs</a></li>
-                <li><a href="privacy.php">Data Privacy Notice</a></li>
+                <li><a href="privacy">Data Privacy Notice</a></li>
                 <?php if($is_logged_in): ?>
-                    <li><a href="my_account.php">My Account</a></li>
+                    <li><a href="my_account">My Account</a></li>
                 <?php else: ?>
-                    <li><a href="applicant_login.php">Log in</a></li>
+                    <li><a href="applicant_login">Log in</a></li>
                 <?php endif; ?>
             </ul>
         </div>
@@ -821,7 +827,7 @@ $programs = [
         <div class="container">
             <span>&copy; <?= date("Y") ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>
             <span class="gold">LGU Assistance Portal</span>
-            <span><a href="privacy.php" style="color:inherit;">Data Privacy Notice</a></span>
+            <span><a href="privacy" style="color:inherit;">Data Privacy Notice</a></span>
             <!-- Required credit: program illustrations are from Storyset (Freepik License) -->
             <span><a href="https://storyset.com/" target="_blank" rel="noopener" style="color:inherit;">Illustrations by Storyset</a></span>
         </div>
@@ -885,19 +891,8 @@ $programs = [
 <?php portal_scripts(); ?>
 <script>
 // ========================================
-// TEXT SIZE (accessibility)
-// The page always opens and refreshes at the normal size (100%); the buttons only enlarge it
-// for this visit, and the choice is not remembered.
+// TEXT SIZE: the "A A A" buttons are run by js/portal-ui.js (same on every applicant page)
 // ========================================
-(function() {
-    const buttons = document.querySelectorAll('.text-size button');
-    function applySize(size) {
-        document.documentElement.style.fontSize = size + '%';
-        buttons.forEach(b => b.setAttribute('aria-pressed', b.dataset.size === String(size)));
-    }
-    applySize('100');
-    buttons.forEach(b => b.addEventListener('click', function() { applySize(this.dataset.size); }));
-})();
 
 // ========================================
 // GREETING: time of day on the visitor's device, typed out with Typed.js
@@ -1080,13 +1075,13 @@ function toggleUserDropdown(e) {
         const body = new FormData();
         body.append('action', 'mark_all_read');
         body.append('csrf_token', document.querySelector('meta[name="csrf-token"]').content);
-        fetch('notifications_action.php', { method: 'POST', body: body, credentials: 'same-origin' })
+        fetch('notifications_action', { method: 'POST', body: body, credentials: 'same-origin' })
             .then(r => r.json())
             .then(res => {
                 if (!res.ok) return;
                 document.querySelectorAll('[data-unread-badge]').forEach(b => b.hidden = true);
                 document.querySelectorAll('.notification-item.is-unread, .mini-updates .is-unread').forEach(el => el.classList.remove('is-unread'));
-                btn.outerHTML = '<a href="user_notifications.php">View All</a>';
+                btn.outerHTML = '<a href="user_notifications">View All</a>';
                 if (window.PortalUI) PortalUI.toast({ title: 'All caught up!', text: 'Your notifications are marked as read.' });
             })
             .catch(() => {});
@@ -1212,7 +1207,7 @@ function sendMessage(useFaq) {
     // Typed questions go to the AI (ai_chat.php in this same /user folder), which knows the portal's
     // programs, requirements and contact details. If the AI is off or fails, use the built-in FAQ.
     chatBusy = true;
-    fetch('ai_chat.php', {
+    fetch('ai_chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: msg, history: history })

@@ -472,12 +472,15 @@ function person_correction_locks(string $formKey, array $old, array $new): array
  *   - after the change the person would match someone else on file (two people would be mixed up), or, for Burial,
  *     the name already has a Burial application or a recorded death
  * Call it inside a transaction, with person_correction_locks() held. It does not touch the application row itself.
+ * The applicant's own edit of a waiting application (includes/application_changes.php) uses it too, with $forApplicant = true:
+ * the same checks, but the messages never carry reference numbers (those can belong to other people) and send them to the office.
  *
  * @param array $application the stored application row
  * @param array $new         the corrected values (first_name, middle_name, last_name, petitioner_name, beneficiary_birthdate, date_of_death)
+ * @param bool  $forApplicant the person asking is the applicant, not the office
  * @return ?string a plain-language reason it can't be done, or null (done, or nothing to correct)
  */
-function person_correct_identity(PDO $pdo, string $formKey, array $application, array $new): ?string
+function person_correct_identity(PDO $pdo, string $formKey, array $application, array $new, bool $forApplicant = false): ?string
 {
     $beneficiaryId = (int)($application['beneficiary_id'] ?? 0);
     if ($beneficiaryId <= 0 || !person_rules_installed($pdo) || !in_array($formKey, ['medical', 'burial'], true)) {
@@ -488,10 +491,18 @@ function person_correct_identity(PDO $pdo, string $formKey, array $application, 
         return $formKey === 'burial' ? 'Please write the full name of the deceased (first name and last name).' : 'Please write the first name and last name of the patient.';
     }
 
-    $stmt = $pdo->prepare('SELECT id FROM applicant WHERE beneficiary_id = ? AND id <> ? ORDER BY id');
+    // For the applicant, an application that was declined or that they withdrew is closed and counts for nothing, so it does
+    // not stop them from correcting a typo (the office, who sees every record, still counts them)
+    $stmt = $pdo->prepare('SELECT id FROM applicant WHERE beneficiary_id = ? AND id <> ?'
+        . ($forApplicant ? " AND status NOT IN ('Disapproved', 'Withdrawn')" : '') . ' ORDER BY id');
     $stmt->execute([$beneficiaryId, (int)$application['id']]);
     $others = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    $contactOffice = 'Please call the office at (046) 123-4567 if the name or birthdate on this application is wrong.';
     if ($others) {
+        if ($forApplicant) {
+            return 'This person is also on another application, so their name and birthdate are shared with it and can\'t be changed from this one. '
+                . $contactOffice . ' The other details of this application can still be saved.';
+        }
         $refs = implode(', ', array_map(function ($id) { return '#' . (int)$id; }, array_slice($others, 0, 5))) . (count($others) > 5 ? ' and more' : '');
         return 'This person is also on ' . (count($others) === 1 ? 'another application' : count($others) . ' other applications') . ' (Ref ' . $refs . '), '
             . 'so their name and birthdate are shared and can\'t be changed from this one. The other fields of this application can still be saved.';
@@ -501,6 +512,9 @@ function person_correct_identity(PDO $pdo, string $formKey, array $application, 
     $clash = array_filter(person_find($pdo, $person), function ($row) use ($beneficiaryId) { return (int)$row['id'] !== $beneficiaryId; });
     $same = 'The corrected name and birthdate already match another person on file';
     if ($clash) {
+        if ($forApplicant) {
+            return $same . ', so this can\'t be saved here. ' . $contactOffice;
+        }
         return $same . ', so saving would mix two people up. Open that person\'s record first' . person_clash_ref($pdo, array_column($clash, 'id')) . '.';
     }
     if ($formKey === 'burial') {
@@ -508,7 +522,7 @@ function person_correct_identity(PDO $pdo, string $formKey, array $application, 
         if ($byName) {
             $ids = array_map('intval', array_column($byName, 'id'));
             if (person_last_application($pdo, $ids, 2) || in_array(1, array_map('intval', array_column($byName, 'is_deceased')), true)) {
-                return 'A Burial application or a recorded death already exists for this person' . person_clash_ref($pdo, $ids)
+                return 'A Burial application or a recorded death already exists for this person' . ($forApplicant ? '' : person_clash_ref($pdo, $ids))
                     . '. Only one Burial application is allowed per deceased person.';
             }
         }

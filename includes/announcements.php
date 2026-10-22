@@ -475,7 +475,7 @@ function ann_card_html(array $row): string
         . '<h2 class="ann-card-title" id="ann-title-' . $id . '">' . ann_e($title) . '</h2>'
         . '<p class="ann-card-date">' . ann_icon('calendar') . 'Posted <time datetime="' . ann_e(date('c', strtotime($posted))) . '">' . ann_e(ann_date($posted)) . '</time></p>'
         . '<p class="ann-card-preview">' . ann_e(ann_preview((string)$row['body'])) . '</p>'
-        . '<a class="ann-read" href="announcements.php?id=' . $id . '" data-ann-open="' . $id . '">Read more'
+        . '<a class="ann-read" href="announcements?id=' . $id . '" data-ann-open="' . $id . '">Read more'
         . '<span class="pui-sr"> about ' . ann_e($title) . '</span>' . ann_icon('arrow') . '</a>'
         // The full text for the dialog; already cleaned when it was saved (ann_clean_html), cleaned again here to be sure
         . '<template data-ann-full>' . ann_clean_html((string)$row['body']) . '</template>'

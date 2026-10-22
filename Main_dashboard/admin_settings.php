@@ -5,7 +5,7 @@ require_once '../includes/password_reset.php';
 
 // Check if user is admin
 if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
-    header("Location: ../login/login.php?role=admin");
+    header("Location: ../login/login?role=admin");
     exit;
 }
 
@@ -20,7 +20,7 @@ $stmt->execute([$admin_id]);
 $admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$admin) {
-    header("Location: ../login/login.php?role=admin");
+    header("Location: ../login/login?role=admin");
     exit;
 }
 
@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 activity_log('staff_removed', 'Removed staff account: ' . ($staff['full_name'] ?: $staff['username']) . ' (@' . $staff['username'] . ').');
                 // An account with no decisions on record: nothing on any application pointed to it
                 $_SESSION['staff_flash'] = ($staff['full_name'] ?: $staff['username']) . " no longer has access. They cannot sign in anymore.";
-                header("Location: admin_settings.php?tab=staff");
+                header("Location: admin_settings?tab=staff");
                 exit;
             } catch (PDOException $e) {
                 error_log('admin_settings delete_staff: ' . $e->getMessage());
@@ -141,7 +141,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = $staff['full_name'] ?: $staff['username'];
             activity_log('avatar_changed', 'Removed the profile picture of ' . $name . ' (@' . $staff['username'] . ').');
             $_SESSION['staff_flash'] = "The picture of " . $name . " was removed. Their initials show instead; they can upload another.";
-            header("Location: admin_settings.php?tab=staff");
+            header("Location: admin_settings?tab=staff");
             exit;
         } else {
             $errors[] = "There was no picture to remove.";
@@ -173,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['staff_flash'] = $turnOn
                     ? $name . " can sign in again."
                     : $name . " can no longer sign in. Their records are kept, and you can turn access back on any time.";
-                header("Location: admin_settings.php?tab=staff");
+                header("Location: admin_settings?tab=staff");
                 exit;
             } catch (PDOException $e) {
                 error_log('admin_settings toggle_staff: ' . $e->getMessage());
@@ -206,7 +206,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $name = $staff['full_name'] ?: $staff['username'];
                 activity_log('staff_password_reset', 'Password reset for ' . $name . ' (@' . $staff['username'] . ').');
                 $_SESSION['staff_flash'] = "New password saved for " . $name . ". Tell them in person; the password is not shown or sent anywhere.";
-                header("Location: admin_settings.php?tab=staff");
+                header("Location: admin_settings?tab=staff");
                 exit;
             } catch (PDOException $e) {
                 error_log('admin_settings reset_staff_password: ' . $e->getMessage());
@@ -241,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $name = trim($applicantRow['firstname'] . ' ' . $applicantRow['lastname']);
                     activity_log('applicant_password_reset', 'Temporary password set for applicant ' . $name . ' (@' . $applicantRow['username'] . '); ID checked at the office.');
                     $_SESSION['applicant_flash'] = "Temporary password saved for " . $name . ". Tell them in person; it is not shown or sent anywhere. They will be asked to choose their own when they log in.";
-                    header("Location: admin_settings.php?tab=applicants&q=" . rawurlencode($applicantRow['username']));
+                    header("Location: admin_settings?tab=applicants&q=" . rawurlencode($applicantRow['username']));
                     exit;
                 }
             } catch (PDOException $e) {
@@ -458,7 +458,7 @@ $tabs = [
                 <?= ui_state('alert', 'The staff list could not be loaded', 'Please reload the page. If it keeps happening, tell the system administrator.') ?>
             <?php elseif (!$staffList): ?>
                 <?= ui_state('inbox', 'No staff accounts yet', 'Nobody but admins can sign in right now. Add a staff account to let someone handle OPD requests.',
-                    '<a class="btn btn-secondary btn-sm" href="../login/register.php">' . ui_icon('user-plus') . 'Add staff account</a>') ?>
+                    '<a class="btn btn-secondary btn-sm" href="../login/register">' . ui_icon('user-plus') . 'Add staff account</a>') ?>
             <?php else:
                 $activeCount = count(array_filter($staffList, function ($s) { return (int)$s['is_active'] === 1; }));
                 $nowTs = time();
@@ -640,7 +640,7 @@ $tabs = [
             <?php endif; ?>
             <?= $messageFor('reset_applicant_password') ?>
 
-            <form class="applicant-search" method="GET" action="admin_settings.php" role="search">
+            <form class="applicant-search" method="GET" action="admin_settings" role="search">
                 <input type="hidden" name="tab" value="applicants">
                 <label for="applicant_q" class="visually-hidden">Find an applicant</label>
                 <input type="search" id="applicant_q" name="q" value="<?= ui_e($applicantQuery) ?>" maxlength="100" placeholder="Name, username, email or mobile number" autocomplete="off">
@@ -691,7 +691,7 @@ $tabs = [
                                     <?php if ($isGoogleApplicant($a)): ?>
                                         <span class="muted">Not needed</span>
                                     <?php else: ?>
-                                        <a class="btn btn-secondary btn-sm" href="admin_settings.php?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>&amp;pick=<?= (int)$a['id'] ?>#applicantResetTitle">Reset password<span class="visually-hidden"> for <?= ui_e($a['username']) ?></span></a>
+                                        <a class="btn btn-secondary btn-sm" href="admin_settings?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>&amp;pick=<?= (int)$a['id'] ?>#applicantResetTitle">Reset password<span class="visually-hidden"> for <?= ui_e($a['username']) ?></span></a>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -702,7 +702,7 @@ $tabs = [
             <?php endif; ?>
 
             <?php if ($applicantPicked && !$isGoogleApplicant($applicantPicked)): ?>
-                <form id="applicantResetForm" class="iis-form staff-reset" method="POST" action="admin_settings.php?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>" novalidate data-busy="Saving…" aria-labelledby="applicantResetTitle">
+                <form id="applicantResetForm" class="iis-form staff-reset" method="POST" action="admin_settings?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>" novalidate data-busy="Saving…" aria-labelledby="applicantResetTitle">
                     <h3 id="applicantResetTitle">Set a temporary password for <?= ui_e(trim($applicantPicked['firstname'] . ' ' . $applicantPicked['lastname'])) ?> (@<?= ui_e($applicantPicked['username']) ?>)</h3>
                     <p class="field-help">Choose a temporary password and tell the person in person. It is not shown or sent anywhere. They will be asked to choose their own the next time they log in.</p>
                     <?= decision_csrf_field() ?>
@@ -735,22 +735,22 @@ $tabs = [
             <button type="button" class="iis-action" data-clear-password><?= ui_icon('refresh') ?>Clear fields</button>
         </div>
         <div class="iis-action-group" data-actions="staff"<?= $active === 'staff' ? '' : ' hidden' ?>>
-            <a class="iis-action" href="../login/register.php"><?= ui_icon('user-plus') ?>Add staff account</a>
+            <a class="iis-action" href="../login/register"><?= ui_icon('user-plus') ?>Add staff account</a>
             <?php if ($staffList): ?>
                 <button type="submit" form="staffResetForm" class="iis-action"><?= ui_icon('lock') ?>Reset staff password</button>
             <?php endif; ?>
-            <a class="iis-action" href="activity_log.php?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
-            <a class="iis-action" href="admin_settings.php?tab=staff"><?= ui_icon('refresh') ?>Refresh list</a>
+            <a class="iis-action" href="activity_log?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
+            <a class="iis-action" href="admin_settings?tab=staff"><?= ui_icon('refresh') ?>Refresh list</a>
         </div>
         <div class="iis-action-group" data-actions="applicants"<?= $active === 'applicants' ? '' : ' hidden' ?>>
             <?php if ($applicantPicked && !$isGoogleApplicant($applicantPicked)): ?>
                 <button type="submit" form="applicantResetForm" class="iis-action"><?= ui_icon('lock') ?>Save temporary password</button>
             <?php endif; ?>
-            <a class="iis-action" href="activity_log.php?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
-            <a class="iis-action" href="admin_settings.php?tab=applicants"><?= ui_icon('refresh') ?>New search</a>
+            <a class="iis-action" href="activity_log?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
+            <a class="iis-action" href="admin_settings?tab=applicants"><?= ui_icon('refresh') ?>New search</a>
         </div>
         <div class="iis-action-group iis-action-group-last">
-            <a class="iis-action" href="dashboard.php"><?= ui_icon('chevron-left') ?>Back to dashboard</a>
+            <a class="iis-action" href="dashboard"><?= ui_icon('chevron-left') ?>Back to dashboard</a>
         </div>
     </aside>
 </div>

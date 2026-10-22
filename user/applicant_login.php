@@ -6,7 +6,7 @@ require_once '../includes/password_reset.php';
 require_once '../includes/admin_security.php';
 
 if (isset($_SESSION['applicant'])) {
-    header('Location: landingpage.php');
+    header('Location: landingpage');
     exit;
 }
 
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!empty($applicant['must_change_password'])) {
                 // The office set a temporary password: ask for their own right away
                 flash('info', 'The office gave you a temporary password. Please choose your own now: type the temporary password as "Current password", then your new one.');
-                header('Location: my_account.php#security');
+                header('Location: my_account#security');
                 exit;
             }
             header('Location: ' . take_after_login());   // the account page they were trying to open, or home
@@ -114,7 +114,7 @@ auth_page_start('Log in', 'login', function () { ?>
         </div>
 
         <div class="field">
-            <label for="password">Password <a href="forgot_password.php" class="field-link">Forgot password?</a></label>
+            <label for="password">Password <a href="forgot_password" class="field-link">Forgot password?</a></label>
             <div class="input-wrap has-toggle">
                 <input type="password" id="password" name="password" required autocomplete="current-password"
                        placeholder="Enter your password" <?php echo $username !== '' ? 'autofocus' : ''; ?>>
@@ -126,7 +126,7 @@ auth_page_start('Log in', 'login', function () { ?>
         <button type="submit" class="btn btn-primary btn-block">Log in</button>
     </form>
 
-    <p class="auth-switch">Don't have an account? <a href="applicant_register.php">Sign up for free</a></p>
-    <div class="auth-links"><a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
+    <p class="auth-switch">Don't have an account? <a href="applicant_register">Sign up for free</a></p>
+    <div class="auth-links"><a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
 <?php
 auth_page_end();

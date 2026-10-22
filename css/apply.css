@@ -359,16 +359,27 @@ img { max-width: 100%; display: block; }
 .ap-section[hidden] { display: none; }
 .ap-section-hint { color: var(--muted); font-size: 0.93rem; margin: 0 0 16px 42px; }
 
+/* 12 columns (it used to be 6; every span below is doubled, so the existing layouts look the same), so a row can
+   also be split 5 : 5 : 2 */
 .ap-grid {
     display: grid;
-    grid-template-columns: repeat(6, 1fr);
+    grid-template-columns: repeat(12, 1fr);
     gap: 16px 18px;
     margin-bottom: 14px;
+    container-type: inline-size;   /* lets the rule below look at this form's own width, not the screen's */
 }
-.span-2 { grid-column: span 2; }
-.span-3 { grid-column: span 3; }
-.span-4 { grid-column: span 4; }
-.span-6 { grid-column: span 6; }
+.span-2 { grid-column: span 4; }    /* a third of the row */
+.span-3 { grid-column: span 6; }    /* half */
+.span-4 { grid-column: span 8; }    /* two thirds */
+.span-6 { grid-column: span 12; }   /* the whole row */
+/* Barangay, Municipality and Province share a row. At the larger text size a third of the row each is too
+   narrow for "Barangay 1 Poblacion" or "General Mariano Alvarez" (both would be cut off), while "Cavite" is short. */
+.field:has(> select#barangay), .field:has(> #municipality) { grid-column: span 5; }
+.field:has(> #province) { grid-column: span 2; }
+/* A narrower form (the My Account profile sits beside other content) can't fit all three in one row: two per row */
+@container (max-width: 640px) {
+    .field:has(> select#barangay), .field:has(> #municipality), .field:has(> #province) { grid-column: span 6; }
+}
 
 .field label {
     display: block;
@@ -858,6 +869,53 @@ img { max-width: 100%; display: block; }
 .ap-flag-warn { background: var(--amber-soft); color: #7a4f00; }
 .ap-thumb.has-issues { border-color: #f0c36a; }
 
+/* ---- Editing a waiting application (user/edit_documents.php, ?edit= on the forms) ---- */
+.ap-edit-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    max-width: 760px;
+}
+.ap-edit-tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 18px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.92rem;
+    text-decoration: none;
+}
+.ap-edit-tabs a:hover { background: rgba(255, 255, 255, 0.14); }
+.ap-edit-tabs a.is-current { background: #fff; color: var(--navy); border-color: #fff; }
+.ap-edit-tabs .ap-edit-tabs-back { margin-left: auto; border-color: transparent; }
+@media (max-width: 640px) { .ap-edit-tabs .ap-edit-tabs-back { margin-left: 0; } }
+.ap-edit-chip { background: var(--info-soft); color: var(--navy); }
+.ap-edit-other { margin: 14px 0 0; }
+
+.ap-dropzone[hidden] { display: none; }
+.ap-thumb-existing a { display: block; }
+.ap-thumb-existing.is-removed img { opacity: 0.35; filter: grayscale(1); }
+.ap-thumb-existing.is-removed { border-color: var(--danger); }
+.ap-thumb-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 8px;
+    border-top: 1px solid var(--line);
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--danger);
+    cursor: pointer;
+}
+.ap-thumb-toggle input { width: 20px; height: 20px; accent-color: var(--danger); flex: none; }
+
 /* What is wrong with a photo, and what to do about it */
 .ap-quality-notes { display: grid; gap: 10px; margin-top: 12px; }
 .ap-quality-notes:empty { display: none; }
@@ -1088,7 +1146,8 @@ img { max-width: 100%; display: block; }
 
     .ap-form-card, .ap-upload-card { padding: 20px 16px; }
     .ap-grid { grid-template-columns: 1fr; }
-    .span-2, .span-3, .span-4, .span-6 { grid-column: auto; }
+    .span-2, .span-3, .span-4, .span-6,
+    .field:has(> select#barangay), .field:has(> #municipality), .field:has(> #province) { grid-column: auto; }
     .ap-section-hint { margin-left: 0; }
 
     .ap-actions { flex-direction: column-reverse; align-items: stretch; }

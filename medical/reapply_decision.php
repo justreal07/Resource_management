@@ -10,7 +10,7 @@ require_once '../includes/application_decision.php';
 require_once '../user/person_rules.php';
 
 $id = filter_var($_POST['applicant_id'] ?? null, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]);
-$back = decision_return_url($id ? '../medical/view_medical_applicants.php?id=' . $id : '../medical/medicalapproved.php');
+$back = decision_return_url($id ? '../medical/view_medical_applicants?id=' . $id : '../medical/medicalapproved');
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
     header('Location: ' . $back);

@@ -53,23 +53,47 @@ function portal_asset(string $path): string {
     return is_file($file) ? $path . '?v=' . filemtime($file) : $path;
 }
 
+/**
+ * Text size of the applicant pages, in % of the browser's own size. Every size on these pages is in rem,
+ * so this one number scales all the text, forms included.
+ * The first is the normal size every page opens with: 112.5% (it was 100%, which many applicants found
+ * too small; 112.5% was the old "larger" step). The other two are the "Text size" buttons' bigger steps.
+ */
+const PORTAL_TEXT_SIZES = ['112.5' => 'Normal text', '125' => 'Larger text', '137.5' => 'Largest text'];
+
+/** The normal text size (the first of PORTAL_TEXT_SIZES). */
+function portal_text_base(): string {
+    return (string)array_key_first(PORTAL_TEXT_SIZES);
+}
+
 /** Inside <head>, after the page's own stylesheet. */
 function portal_head(): void {
     ?>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="<?= htmlspecialchars(portal_asset('../css/portal-ui.css')) ?>">
     <script>
-        // Every page opens and refreshes at the normal text size. The "Text size" buttons only enlarge the page
-        // being viewed; the choice is not remembered (it used to be saved, so one click on a bigger "A" kept the whole
-        // site enlarged on every visit). This clears a size saved by the old version.
+        // Every page opens and refreshes at the normal text size (PORTAL_TEXT_SIZES in user/portal_ui.php), set
+        // here so the page is drawn at that size from the start. The "Text size" buttons only enlarge the page being
+        // viewed (js/portal-ui.js); the choice is not remembered. This also clears a size saved by an old version.
+        document.documentElement.style.fontSize = '<?= portal_text_base() ?>%';
         try { localStorage.removeItem('portalTextSize'); } catch (e) {}
     </script>
     <?php
 }
 
+/** The "Text size: A A A" buttons of the top bar (js/portal-ui.js makes them work). */
+function portal_text_size_buttons(): void {
+    $base = portal_text_base();
+    echo '<div class="text-size" role="group" aria-label="Text size"><span class="text-size-label">Text size:</span>';
+    foreach (PORTAL_TEXT_SIZES as $size => $label) {
+        echo '<button type="button" data-size="' . $size . '" aria-label="' . $label . '" aria-pressed="' . ($size === $base ? 'true' : 'false') . '">A</button>';
+    }
+    echo '</div>';
+}
+
 /** Before the page's own scripts: the library list and js/portal-ui.js (window.PortalUI). */
 function portal_scripts(): void {
-    $config = ['vendor' => portal_vendor_libs()];
+    $config = ['vendor' => portal_vendor_libs(), 'textBase' => portal_text_base()];
     echo '<script type="application/json" id="portalConfig">'
         . json_encode($config, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) . "</script>\n";
     echo '<script src="' . htmlspecialchars(portal_asset('../js/portal-ui.js')) . '"></script>' . "\n";
@@ -83,11 +107,11 @@ function portal_scripts(): void {
  */
 function portal_bottom_nav(string $active, int $unread): void {
     $items = [
-        'home'          => ['landingpage.php', 'fa-house', 'Home'],
-        'account'       => ['my_account.php', 'fa-user', 'Account'],
-        'apply'         => ['landingpage.php#programs', 'fa-plus', 'Apply'],
-        'documents'     => ['my_documents.php', 'fa-folder-open', 'Documents'],
-        'notifications' => ['user_notifications.php', 'fa-bell', 'Updates'],
+        'home'          => ['landingpage', 'fa-house', 'Home'],
+        'account'       => ['my_account', 'fa-user', 'Account'],
+        'apply'         => ['landingpage#programs', 'fa-plus', 'Apply'],
+        'documents'     => ['my_documents', 'fa-folder-open', 'Documents'],
+        'notifications' => ['user_notifications', 'fa-bell', 'Updates'],
     ];
     ?>
 <nav class="pui-bottom-nav" aria-label="Quick menu">

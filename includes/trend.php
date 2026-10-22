@@ -25,7 +25,7 @@ function trend_daily_new(PDO $pdo, array $typeIds, int $days = TREND_DAYS): arra
     $marks = implode(',', array_fill(0, count($typeIds), '?'));
     $stmt = $pdo->prepare("SELECT assistance_type_id, DATE(created_at) AS d, COUNT(*) AS n
                            FROM applicant
-                           WHERE created_at >= ? AND status <> 'Disapproved' AND assistance_type_id IN ($marks)
+                           WHERE created_at >= ? AND status NOT IN ('Disapproved', 'Withdrawn') AND assistance_type_id IN ($marks)
                            GROUP BY assistance_type_id, DATE(created_at)");
     $stmt->execute(array_merge([$labels[0] . ' 00:00:00'], array_values($typeIds)));
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {

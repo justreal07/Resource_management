@@ -8,7 +8,7 @@ require_once '../includes/barangay_map.php';    // the barangay heat map (and th
 
 // Security Check - Verify if user is logged in as admin
 if(!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
-    header("Location: ../login/login.php?role=admin");
+    header("Location: ../login/login?role=admin");
     exit();
 }
 
@@ -35,8 +35,8 @@ $now = time();
 $userRole = $_SESSION['user']['role'];
 
 $quickActions = [
-    ['href' => '../reports/reports.php', 'label' => 'Generate report', 'icon' => 'chart', 'roles' => ['admin']],
-    ['href' => '../login/register.php', 'label' => 'Add staff account', 'icon' => 'user-plus', 'roles' => ['admin']],
+    ['href' => '../reports/reports', 'label' => 'Generate report', 'icon' => 'chart', 'roles' => ['admin']],
+    ['href' => '../login/register', 'label' => 'Add staff account', 'icon' => 'user-plus', 'roles' => ['admin']],
 ];
 
 /* Each part of the page loads in its own try block: if one query fails, that part
@@ -60,7 +60,7 @@ try {
     $stmt = $pdo->prepare("
     SELECT MONTH(created_at) as month, COUNT(*) as total
     FROM applicant
-    WHERE YEAR(created_at) = ? AND status <> 'Disapproved'
+    WHERE YEAR(created_at) = ? AND status NOT IN ('Disapproved', 'Withdrawn')
     GROUP BY MONTH(created_at)
     ");
 
@@ -99,20 +99,20 @@ try {
        DASHBOARD STATISTICS
     ====================== */
 
-    $total = $pdo->query("SELECT COUNT(*) FROM applicant WHERE status <> 'Disapproved'")->fetchColumn();
+    $total = $pdo->query("SELECT COUNT(*) FROM applicant WHERE status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
     $approved = $pdo->query("SELECT COUNT(*) FROM applicant WHERE status='Approved'")->fetchColumn();
     $pending = $pdo->query("SELECT COUNT(*) FROM applicant WHERE status='Pending'")->fetchColumn();
 
     // Statistics by Assistance Type
-    $medical = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 1 AND status <> 'Disapproved'")->fetchColumn();
-    $burial = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 2 AND status <> 'Disapproved'")->fetchColumn();
-    $opd = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 3 AND status <> 'Disapproved'")->fetchColumn();
+    $medical = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 1 AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
+    $burial = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 2 AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
+    $opd = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
 
     // Total Amount Released (Approved applications)
     $totalAmount = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM applicant WHERE status='Approved' AND amount IS NOT NULL")->fetchColumn();
 
     // Today's applications
-    $today = $pdo->query("SELECT COUNT(*) FROM applicant WHERE DATE(created_at) = CURDATE() AND status <> 'Disapproved'")->fetchColumn();
+    $today = $pdo->query("SELECT COUNT(*) FROM applicant WHERE DATE(created_at) = CURDATE() AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
 } catch (PDOException $e) {
     error_log('dashboard.php statistics: ' . $e->getMessage());
     $loadFailed['stats'] = true;
@@ -182,7 +182,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT assistance_type_id, status, COUNT(*) AS n
         FROM applicant
-        WHERE created_at >= ? AND created_at < ? AND status <> 'Disapproved'
+        WHERE created_at >= ? AND created_at < ? AND status NOT IN ('Disapproved', 'Withdrawn')
         GROUP BY assistance_type_id, status
     ");
     $stmt->execute([$yearStart, $yearEnd]);
@@ -201,7 +201,7 @@ try {
     $stmt = $pdo->prepare("
         SELECT TRIM(barangay) AS barangay, COUNT(*) AS n
         FROM applicant
-        WHERE created_at >= ? AND created_at < ? AND status <> 'Disapproved'
+        WHERE created_at >= ? AND created_at < ? AND status NOT IN ('Disapproved', 'Withdrawn')
         GROUP BY TRIM(barangay)
         ORDER BY n DESC, barangay
         LIMIT 8
@@ -231,7 +231,7 @@ try {
         SELECT * FROM (
             (SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.account_id,
                     'new' AS event, a.created_at AS event_at, NULL AS actor
-             FROM applicant a WHERE a.status <> 'Disapproved' AND a.account_id IS NULL ORDER BY a.created_at DESC LIMIT 10)
+             FROM applicant a WHERE a.status NOT IN ('Disapproved', 'Withdrawn') AND a.account_id IS NULL ORDER BY a.created_at DESC LIMIT 10)
             UNION ALL
             (SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.account_id,
                     'Approved', a.approved_at, u.full_name
@@ -293,7 +293,7 @@ $state = [
 $url = function (array $changes = [], string $anchor = '') use ($state): string {
     $params = array_filter(array_merge($state, $changes), function ($v) { return $v !== '' && $v !== null; });
     $qs = http_build_query($params);
-    return 'dashboard.php' . ($qs !== '' ? '?' . $qs : '') . ($anchor !== '' ? '#' . $anchor : '');
+    return 'dashboard' . ($qs !== '' ? '?' . $qs : '') . ($anchor !== '' ? '#' . $anchor : '');
 };
 $hiddenInputs = function (array $keys) use ($state): string {
     $html = '';
@@ -310,7 +310,7 @@ $mapLink = function (string $name) use ($url, $year, $mapTo): string {
     return $url(['q' => '', 'type' => '', 'status' => '', 'barangay' => $name, 'from' => $year . '-01-01', 'to' => $mapTo, 'page' => ''], 'applications');
 };
 
-$where = ["a.status <> 'Disapproved'"];   // discarded applications are only on each program's Declined tab
+$where = ["a.status NOT IN ('Disapproved', 'Withdrawn')"];   // discarded applications are only on each program's Declined tab
 $params = [];
 if ($filters['q'] !== '') {
     if (preg_match('/^#?(\d+)$/', $filters['q'], $m)) {
@@ -406,7 +406,7 @@ admin_layout_start([
                     <div class="alert-body">
                         <strong><?= ui_e($_SESSION['admin_add_applicant_name'] ?? 'The applicant') ?></strong> was added
                         as Ref #<?= (int)($_SESSION['admin_add_applicant_id'] ?? 0) ?>. The application is Pending.
-                        <a href="view_applicant.php?applicant_id=<?= (int)($_SESSION['admin_add_applicant_id'] ?? 0) ?>">Open the record</a>
+                        <a href="view_applicant?applicant_id=<?= (int)($_SESSION['admin_add_applicant_id'] ?? 0) ?>">Open the record</a>
                     </div>
                 </div>
                 <?php unset($_SESSION['admin_add_success'], $_SESSION['admin_add_applicant_id'], $_SESSION['admin_add_applicant_name']); ?>
@@ -519,7 +519,7 @@ admin_layout_start([
                             <h2 id="overviewTitle">Overview</h2>
                             <p class="panel-sub">Applications filed <strong><?= ui_e($rangeText) ?></strong></p>
                         </div>
-                        <form class="year-form" method="GET" action="dashboard.php#overview" data-busy>
+                        <form class="year-form" method="GET" action="dashboard#overview" data-busy>
                             <?= $hiddenInputs(['q', 'type', 'status', 'barangay', 'from', 'to', 'sort', 'per']) ?>
                             <label for="yearSelect">Year</label>
                             <select name="year" id="yearSelect">
@@ -608,7 +608,7 @@ admin_layout_start([
                                     <span class="activity-icon activity-<?= $evClass ?>"><?= ui_icon($evIcon) ?></span>
                                     <div class="activity-body">
                                         <p class="activity-title">
-                                            <a href="view_applicant.php?applicant_id=<?= (int)$ev['id'] ?>"><?= ui_e(ui_person_name($ev)) ?></a>
+                                            <a href="view_applicant?applicant_id=<?= (int)$ev['id'] ?>"><?= ui_e(ui_person_name($ev)) ?></a>
                                         </p>
                                         <p class="activity-text"><?= ui_e($evText) ?> · <?= ui_e($typeInfo[(int)$ev['assistance_type_id']]['short'] ?? 'Other') ?> · Ref #<?= (int)$ev['id'] ?></p>
                                         <p class="activity-meta">
@@ -730,7 +730,7 @@ admin_layout_start([
                     <p class="panel-sub">Every application, from any date. Search by name or reference number.</p>
                 </div>
 
-                <form class="filters" method="GET" action="dashboard.php#applications" role="search" data-filter-form novalidate>
+                <form class="filters" method="GET" action="dashboard#applications" role="search" data-filter-form novalidate>
                     <?= $hiddenInputs(['year', 'barangay', 'from', 'to']) ?>   <?php /* barangay / from / to come only from a heat-map tile: no boxes for them, but searching keeps them (Clear filters drops them) */ ?>
                     <div class="field field-search">
                         <label for="fQ">Search</label>
@@ -846,7 +846,7 @@ admin_layout_start([
                                             <?php endif; ?>
                                         </td>
                                         <td class="cell-action">
-                                            <a class="btn btn-secondary btn-sm" href="view_applicant.php?applicant_id=<?= (int)$row['id'] ?>">
+                                            <a class="btn btn-secondary btn-sm" href="view_applicant?applicant_id=<?= (int)$row['id'] ?>">
                                                 <?= ui_icon('file') ?>Open<span class="visually-hidden"> record of <?= ui_e($fullName) ?>, Ref #<?= (int)$row['id'] ?></span>
                                             </a>
                                         </td>
@@ -886,10 +886,10 @@ admin_layout_start([
             </section>
 <?php
 admin_layout_end([
-    'after' => walkin_form_html($typeInfo, 'submit_admin_applicant.php'),
+    'after' => walkin_form_html($typeInfo, 'submit_admin_applicant'),
     'scripts' => ['../js/admin_dashboard.js'],
     'config' => [
-        'viewUrl' => 'view_applicant.php?applicant_id=',
+        'viewUrl' => 'view_applicant?applicant_id=',
         // The paper documents to check for each program: the same list the online upload step asks for
         'documents' => [1 => array_keys(get_program('medical')['documents']), 2 => array_keys(get_program('burial')['documents']),
                         3 => array_keys(get_program('opd')['documents'])],

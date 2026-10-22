@@ -37,5 +37,5 @@ function document_file_path(array $doc): ?string
  */
 function document_url(int $documentId, bool $download = false, string $base = '../user/'): string
 {
-    return $base . 'document.php?id=' . $documentId . ($download ? '&download=1' : '');
+    return $base . 'document?id=' . $documentId . ($download ? '&download=1' : '');
 }

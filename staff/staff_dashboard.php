@@ -11,7 +11,7 @@ $year = ui_year($year);   // only a real year reaches the query and the page
 $stmt = $pdo->prepare("
     SELECT MONTH(created_at) as month, COUNT(*) as total
     FROM applicant
-    WHERE YEAR(created_at) = ? AND assistance_type_id = 3 AND status <> 'Disapproved'
+    WHERE YEAR(created_at) = ? AND assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')
     GROUP BY MONTH(created_at)
 ");
 $stmt->execute([$year]);
@@ -26,19 +26,17 @@ $stats = $pdo->query("
            COALESCE(SUM(status = 'Pending'), 0) AS pending,
            COALESCE(SUM(status = 'Approved'), 0) AS approved
     FROM applicant
-    WHERE assistance_type_id = 3 AND status <> 'Disapproved'
+    WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')
 ")->fetch(PDO::FETCH_ASSOC);
 
 // CHECK-UPS TODAY AND TOMORROW: who the van picks up, and what each patient needs on board.
-// Departure time and pick-up point are set when the request is approved (when those columns are there).
 $today = date('Y-m-d');
 $tomorrow = date('Y-m-d', strtotime('+1 day'));
-$departureCols = decision_claim_ensure($pdo) ? ', a.claim_time, a.claim_place' : '';
 $stmt = $pdo->prepare("
     SELECT a.id, a.first_name, a.middle_name, a.last_name, a.checkup_date, a.status, a.hospital,
-           a.petitioner_name, a.relationship, a.wheelchair, a.stretcher, a.barangay$departureCols
+           a.petitioner_name, a.relationship, a.wheelchair, a.stretcher, a.barangay
     FROM applicant a
-    WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved' AND a.checkup_date IN (?, ?)
+    WHERE a.assistance_type_id = 3 AND a.status NOT IN ('Disapproved', 'Withdrawn') AND a.checkup_date IN (?, ?)
     ORDER BY a.checkup_date ASC, a.last_name ASC, a.first_name ASC
 ");
 $stmt->execute([$today, $tomorrow]);
@@ -49,7 +47,7 @@ $stmt = $pdo->prepare("
     SELECT a.id, a.first_name, a.last_name, a.barangay, a.status, a.created_at, at.name as assistance_type
     FROM applicant a
     JOIN assistance_types at ON a.assistance_type_id = at.id
-    WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved'
+    WHERE a.assistance_type_id = 3 AND a.status NOT IN ('Disapproved', 'Withdrawn')
     ORDER BY a.created_at DESC
     LIMIT 10
 ");
@@ -67,14 +65,13 @@ $todayCount = count(array_filter($upcoming, function ($r) use ($today) { return 
 $upcomingPanel = '<section class="panel" aria-labelledby="upcomingTitle"><div class="panel-head panel-head-row"><div>'
     . '<h3 id="upcomingTitle">Check-ups today and tomorrow</h3>'
     . '<p class="panel-sub">' . ui_e(number_format($todayCount) . ' today, ' . number_format(count($upcoming) - $todayCount) . ' tomorrow') . '</p></div>'
-    . '<a class="btn btn-secondary btn-sm" href="opd_staff_report.php?date=' . ui_e($today) . '">' . ui_icon('print') . 'Today\'s report</a></div>'
+    . '<a class="btn btn-secondary btn-sm" href="opd_staff_report?date=' . ui_e($today) . '">' . ui_icon('print') . 'Today\'s report</a></div>'
     . ui_table($upcoming, [
         ['label' => 'Patient', 'type' => 'person', 'link' => function ($r) { return ui_type_url(3, 'view', ['id' => (int)$r['id']]); }],
         ['label' => 'Day', 'type' => 'text', 'value' => function ($r) use ($today) {
             return ($r['checkup_date'] === $today ? 'Today' : 'Tomorrow') . ', ' . ui_date($r['checkup_date']);
         }],
         ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
-        ['label' => 'Departure', 'type' => 'text', 'value' => 'ui_opd_departure'],
         ['label' => 'Hospital', 'type' => 'text', 'key' => 'hospital'],
         ['label' => 'Transport needs', 'type' => 'text', 'value' => $needs],
         ['label' => 'Accompanied by', 'type' => 'text', 'value' => function ($r) {
@@ -110,7 +107,7 @@ try {
     $rows = $pdo->query("
         SELECT first_name, middle_name, last_name, barangay, checkup_date
         FROM applicant
-        WHERE assistance_type_id = 3 AND status <> 'Disapproved'
+        WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')
     ")->fetchAll(PDO::FETCH_ASSOC);
 
     // The official spelling of each barangay, whatever case or spacing it was saved with
@@ -219,7 +216,7 @@ $brgyPanel = '<section class="panel" id="barangays" aria-labelledby="brgyTitle">
     . ($brgyFailed ? '' : '<div class="period-switch no-print" role="group" aria-label="Period" data-period-switch hidden>' . $brgyButtons . '</div>')
     . '</div>'
     . ($brgyFailed
-        ? ui_load_error('this chart', 'staff_dashboard.php#barangays')
+        ? ui_load_error('this chart', 'staff_dashboard#barangays')
         : $brgyViews . '<p class="visually-hidden" aria-live="polite" data-brgy-status></p>')
     . '</section>';
 

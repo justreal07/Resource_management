@@ -17,7 +17,7 @@ require_once 'portal_ui.php';
 
 // Check if user is logged in (same guard as the forms)
 if (!isset($_SESSION['applicant'])) {
-    header('Location: applicant_login.php');
+    header('Location: applicant_login');
     exit;
 }
 
@@ -53,19 +53,14 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
             <span><i class="fas fa-landmark" aria-hidden="true"></i> Municipality of General Mariano Alvarez, Cavite</span>
             <span><i class="fas fa-phone" aria-hidden="true"></i> (046) 123-4567</span>
         </div>
-        <div class="text-size" role="group" aria-label="Text size">
-            <span class="text-size-label">Text size:</span>
-            <button type="button" data-size="100" aria-label="Normal text">A</button>
-            <button type="button" data-size="112.5" aria-label="Larger text">A</button>
-            <button type="button" data-size="125" aria-label="Largest text">A</button>
-        </div>
+        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
 <!-- HEADER: the brand, and the way out ("Skip for now" goes to the home page) -->
 <header class="site-header ch-header">
     <div class="container ch-header-inner">
-        <a href="landingpage.php" class="brand">
+        <a href="landingpage" class="brand">
             <span class="brand-logos">
                 <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -75,7 +70,7 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
                 <small>LGU General Mariano Alvarez</small>
             </span>
         </a>
-        <a href="landingpage.php" class="btn btn-outline btn-sm ch-header-skip">Skip for now <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+        <a href="landingpage" class="btn btn-outline btn-sm ch-header-skip">Skip for now <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
     </div>
 </header>
 
@@ -149,7 +144,7 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
         </ul>
 
         <p class="ch-skip">
-            Not sure yet? <a href="landingpage.php">Skip for now and go to my dashboard</a>.
+            Not sure yet? <a href="landingpage">Skip for now and go to my dashboard</a>.
             You can apply anytime from the Programs section.
         </p>
     </div>
@@ -168,19 +163,6 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
 <?php portal_bottom_nav('apply', $unread); ?>
 
 <?php portal_scripts(); ?>
-<script>
-// Text size: opens at the normal size; the buttons enlarge this visit only (not remembered, like the home page)
-(function () {
-    const buttons = document.querySelectorAll('.text-size button');
-    function applySize(size) {
-        document.documentElement.style.fontSize = size + '%';
-        buttons.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.size === String(size)); });
-    }
-    applySize('100');
-    buttons.forEach(function (b) {
-        b.addEventListener('click', function () { applySize(this.dataset.size); });
-    });
-})();
-</script>
+<?php /* Text size buttons: js/portal-ui.js */ ?>
 </body>
 </html>

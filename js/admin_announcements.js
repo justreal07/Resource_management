@@ -56,7 +56,7 @@
         formData.set('ajax', '1');
         let response;
         try {
-            response = await fetch('announcement_action.php', {
+            response = await fetch('announcement_action', {
                 method: 'POST', body: formData, credentials: 'same-origin',
                 headers: { Accept: 'application/json', 'X-Decision-Token': token }
             });
@@ -455,7 +455,7 @@
         form.elements.id.value = data.id;
         form.elements.version.value = data.version;
         form.dataset.new = '0';
-        if (location.search.indexOf('id=' + data.id) === -1) history.replaceState(null, '', 'announcements.php?id=' + data.id);
+        if (location.search.indexOf('id=' + data.id) === -1) history.replaceState(null, '', 'announcements?id=' + data.id);
         fields.image.value = '';
         if (form.elements.remove_image) form.elements.remove_image.checked = false;
         if (data.image !== undefined && preview.image) {
@@ -489,7 +489,7 @@
             if (!data.ok) { showFormAlert(data.message); return; }
             dirty = false;
             try { sessionStorage.setItem('annFlash', data.message); } catch (e) { /* the list opens without the message */ }
-            window.location.href = 'announcements.php';
+            window.location.href = 'announcements';
         });
     }
 
@@ -497,7 +497,7 @@
     window.addEventListener('beforeunload', (e) => {
         if (dirty && !saving) { e.preventDefault(); e.returnValue = ''; }
     });
-    $$('a[href="announcements.php"]').forEach((a) => a.addEventListener('click', async (e) => {
+    $$('a[href="announcements"]').forEach((a) => a.addEventListener('click', async (e) => {
         if (!dirty) return;
         e.preventDefault();
         const ok = await UI.confirmAction({ title: 'Leave without saving?', message: 'Your changes to this announcement have not been saved.',

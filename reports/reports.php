@@ -32,9 +32,9 @@ $model = report_build($pdo, $f);
 admin_layout_start(['title' => 'Reports', 'section' => 'reports']);
 echo ui_page_head('Reports', 'Totals and lists to print or open in Excel.',
     '<button type="button" class="btn btn-secondary" data-print>' . ui_icon('print') . 'Print</button>'
-    . '<a class="btn btn-secondary" href="export.php?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>');
+    . '<a class="btn btn-secondary" href="export?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>');
 ?>
-<form class="panel report-filters" method="GET" action="reports.php" data-busy id="reportFilters">
+<form class="panel report-filters" method="GET" action="reports" data-busy id="reportFilters">
     <input type="hidden" name="report" value="<?= ui_e($f['report']) ?>">
     <div class="field">
         <label for="rRange">Period</label>
@@ -91,7 +91,7 @@ echo ui_page_head('Reports', 'Totals and lists to print or open in Excel.',
 <?php
 $tabItems = [];
 foreach ($reportTypes as $key => $label) {
-    $tabItems[$key] = [$label, 'reports.php?' . report_query($f, ['report' => $key])];
+    $tabItems[$key] = [$label, 'reports?' . report_query($f, ['report' => $key])];
 }
 echo ui_tabs($tabItems, $f['report'], 'Report type');
 ?>

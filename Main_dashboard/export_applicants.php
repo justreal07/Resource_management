@@ -1,11 +1,11 @@
 <?php
 /**
  * Download one program's list as a CSV file (opens in Excel).
- *   export_applicants.php?type=1|2|3&status=all|Pending|Approved|Disapproved
+ *   export_applicants.php?type=1|2|3&status=all|Pending|Approved|Disapproved|Withdrawn
  * The "Export CSV" button on every list page (ui_type_tabs) links here.
  *
  * Who: an admin, any program; OPD staff, OPD only (same rule as the list pages).
- * What: the same applications the list page shows. "all" leaves out Disapproved, like the "All applications" lists.
+ * What: the same applications the list page shows. "all" leaves out Disapproved and Withdrawn, like the "All applications" lists.
  * Nothing is changed in the database; the download is written to the activity log.
  */
 require_once '../config.php';
@@ -15,7 +15,7 @@ require_once '../includes/admin_components.php';
 
 $user = decision_user();
 if ($user === null) {
-    header('Location: ../login/login.php');
+    header('Location: ../login/login');
     exit;
 }
 
@@ -30,7 +30,7 @@ if (!decision_can($user, $typeId)) {
     exit('You can only export the programs you handle.');
 }
 $status = (string)($_GET['status'] ?? 'all');
-if (!in_array($status, ['all', 'Pending', 'Approved', 'Disapproved'], true)) $status = 'all';
+if (!in_array($status, ['all', 'Pending', 'Approved', 'Disapproved', 'Withdrawn'], true)) $status = 'all';
 
 /** A cell that a spreadsheet cannot run as a formula (a value starting with = + - @ would be one). */
 function csv_cell($value, bool $isPhone = false): string
@@ -62,7 +62,7 @@ if ($typeId === 1) {
         ['Relationship to the patient', function ($a) { return $a['relationship'] ?? ''; }],
         ['Purpose of assistance', function ($a) { return $a['purpose'] ?? ''; }],
         ['Hospital',             function ($a) { return $a['hospital'] ?? ''; }],
-        ['Diagnosis',            function ($a) { return $a['diagnosis'] ?? ''; }],
+        ['Reason for check-up',  function ($a) { return $a['checkup_reason'] ?? ''; }],
         ['Check-up date',        function ($a) { return ui_date($a['checkup_date'] ?? '', 'Y-m-d'); }]
     );
 } elseif ($typeId === 2) {
@@ -71,8 +71,7 @@ if ($typeId === 1) {
         ['Relationship to the deceased', function ($a) { return $a['relationship'] ?? ''; }],
         ['Deceased full name',   function ($a) { return $a['petitioner_name'] ?? ''; }],
         ['Deceased birthdate',   function ($a) { return ui_date($a['beneficiary_birthdate'] ?? '', 'Y-m-d'); }],
-        ['Date of death',        function ($a) { return ui_date($a['date_of_death'] ?? '', 'Y-m-d'); }],
-        ['Purpose of assistance', function ($a) { return $a['purpose'] ?? ''; }]
+        ['Date of death',        function ($a) { return ui_date($a['date_of_death'] ?? '', 'Y-m-d'); }]
     );
 } else {
     array_push($columns,
@@ -80,7 +79,7 @@ if ($typeId === 1) {
         ['Age',                  function ($a) { return $a['age'] ?? ''; }],
         ['Hospital or clinic',   function ($a) { return $a['hospital'] ?? ''; }],
         ['Check-up date',        function ($a) { return ui_date($a['checkup_date'] ?? '', 'Y-m-d'); }],
-        ['Diagnosis or complaint', function ($a) { return $a['diagnosis'] ?? ''; }],
+        ['Reason for check-up',  function ($a) { return $a['checkup_reason'] ?? ''; }],
         ['Accompanied by',       function ($a) { return $a['petitioner_name'] ?? ''; }],
         ['Relationship',         function ($a) { return $a['relationship'] ?? ''; }],
         ['Wheelchair',           function ($a) { return $a['wheelchair'] ?? ''; }],
@@ -101,6 +100,9 @@ array_push($columns,
     ['Declined on', function ($a) { return ui_date($a['disapproved_at'] ?? '', 'Y-m-d H:i'); }],
     ['Declined by', function ($a) { return !empty($a['disapproved_by']) ? ui_user_name((int)$a['disapproved_by']) : ''; }],
     ['Reason for declining', function ($a) { return $a['disapproval_remarks'] ?? ''; }],
+    ['Withdrawn on', function ($a) { return ui_date($a['withdrawn_at'] ?? '', 'Y-m-d H:i'); }],
+    ['Reason for withdrawing', function ($a) { return $a['withdrawal_reason'] ?? ''; }],
+    ['Edited by applicant on', function ($a) { return ui_date($a['edited_at'] ?? '', 'Y-m-d H:i'); }],
     ['Remarks',        function ($a) { return $a['remarks'] ?? ''; }]
 );
 

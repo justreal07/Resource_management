@@ -330,7 +330,7 @@ function report_load(PDO $pdo, array $f, ?int $typeId = null): array
     $pending = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $stmt = $pdo->prepare("SELECT a.assistance_type_id, COUNT(*) FROM applicant a
-                           WHERE a.status <> 'Disapproved' AND a.created_at >= ? AND a.created_at < ?$typeSql
+                           WHERE a.status NOT IN ('Disapproved', 'Withdrawn') AND a.created_at >= ? AND a.created_at < ?$typeSql
                            GROUP BY a.assistance_type_id");
     $stmt->execute($bind([$f['from_dt'], $f['to_dt']]));
     $filed = array_map('intval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
@@ -614,7 +614,7 @@ function report_budget_table(PDO $pdo, array $f): ?array
         $anyBudget ? report_signed_peso($sumBudget - $sumUsedBudgeted) : '—',
         $anyBudget && $sumBudget > 0 ? round($sumUsedBudgeted / $sumBudget * 100, 1) . '%' : '—'];
 
-    $link = '<p class="panel-note no-print"><a href="../Main_dashboard/budget.php?year=' . $year . '">' . ui_icon('wallet') . 'Open the Budget page</a> to set the ' . $year
+    $link = '<p class="panel-note no-print"><a href="../Main_dashboard/budget?year=' . $year . '">' . ui_icon('wallet') . 'Open the Budget page</a> to set the ' . $year
         . ' budget, add to it or reduce it, and see its history.</p>';
     return report_table('Budget use', 'Budget use · ' . $year,
         'Money released in ' . $year . ' (by date approved) against the budget the office set. The period above does not change this table.',
@@ -682,7 +682,7 @@ function report_build(PDO $pdo, array $f): array
 /** The page body of a model: number cards, charts, then each table in its own panel. */
 function report_render(array $m): string
 {
-    if (!empty($m['error'])) return ui_load_error('this report', 'reports.php?' . $m['retry']);
+    if (!empty($m['error'])) return ui_load_error('this report', 'reports?' . $m['retry']);
     if (!empty($m['empty'])) return $m['empty'];
 
     $html = '';

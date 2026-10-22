@@ -61,13 +61,13 @@ function start_applicant_session(array $account, array $extra = []): void {
  * Only a page of this folder is accepted ("feedback.php", "view_application.php?id=12"), never another site.
  */
 function remember_after_login(string $page): void {
-    if (preg_match('/^[a-z_]+\.php(\?[A-Za-z0-9_=&-]*)?$/', $page)) $_SESSION['after_login'] = $page;
+    if (preg_match('/^[a-z_]+(\.php)?(\?[A-Za-z0-9_=&-]*)?$/', $page)) $_SESSION['after_login'] = $page;
 }
 
-function take_after_login(string $default = 'landingpage.php'): string {
+function take_after_login(string $default = 'landingpage'): string {
     $page = $_SESSION['after_login'] ?? '';
     unset($_SESSION['after_login']);
-    return is_string($page) && preg_match('/^[a-z_]+\.php(\?[A-Za-z0-9_=&-]*)?$/', $page) ? $page : $default;
+    return is_string($page) && preg_match('/^[a-z_]+(\.php)?(\?[A-Za-z0-9_=&-]*)?$/', $page) ? $page : $default;
 }
 
 function is_google_account(array $user): bool {
@@ -77,7 +77,7 @@ function is_google_account(array $user): bool {
 /** URL of the user's avatar (relative to /user pages). The file is shown through avatar_file.php: avatars/ is closed to direct addresses. */
 function avatar_url(?array $user): string {
     if (!empty($user['avatar']) && is_file(__DIR__ . '/../avatars/' . $user['avatar'])) {
-        return 'avatar_file.php?f=' . rawurlencode($user['avatar']);
+        return 'avatar_file?f=' . rawurlencode($user['avatar']);
     }
     if (!empty($_SESSION['applicant']['picture'])) {
         return $_SESSION['applicant']['picture'];   // Google profile photo
@@ -160,16 +160,12 @@ function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): ar
         if ($a['status'] === 'Approved') {
             // The approved amount is never shown to the applicant (only that it was approved), like the approval email
             $msg = "Good news! Your $name application #$id has been approved.";
-            if (!empty($a['claim_place']) && !empty($a['claim_date'])) {
+            if ((int)$a['assistance_type_id'] !== 3 && !empty($a['claim_place']) && !empty($a['claim_date'])) {
                 $msg .= ' Claim it on ' . date('M d, Y', strtotime($a['claim_date']))
                     . (!empty($a['claim_time']) ? ', ' . date('g:i A', strtotime($a['claim_time'])) : '') . ' at ' . $a['claim_place'] . '.';
             }
             if ((int)$a['assistance_type_id'] === 3 && $a['checkup_date']) {
                 $msg .= ' Check-up: ' . date('M d, Y', strtotime($a['checkup_date'])) . ($a['hospital'] ? ' at ' . $a['hospital'] : '') . '.';
-                // The vehicle leaves on the check-up date, at the time and place set when approving
-                if (!empty($a['claim_time'])) {
-                    $msg .= ' Departure: ' . date('g:i A', strtotime($a['claim_time'])) . (!empty($a['claim_place']) ? ' from ' . $a['claim_place'] : '') . '.';
-                }
             }
             $events[] = [
                 'kind' => 'approved', 'app_id' => $id, 'time' => $a['approved_at'] ?: $a['created_at'],
@@ -186,6 +182,15 @@ function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): ar
                 'icon' => 'fa-times-circle', 'tone' => 'danger',
             ];
             continue;   // a declined application doesn't count as "applied" for the reminders below
+        } elseif ($a['status'] === 'Withdrawn') {
+            // The applicant's own withdrawal (user/withdraw_application.php): worded as theirs, not as the office's decision
+            $events[] = [
+                'kind' => 'withdrawn', 'app_id' => $id, 'type_id' => (int)$a['assistance_type_id'], 'time' => ($a['withdrawn_at'] ?? null) ?: $a['created_at'],
+                'title' => 'Application withdrawn',
+                'message' => "You withdrew your $name application #$id. You may apply again whenever you are ready.",
+                'icon' => 'fa-ban', 'tone' => 'muted',
+            ];
+            continue;   // like a declined one, it doesn't count as "applied"
         }
 
         $t = (int)$a['assistance_type_id'];
@@ -219,7 +224,7 @@ function get_user_notifications(PDO $pdo, int $account_id, ?string $seen_at): ar
 
     foreach ($events as &$ev) {
         $ev['unread'] = $seen_at === null || $ev['time'] > $seen_at;
-        $ev['link'] = $ev['link'] ?? ('view_application.php?id=' . $ev['app_id']);
+        $ev['link'] = $ev['link'] ?? ('view_application?id=' . $ev['app_id']);
     }
     unset($ev);
 

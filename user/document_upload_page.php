@@ -11,7 +11,7 @@ require_once __DIR__ . '/../includes/privacy.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
-    header('Location: applicant_login.php');
+    header('Location: applicant_login');
     exit;
 }
 
@@ -74,7 +74,7 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
 <?php endif; ?>
 
 <div class="ap-layout">
-    <form action="submit_assistance.php?type=<?= e($form_key) ?>" method="post" enctype="multipart/form-data"
+    <form action="submit_assistance?type=<?= e($form_key) ?>" method="post" enctype="multipart/form-data"
           class="ap-card ap-upload-card" id="uploadForm"
           data-program="<?= e($program['name']) ?>"
           data-max-bytes="<?= PHOTO_MAX_BYTES ?>"

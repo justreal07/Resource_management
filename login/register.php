@@ -73,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             $_SESSION['register_flash'] = ['username' => $username, 'role' => $role];
             // An admin adding accounts stays here; everyone else goes on to sign in
-            header('Location: ' . ($signedInAdmin ? 'register.php' : 'login.php?role=' . $role));
+            header('Location: ' . ($signedInAdmin ? 'register' : 'login?role=' . $role));
             exit;
         } catch (PDOException $e) {
             $errors[] = $e->getCode() === '23000'
@@ -117,7 +117,7 @@ auth_side(
 
             <?php if (!$canRegister): ?>
                 <?= auth_alert('info', 'user-shield', 'Staff and admin accounts are given by the office. Please ask your admin to create one for you; an admin can do it with "Add staff account" on the dashboard.') ?>
-                <a class="btn btn-primary btn-block" href="login.php">Go to sign in</a>
+                <a class="btn btn-primary btn-block" href="login">Go to sign in</a>
             <?php else: ?>
 
             <?php if (!empty($errors)): ?>
@@ -193,9 +193,9 @@ auth_side(
 
             <p class="login-help">
                 <?php if ($signedInAdmin): ?>
-                    <a href="../Main_dashboard/dashboard.php">Back to dashboard</a>
+                    <a href="../Main_dashboard/dashboard">Back to dashboard</a>
                 <?php else: ?>
-                    Already have an account? <a href="login.php">Sign in</a>
+                    Already have an account? <a href="login">Sign in</a>
                 <?php endif; ?>
             </p>
         </section>

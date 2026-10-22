@@ -2,10 +2,10 @@
 require_once '../config.php';
 
 // Send errors back to the page the button was on (login or register)
-$returnPage = (($_GET['from'] ?? '') === 'register') ? 'applicant_register.php' : 'applicant_login.php';
+$returnPage = (($_GET['from'] ?? '') === 'register') ? 'applicant_register' : 'applicant_login';
 
 if (isset($_SESSION['applicant'])) {
-    header('Location: landingpage.php');
+    header('Location: landingpage');
     exit();
 }
 

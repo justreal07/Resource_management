@@ -10,7 +10,7 @@ require_once 'auth_layout.php';
 require_once '../includes/password_reset.php';
 
 if (isset($_SESSION['applicant'])) {
-    header('Location: landingpage.php');
+    header('Location: landingpage');
     exit;
 }
 
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $ip = substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45);
         // Same reply for every request; the email (if any) is sent after the visitor has been sent on
-        password_reset_finish_response('forgot_password.php?sent=1');
+        password_reset_finish_response('forgot_password?sent=1');
         try {
             ensure_user_schema($pdo);
             password_reset_request($pdo, $identifier, $ip);
@@ -76,8 +76,8 @@ auth_page_start('Forgot password', 'login', function () { ?>
             </ul>
         </div>
 
-        <a href="applicant_login.php" class="btn btn-primary btn-block"><i class="fas fa-arrow-left"></i> Back to Log in</a>
-        <p class="auth-switch"><a href="forgot_password.php">Try a different username or email</a></p>
+        <a href="applicant_login" class="btn btn-primary btn-block"><i class="fas fa-arrow-left"></i> Back to Log in</a>
+        <p class="auth-switch"><a href="forgot_password">Try a different username or email</a></p>
     <?php else: ?>
         <form method="POST" class="auth-form" data-auth-form novalidate>
             <?php echo csrf_field(); ?>
@@ -95,8 +95,8 @@ auth_page_start('Forgot password', 'login', function () { ?>
             <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Send reset link</button>
         </form>
 
-        <p class="auth-switch">Remembered it? <a href="applicant_login.php">Log in</a></p>
-        <div class="auth-links"><a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
+        <p class="auth-switch">Remembered it? <a href="applicant_login">Log in</a></p>
+        <div class="auth-links"><a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
     <?php endif; ?>
 <?php
 auth_page_end();

@@ -25,16 +25,16 @@ function account_page_start(array $ctx, string $title, string $active, array $he
     // Sidebar menu. 'tab' = a section of my_account.php (js/account.js marks the open one).
     $menu = [
         'Overview' => [
-            ['my_account.php#applications', 'fa-gauge-high', 'Dashboard', $active === 'account', 'applications'],
-            ['my_documents.php', 'fa-folder-open', 'My Documents', $active === 'documents', null],
-            ['user_notifications.php', 'fa-bell', 'Notifications', $active === 'notifications', null],
-            ['feedback.php', 'fa-star', 'Feedback', $active === 'feedback', null],
-            ['announcements.php', 'fa-bullhorn', 'Announcements', false, null],
+            ['my_account#applications', 'fa-gauge-high', 'Dashboard', $active === 'account', 'applications'],
+            ['my_documents', 'fa-folder-open', 'My Documents', $active === 'documents', null],
+            ['user_notifications', 'fa-bell', 'Notifications', $active === 'notifications', null],
+            ['feedback', 'fa-star', 'Feedback', $active === 'feedback', null],
+            ['announcements', 'fa-bullhorn', 'Announcements', false, null],
         ],
         'Account' => [
-            ['my_account.php#profile', 'fa-user-pen', 'Profile', false, 'profile'],
-            ['my_account.php#security', 'fa-shield-halved', 'Password & Security', false, 'security'],
-            ['my_account.php#preferences', 'fa-sliders', 'Preferences', false, 'preferences'],
+            ['my_account#profile', 'fa-user-pen', 'Profile', false, 'profile'],
+            ['my_account#security', 'fa-shield-halved', 'Password & Security', false, 'security'],
+            ['my_account#preferences', 'fa-sliders', 'Preferences', false, 'preferences'],
         ],
     ];
     ?>
@@ -57,7 +57,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
 
 <!-- SIDEBAR -->
 <aside class="db-sidebar" id="dbSidebar" aria-label="Main menu">
-    <a href="landingpage.php" class="db-brand">
+    <a href="landingpage" class="db-brand">
         <span class="ap-brand-logos">
             <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
             <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -89,8 +89,8 @@ function account_page_start(array $ctx, string $title, string $active, array $he
     </nav>
 
     <div class="db-sidebar-foot">
-        <a href="landingpage.php" class="db-menu-link"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to website</span></a>
-        <a href="applicant_logout.php" class="db-menu-link db-logout"><i class="fas fa-right-from-bracket" aria-hidden="true"></i><span>Log out</span></a>
+        <a href="landingpage" class="db-menu-link"><i class="fas fa-arrow-left" aria-hidden="true"></i><span>Back to website</span></a>
+        <a href="applicant_logout" class="db-menu-link db-logout"><i class="fas fa-right-from-bracket" aria-hidden="true"></i><span>Log out</span></a>
     </div>
 </aside>
 <div class="db-backdrop" data-sidebar-close hidden></div>
@@ -103,7 +103,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
         <button type="button" class="acc-icon-btn db-menu-toggle" data-sidebar-toggle aria-controls="dbSidebar" aria-expanded="false" aria-label="Open menu">
             <i class="fas fa-bars"></i>
         </button>
-        <a href="landingpage.php" class="ap-brand db-topbar-brand">
+        <a href="landingpage" class="ap-brand db-topbar-brand">
             <span class="ap-brand-logos">
                 <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -138,7 +138,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                     <?php else: ?>
                         <div class="acc-empty-mini"><i class="far fa-bell-slash"></i><p>No notifications yet</p></div>
                     <?php endif; ?>
-                    <a href="user_notifications.php" class="acc-dd-foot">See all notifications <i class="fas fa-arrow-right"></i></a>
+                    <a href="user_notifications" class="acc-dd-foot">See all notifications <i class="fas fa-arrow-right"></i></a>
                 </div>
             </div>
 
@@ -154,15 +154,15 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                         <img src="<?= e($avatar) ?>" alt="">
                         <div><strong><?= e($user['firstname'] . ' ' . $user['lastname']) ?></strong><span>@<?= e($user['username']) ?></span></div>
                     </div>
-                    <a href="my_account.php#applications"><i class="fas fa-list"></i> My Applications</a>
-                    <a href="my_documents.php"><i class="fas fa-folder-open"></i> My Documents</a>
-                    <a href="user_notifications.php"><i class="fas fa-bell"></i> Notifications</a>
-                    <a href="feedback.php"><i class="fas fa-star"></i> Feedback</a>
-                    <a href="my_account.php#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
-                    <a href="my_account.php#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
-                    <a href="my_account.php#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
+                    <a href="my_account#applications"><i class="fas fa-list"></i> My Applications</a>
+                    <a href="my_documents"><i class="fas fa-folder-open"></i> My Documents</a>
+                    <a href="user_notifications"><i class="fas fa-bell"></i> Notifications</a>
+                    <a href="feedback"><i class="fas fa-star"></i> Feedback</a>
+                    <a href="my_account#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
+                    <a href="my_account#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
+                    <a href="my_account#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
                     <a href="#tour" role="button" data-tour-start><i class="fas fa-route"></i> Take a tour of this page</a>
-                    <a href="applicant_logout.php" class="acc-logout"><i class="fas fa-sign-out-alt"></i> Log out</a>
+                    <a href="applicant_logout" class="acc-logout"><i class="fas fa-sign-out-alt"></i> Log out</a>
                 </div>
             </div>
         </nav>
@@ -208,7 +208,7 @@ function account_page_end(array $scripts = []): void {
     <div class="ap-container">
         <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez</span>
         <span><i class="fas fa-phone"></i> Need help? Call (046) 123-4567 · Mon–Fri, 8 AM–5 PM</span>
-        <span><a href="privacy.php">Data Privacy Notice</a></span>
+        <span><a href="privacy">Data Privacy Notice</a></span>
     </div>
 </footer>
 
@@ -231,14 +231,14 @@ function account_context(PDO $pdo): array {
     if (!isset($_SESSION['applicant'])) {
         // Come back to this page after signing in (e.g. Feedback, opened from the header while signed out)
         $query = (string)($_SERVER['QUERY_STRING'] ?? '');
-        remember_after_login(basename((string)($_SERVER['SCRIPT_NAME'] ?? '')) . ($query !== '' ? '?' . $query : ''));
-        header('Location: applicant_login.php');
+        remember_after_login(basename((string)($_SERVER['SCRIPT_NAME'] ?? ''), '.php') .($query !== '' ? '?' . $query : ''));
+        header('Location: applicant_login');
         exit;
     }
     $user = get_current_user_row($pdo);
     if (!$user) {
         session_destroy();
-        header('Location: applicant_login.php');
+        header('Location: applicant_login');
         exit;
     }
     $notifications = get_user_notifications($pdo, (int)$user['id'], $user['notifications_seen_at']);

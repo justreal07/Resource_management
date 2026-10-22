@@ -20,7 +20,7 @@ require_once '../includes/xlsx_writer.php';
 
 $user = decision_user();
 if ($user === null) {
-    header('Location: ../login/login.php');
+    header('Location: ../login/login');
     exit;
 }
 if ($user['role'] !== 'admin') {
@@ -29,7 +29,7 @@ if ($user['role'] !== 'admin') {
 }
 
 admin_tools_ensure($pdo);      // the activity log
-decision_claim_ensure($pdo);   // OPD departure time and pick-up point
+decision_claim_ensure($pdo);   // the approval details columns
 budget_ensure($pdo);
 
 $f = report_filters($_GET);

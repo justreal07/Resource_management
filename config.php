@@ -68,6 +68,12 @@ try {
         . '(System administrator: check that MySQL is running in the XAMPP Control Panel and that the database "' . $dbname . '" exists.)');
 }
 
+// An older database still has OPD's reason for the check-up under its old column name: rename it once (see includes/schema.php)
+require_once __DIR__ . '/includes/schema.php';
+schema_checkup_reason_ready($pdo);
+// Withdrawing and editing an application: its columns, the 'Withdrawn' status and the Burial key (once; see includes/schema.php)
+schema_application_changes_ready($pdo);
+
 define('ASSISTANCE_DB_NAME', $dbname);
 define('ASSISTANCE_DB_HOST', $host);
 

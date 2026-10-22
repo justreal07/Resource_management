@@ -568,7 +568,8 @@ a:hover { color: var(--c-primary-hover); }
 .name-search-result { margin: -4px 0 12px; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .name-search-result strong { color: var(--c-text); }
 .tabs-bar { display: flex; flex-wrap: wrap; align-items: stretch; }
-.tabs-bar .tabs { flex: 1 1 28rem; min-width: 0; }
+/* wide enough for all six tabs (Overview ... Withdrawn): the tools drop below them when the page is narrower */
+.tabs-bar .tabs { flex: 1 1 46rem; min-width: 0; }
 .tabs-tools { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; padding: 0 0 1px 16px; margin-left: auto; border-bottom: 1px solid var(--c-border); }
 .tabs ul { display: flex; gap: 4px; min-width: max-content; }
 .tabs a {
@@ -635,6 +636,8 @@ a:hover { color: var(--c-primary-hover); }
 .badge-pending  { background: var(--c-pending-bg);  color: var(--c-pending-text);  border-color: var(--c-pending-border); }
 .badge-approved { background: var(--c-approved-bg); color: var(--c-approved-text); border-color: var(--c-approved-border); }
 .badge-danger, .badge-disapproved { background: var(--c-danger-bg); color: var(--c-danger-text); border-color: var(--c-danger-border); }
+.badge-edited { background: var(--c-info-bg, var(--c-deceased-bg)); color: var(--c-info-text, var(--c-deceased-text)); border-color: var(--c-info-border, var(--c-deceased-border)); }
+.badge-withdrawn,
 .badge-deceased,
 .badge-neutral  { background: var(--c-deceased-bg); color: var(--c-deceased-text); border-color: var(--c-deceased-border); }
 
@@ -1794,6 +1797,8 @@ kbd {
 .review-id { display: grid; gap: 4px; flex: none; padding: 14px 16px; }
 .review-id h2 { font-size: var(--fs-xl); line-height: 1.25; }
 .review-id-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.review-edited { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 8px 10px; border-radius: var(--radius-sm, 8px); background: var(--c-info-bg); color: var(--c-info-text); border: 1px solid var(--c-info-border); font-size: var(--fs-sm); }
+.review-edited .icon { flex: none; margin-top: 2px; }
 .review-links { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 4px; font-weight: 600; }
 .review-cards { display: grid; gap: 12px; }
 .review-cards .detail-list > div { grid-template-columns: 9rem minmax(0, 1fr); }

@@ -1,7 +1,7 @@
 <?php
 // Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
 if (!defined('REPORT_ENGINE')) {
-    header('Location: reports.php?report=overview');
+    header('Location: reports?report=overview');
     exit;
 }
 // Overview: the three programs together. Built by report_build() (includes/report_data.php) for the chosen period.

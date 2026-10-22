@@ -7,5 +7,5 @@ require_once '../config.php';
 require_once '../includes/application_decision.php';
 
 decision_run_endpoint($pdo, 'disapprove', [
-    'fallback' => '../Main_dashboard/dashboard.php',
+    'fallback' => '../Main_dashboard/dashboard',
 ]);

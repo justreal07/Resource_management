@@ -32,8 +32,10 @@ try {
 
     $decisions = "
         SELECT h.id AS rid, 1 AS src, h.changed_at AS happened_at, h.changed_by AS actor_id,
-               COALESCE(NULLIF(TRIM(u.full_name), ''), u.username, '') AS actor_name, COALESCE(u.role, '') AS actor_role,
-               CASE h.new_status WHEN 'Approved' THEN 'application_approved' WHEN 'Disapproved' THEN 'application_disapproved' ELSE 'application_status' END AS action,
+               CASE WHEN h.new_status = 'Withdrawn' THEN CONCAT('Applicant: ', COALESCE(a.first_name, ''), ' ', COALESCE(a.last_name, ''))
+                    ELSE COALESCE(NULLIF(TRIM(u.full_name), ''), u.username, '') END AS actor_name,
+               CASE WHEN h.new_status = 'Withdrawn' THEN 'applicant' ELSE COALESCE(u.role, '') END AS actor_role,
+               CASE h.new_status WHEN 'Approved' THEN 'application_approved' WHEN 'Disapproved' THEN 'application_disapproved' WHEN 'Withdrawn' THEN 'application_withdrawn' ELSE 'application_status' END AS action,
                CONCAT(COALESCE(t.name, 'Application'), ' · ', COALESCE(a.first_name, ''), ' ', COALESCE(a.last_name, ''), ' (Ref #', h.applicant_id, ')') AS details,
                '' AS ip
         FROM application_status_history h
@@ -81,12 +83,12 @@ try {
 $link = function (array $change) use ($group, $actorId, $from, $to, $page): string {
     $q = array_filter(['group' => $group, 'actor' => $actorId ?: '', 'from' => $from, 'to' => $to, 'page' => $page] + [], 'strlen');
     foreach ($change as $k => $v) { if ($v === '' || $v === null) unset($q[$k]); else $q[$k] = $v; }
-    return 'activity_log.php' . ($q ? '?' . http_build_query($q) : '');
+    return 'activity_log' . ($q ? '?' . http_build_query($q) : '');
 };
 $filtered = $group !== '' || $actorId > 0 || $from !== '' || $to !== '';
 
 admin_layout_start(['title' => 'Activity Log', 'section' => 'activity']);
-echo ui_page_head('Activity log', 'Who approved or declined a request, signed in, or changed an account, and when. Newest first.');
+echo ui_page_head('Activity log', 'Who approved, declined or withdrew a request, signed in, or changed an account, and when. Newest first.');
 ?>
 <?php if (!$logReady && !$loadError): ?>
     <div class="alert alert-error" role="alert"><?= ui_icon('alert', 'alert-icon') ?><div class="alert-body">
@@ -94,7 +96,7 @@ echo ui_page_head('Activity log', 'Who approved or declined a request, signed in
         Import <strong>database/migrations/migration_admin_tools.sql</strong> in phpMyAdmin, then reload this page.</div></div>
 <?php endif; ?>
 
-<form class="panel report-filters" method="GET" action="activity_log.php" data-busy="Filtering…">
+<form class="panel report-filters" method="GET" action="activity_log" data-busy="Filtering…">
     <div class="field">
         <label for="fGroup">Show</label>
         <select id="fGroup" name="group">
@@ -123,7 +125,7 @@ echo ui_page_head('Activity log', 'Who approved or declined a request, signed in
     </div>
     <div class="page-actions">
         <button type="submit" class="btn btn-primary"><?= ui_icon('search') ?>Show</button>
-        <?php if ($filtered): ?><a class="btn btn-secondary" href="activity_log.php">Clear filters</a><?php endif; ?>
+        <?php if ($filtered): ?><a class="btn btn-secondary" href="activity_log">Clear filters</a><?php endif; ?>
     </div>
 </form>
 
@@ -132,7 +134,7 @@ echo ui_page_head('Activity log', 'Who approved or declined a request, signed in
         <?= ui_state('alert', 'The activity log could not be loaded', 'Please reload the page. If it keeps happening, tell the system administrator.') ?>
     <?php elseif (!$rows): ?>
         <?= $filtered
-            ? ui_state('search', 'Nothing matches these filters', 'Try a wider date range, or choose Everything.', '<a class="btn btn-secondary btn-sm" href="activity_log.php">Clear filters</a>')
+            ? ui_state('search', 'Nothing matches these filters', 'Try a wider date range, or choose Everything.', '<a class="btn btn-secondary btn-sm" href="activity_log">Clear filters</a>')
             : ui_state('inbox', 'No activity yet', 'Approvals, declines, sign-ins and account changes will be listed here.') ?>
     <?php else: ?>
         <p class="panel-sub activity-count"><?= number_format($total) ?> <?= $total === 1 ? 'entry' : 'entries' ?><?= $filtered ? ' match' : '' ?>. Page <?= $page ?> of <?= $pages ?>.</p>
@@ -158,7 +160,7 @@ echo ui_page_head('Activity log', 'Who approved or declined a request, signed in
                                     <?= (!$isStranger && (int)$r['actor_id'] > 0) ? ui_avatar((int)$r['actor_id'], (string)$r['actor_name'], 'avatar-sm') : '' ?>
                                     <div>
                                         <strong class="row-name"><?= ui_e($r['actor_name']) ?></strong>
-                                        <span class="muted"><?= $isStranger ? 'Not signed in' : ($r['actor_role'] === 'admin' ? 'Admin' : ($r['actor_role'] === 'staff' ? 'Staff' : '')) ?></span>
+                                        <span class="muted"><?= $isStranger ? 'Not signed in' : ($r['actor_role'] === 'admin' ? 'Admin' : ($r['actor_role'] === 'staff' ? 'Staff' : ($r['actor_role'] === 'applicant' ? 'Applicant' : ''))) ?></span>
                                     </div>
                                 </div>
                             <?php elseif ($r['actor_id']): ?>

@@ -105,6 +105,7 @@
 .tone-success { background: var(--green-soft); color: var(--green); }
 .tone-danger { background: var(--danger-soft); color: var(--danger); }
 .tone-gold { background: var(--amber-soft); color: var(--amber); }
+.tone-muted { background: #eceff5; color: #3d4660; }
 .acc-app-icon.tone-red, .acc-program-icon.tone-red { background: linear-gradient(135deg, #ef5350, #c62828); color: #fff; }
 .acc-app-icon.tone-blue, .acc-program-icon.tone-blue { background: linear-gradient(135deg, #3f6fd8, var(--navy)); color: #fff; }
 .acc-app-icon.tone-green, .acc-program-icon.tone-green { background: linear-gradient(135deg, #2bb673, #1b7f4c); color: #fff; }
@@ -161,6 +162,7 @@
 .acc-status.s-pending { background: var(--amber-soft); color: #7a4f00; }
 .acc-status.s-approved { background: var(--green-soft); color: #146c3e; }
 .acc-status.s-disapproved { background: var(--danger-soft); color: #9b1c1c; }
+.acc-status.s-withdrawn { background: #eceff5; color: #3d4660; }
 
 .acc-note {
     display: flex; gap: 10px; align-items: flex-start;
@@ -220,7 +222,9 @@
 .acc-stat.tone-amber .acc-stat-icon { background: linear-gradient(135deg, #ffc93c, #e09b00); }
 .acc-stat.tone-green .acc-stat-icon { background: linear-gradient(135deg, #2bb673, #1b7f4c); }
 .acc-stat.tone-red .acc-stat-icon { background: linear-gradient(135deg, #ef5350, #c62828); }
-.acc-stat.tone-navy, .acc-stat.tone-amber, .acc-stat.tone-green, .acc-stat.tone-red { color: inherit; }
+.acc-stat.tone-slate .acc-stat-icon { background: linear-gradient(135deg, #8a93ab, #5b6478); }
+.acc-stats.has-withdrawn { grid-template-columns: repeat(5, 1fr); }
+.acc-stat.tone-navy, .acc-stat.tone-amber, .acc-stat.tone-green, .acc-stat.tone-red, .acc-stat.tone-slate { color: inherit; }
 
 /* ---------- Program cards ---------- */
 .acc-programs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
@@ -268,6 +272,7 @@
 .acc-app.status-pending { border-left-color: #f0ad00; }
 .acc-app.status-approved { border-left-color: var(--green); }
 .acc-app.status-disapproved { border-left-color: var(--danger); }
+.acc-app.status-withdrawn { border-left-color: #8a93ab; }
 .acc-app[hidden] { display: none; }
 .acc-app-main { flex: 1; min-width: 0; }
 .acc-app-main strong { color: var(--ink); }
@@ -333,6 +338,7 @@
 .acc-status-card { padding: 26px; margin-bottom: 20px; border-top: 5px solid #f0ad00; }
 .acc-status-card.s-approved { border-top-color: var(--green); }
 .acc-status-card.s-disapproved { border-top-color: var(--danger); }
+.acc-status-card.s-withdrawn { border-top-color: #8a93ab; }
 .acc-status-head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
 .acc-status-head h2 { margin: 0; font-size: 1.6rem; }
 .acc-status-head small { font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.75rem; color: var(--muted); }
@@ -344,6 +350,7 @@
 }
 .s-approved .acc-status-icon { background: linear-gradient(135deg, #2bb673, #1b7f4c); }
 .s-disapproved .acc-status-icon { background: linear-gradient(135deg, #ef5350, #c62828); }
+.s-withdrawn .acc-status-icon { background: linear-gradient(135deg, #8a93ab, #5b6478); }
 
 .acc-steps { list-style: none; margin: 22px 0 6px; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); position: relative; }
 .acc-steps::before { content: ""; position: absolute; top: 20px; left: 16%; right: 16%; height: 3px; background: var(--line); }
@@ -361,6 +368,18 @@
 .acc-details:has(> .acc-wide:first-child) { grid-template-columns: minmax(0, 1fr) 360px; }
 .acc-tl-success { background: var(--green) !important; color: #fff !important; }
 .acc-tl-danger { background: var(--danger) !important; color: #fff !important; }
+.acc-tl-muted { background: #5b6478 !important; color: #fff !important; }
+
+/* Edit / withdraw card on the application page */
+.acc-change { margin-bottom: 20px; }
+.acc-change > p { margin: 0 0 14px; }
+.acc-change-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.db-body .acc-change-actions .ap-btn, .db-body .acc-btn-edit { min-height: 44px; }
+.acc-withdraw { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); display: grid; gap: 8px; max-width: 560px; }
+.acc-withdraw label { font-weight: 700; font-size: 0.92rem; }
+.acc-withdraw textarea { width: 100%; resize: vertical; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.db-body .acc-withdraw .acc-btn-danger { min-height: 44px; justify-self: start; background: #fff; color: var(--danger); border: 2px solid var(--danger); }
+.db-body .acc-withdraw .acc-btn-danger:hover { background: var(--danger); color: #fff; }
 .acc-card .ap-timeline small { font-size: 0.8rem; }
 
 /* ---------- Gallery & documents ---------- */
@@ -420,7 +439,7 @@
 
 @media (max-width: 860px) {
     .acc-nav .ap-nav-link span { display: none; }
-    .acc-stats { grid-template-columns: 1fr 1fr; }
+    .acc-stats, .acc-stats.has-withdrawn { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 640px) {

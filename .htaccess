@@ -10,6 +10,35 @@ Options -Indexes
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteRule ^(\.git|\.github|\.vscode|\.claude|vendor|database|includes|zsetup_guideline)(/|$) - [R=404,NC,L]
+
+    # Addresses without ".php": /user/landingpage opens user/landingpage.php. It works in every folder (user/,
+    # Main_dashboard/, medical/ ...) because the rules are measured from this folder.
+
+    # 0. A typed address with a doubled slash (.../Resource_management//Resource_management/...) is sent to the same
+    #    address with single slashes. Apache itself accepts it, so without this it would keep opening. GET/HEAD only.
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{THE_REQUEST} ^[A-Z]+\s[^\s?]*//
+    RewriteRule ^ %{REQUEST_URI} [R=302,L]
+
+    # 1. Someone asks for "page.php": send them to "page" (302, not 301, so a browser does not remember it while testing;
+    #    change to 301 once everything works). Only GET/HEAD: a POST keeps its form data and is not redirected.
+    #    THE_REQUEST is what the browser itself sent, so the internal rewrite in rule 2 can never loop back here.
+    #    The query string (?id=5) is kept by Apache. Private *.local.php files are left to the FilesMatch below.
+    #    The target is built from REQUEST_URI (a full path from the site root) so it does not depend on where this
+    #    folder is, and needs no RewriteBase.
+    RewriteCond %{REQUEST_METHOD} ^(GET|HEAD)$
+    RewriteCond %{THE_REQUEST} ^[A-Z]+\s[^\s?]*\.php(\?\S*)?\sHTTP/
+    RewriteCond %{REQUEST_URI} !\.local\.php$ [NC]
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteCond %{REQUEST_URI} ^(.+)\.php$
+    RewriteRule ^ %1 [R=302,L]
+
+    # 2. Someone asks for "page": serve page.php, but only when "page" is not a real file or folder (so css, js, images
+    #    and folders are never touched) and page.php exists. The address in the browser does not change.
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.+)$ $1.php [L]
 </IfModule>
 
 # File types that are not pages: notes, SQL, settings, lock files, backups, hidden files and the private *.local.php

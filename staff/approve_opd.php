@@ -5,7 +5,7 @@ require_once '../config.php';
 require_once '../includes/application_decision.php';
 
 decision_run_endpoint($pdo, 'approve', [
-    'fallback'    => '../staff/staffpen.php',
+    'fallback'    => '../staff/staffpen',
     'expect_type' => 3,
-    'on_success'  => function () { return '../staff/opdapproved.php'; },
+    'on_success'  => function () { return '../staff/opdapproved'; },
 ]);

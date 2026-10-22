@@ -18,7 +18,7 @@
     const list = document.getElementById('cmdkList');
     const empty = document.getElementById('cmdkEmpty');
     const status = document.getElementById('cmdkStatus');
-    const SEARCH = '../Main_dashboard/search.php';   // every admin and staff folder is one level below the project root
+    const SEARCH = '../Main_dashboard/search';   // every admin and staff folder is one level below the project root
 
     // "Ctrl K" on Windows and Linux, "⌘ K" on a Mac
     const mac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
@@ -180,7 +180,7 @@
         if (!data || !data.href) return;
         // "Add walk-in applicant" while already on the dashboard: open the form instead of reloading the page
         const addButton = document.querySelector('[data-open-add]');
-        if (/dashboard\.php#add$/.test(data.href) && addButton) {
+        if (/dashboard(\.php)?#add$/.test(data.href) && addButton) {
             UI.closeDialog(dialog);
             addButton.click();
             return;

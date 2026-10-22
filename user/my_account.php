@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!csrf_valid()) {
         flash('error', 'Your session expired. Please try again.');
-        header('Location: my_account.php#' . $tab);
+        header('Location: my_account#' . $tab);
         exit;
     }
 
@@ -172,7 +172,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('success', 'Your preferences were saved.');
     }
 
-    header('Location: my_account.php#' . $tab);
+    header('Location: my_account#' . $tab);
     exit;
 }
 
@@ -190,8 +190,9 @@ $stmt->execute([$account_id]);
 $applications = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // CHANGED (Disapprove): 'Rejected' → 'Disapproved', shown to the applicant as "Declined"
-$counts = ['all' => count($applications), 'Pending' => 0, 'Approved' => 0, 'Disapproved' => 0];
-$status_labels = ['Pending' => 'Pending', 'Approved' => 'Approved', 'Disapproved' => 'Declined'];
+// 'Withdrawn' = the applicant's own withdrawal (user/withdraw_application.php): its own count, never part of Declined
+$counts = ['all' => count($applications), 'Pending' => 0, 'Approved' => 0, 'Disapproved' => 0, 'Withdrawn' => 0];
+$status_labels = ['Pending' => 'Pending', 'Approved' => 'Approved', 'Disapproved' => 'Declined', 'Withdrawn' => 'Withdrawn'];
 foreach ($applications as $a) {
     if (isset($counts[$a['status']])) $counts[$a['status']]++;
 }
@@ -212,14 +213,14 @@ $has_avatar = !empty($user['avatar']);
 
 $initial_filter = ucfirst(strtolower($_GET['filter'] ?? 'all'));
 if ($initial_filter === 'Not_approved') $initial_filter = 'Disapproved';
-if (!in_array($initial_filter, ['All', 'Pending', 'Approved', 'Disapproved'], true)) $initial_filter = 'All';
+if (!in_array($initial_filter, ['All', 'Pending', 'Approved', 'Disapproved', 'Withdrawn'], true)) $initial_filter = 'All';
 
 account_page_start($ctx, 'My Account', 'account', [
     'eyebrow'  => 'My Account',
     'title'    => 'Hello, ' . $user['firstname'] . '!',
     'subtitle' => 'Track your applications and manage your account settings.',
     'icon'     => 'fa-user-circle',
-    'actions'  => '<a href="landingpage.php#programs" class="ap-btn acc-btn-gold"><i class="fas fa-plus"></i> New Application</a>',
+    'actions'  => '<a href="landingpage#programs" class="ap-btn acc-btn-gold"><i class="fas fa-plus"></i> New Application</a>',
 ], 'account');
 ?>
 
@@ -257,8 +258,8 @@ account_page_start($ctx, 'My Account', 'account', [
 
 <!-- ============ APPLICATIONS ============ -->
 <section class="acc-panel" data-panel="applications" role="tabpanel">
-    <div class="acc-stats">
-        <?php foreach ([['All', 'Total', 'fa-folder', 'navy'], ['Pending', 'Pending', 'fa-hourglass-half', 'amber'], ['Approved', 'Approved', 'fa-check', 'green'], ['Disapproved', 'Declined', 'fa-times', 'red']] as [$key, $label, $icon, $tone]): ?>
+    <div class="acc-stats<?= $counts['Withdrawn'] > 0 ? ' has-withdrawn' : '' ?>">
+        <?php foreach (array_filter([['All', 'Total', 'fa-folder', 'navy'], ['Pending', 'Pending', 'fa-hourglass-half', 'amber'], ['Approved', 'Approved', 'fa-check', 'green'], ['Disapproved', 'Declined', 'fa-times', 'red'], $counts['Withdrawn'] > 0 ? ['Withdrawn', 'Withdrawn', 'fa-ban', 'slate'] : null]) as [$key, $label, $icon, $tone]): ?>
         <button type="button" class="acc-stat tone-<?= $tone ?>" data-filter-status="<?= $key ?>">
             <span class="acc-stat-icon"><i class="fas <?= $icon ?>"></i></span>
             <span><strong><?= $counts[$key === 'All' ? 'all' : $key] ?></strong><small><?= $label ?></small></span>
@@ -313,7 +314,7 @@ account_page_start($ctx, 'My Account', 'account', [
         </div>
 
         <div class="acc-chips" role="group" aria-label="Filter by status">
-            <?php foreach (['All', 'Pending', 'Approved', 'Disapproved'] as $s): ?>
+            <?php foreach (array_filter(['All', 'Pending', 'Approved', 'Disapproved', $counts['Withdrawn'] > 0 ? 'Withdrawn' : null]) as $s): ?>
                 <button type="button" class="acc-chip-btn" data-filter-status="<?= $s ?>"><?= $status_labels[$s] ?? $s ?> <span><?= $counts[$s === 'All' ? 'all' : $s] ?></span></button>
             <?php endforeach; ?>
         </div>
@@ -341,10 +342,13 @@ account_page_start($ctx, 'My Account', 'account', [
                     </span>
                 </div>
                 <span class="acc-status s-<?= strtolower($a['status']) ?>"><?= e($status_labels[$a['status']] ?? $a['status']) ?></span>
-                <?php if ($a['status'] === 'Disapproved' && !empty($p['form_page'])): ?>
+                <?php if ($a['status'] === 'Pending' && !empty($p['form_page'])): ?>
+                    <a href="<?= e(str_replace(' ', '%20', $p['form_page'])) ?>?edit=<?= (int)$a['id'] ?>" class="ap-btn ap-btn-ghost acc-btn-sm acc-btn-edit"><i class="fas fa-pen"></i> Edit</a>
+                <?php endif; ?>
+                <?php if (in_array($a['status'], ['Disapproved', 'Withdrawn'], true) && !empty($p['form_page'])): ?>
                     <a href="<?= e(str_replace(' ', '%20', $p['form_page'])) ?>" class="ap-btn ap-btn-primary acc-btn-sm"><i class="fas fa-redo"></i> Apply again</a>
                 <?php endif; ?>
-                <a href="view_application.php?id=<?= (int)$a['id'] ?>" class="ap-btn ap-btn-ghost acc-btn-sm">View <i class="fas fa-chevron-right"></i></a>
+                <a href="view_application?id=<?= (int)$a['id'] ?>" class="ap-btn ap-btn-ghost acc-btn-sm">View <i class="fas fa-chevron-right"></i></a>
             </li>
             <?php endforeach; ?>
         </ul>
@@ -358,7 +362,7 @@ account_page_start($ctx, 'My Account', 'account', [
             <i class="far fa-folder-open"></i>
             <h4>No applications yet</h4>
             <p>When you apply for assistance, you can follow its status here.</p>
-            <a href="landingpage.php#programs" class="ap-btn ap-btn-primary"><i class="fas fa-plus"></i> Start an application</a>
+            <a href="landingpage#programs" class="ap-btn ap-btn-primary"><i class="fas fa-plus"></i> Start an application</a>
         </div>
         <?php endif; ?>
     </div>
@@ -530,7 +534,7 @@ account_page_start($ctx, 'My Account', 'account', [
                 <div><dt>Last updated</dt><dd><?= e(date('M d, Y · g:i A', strtotime($user['updated_at']))) ?></dd></div>
                 <div><dt>Sign-in method</dt><dd><?= $google ? 'Google' : 'Username &amp; password' ?></dd></div>
             </dl>
-            <a href="applicant_logout.php" class="ap-btn ap-btn-ghost acc-btn-sm acc-danger-link"><i class="fas fa-sign-out-alt"></i> Log out</a>
+            <a href="applicant_logout" class="ap-btn ap-btn-ghost acc-btn-sm acc-danger-link"><i class="fas fa-sign-out-alt"></i> Log out</a>
         </div>
     </div>
 </section>
@@ -559,9 +563,11 @@ account_page_start($ctx, 'My Account', 'account', [
             <h3 class="acc-h3"><i class="fas fa-text-height"></i> Text size</h3>
             <p class="acc-small ap-muted">Make the text bigger and easier to read on this page. Pages always open at the normal size.</p>
             <div class="acc-size-picker" role="group" aria-label="Text size">
-                <button type="button" data-size="100"><span style="font-size:.9rem">A</span>Normal</button>
-                <button type="button" data-size="112.5"><span style="font-size:1.15rem">A</span>Large</button>
-                <button type="button" data-size="125"><span style="font-size:1.4rem">A</span>Largest</button>
+                <?php /* Same sizes as the top bar's buttons (PORTAL_TEXT_SIZES); run by js/portal-ui.js */ ?>
+                <?php $pickerLabels = ['Normal', 'Large', 'Largest']; $pickerA = ['.9rem', '1.15rem', '1.4rem']; $i = 0; ?>
+                <?php foreach (PORTAL_TEXT_SIZES as $size => $_): ?>
+                    <button type="button" data-size="<?= e((string)$size) ?>"><span style="font-size:<?= $pickerA[$i] ?>">A</span><?= $pickerLabels[$i++] ?></button>
+                <?php endforeach; ?>
             </div>
         </div>
     </div>

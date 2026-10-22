@@ -444,7 +444,7 @@ function ui_budget_panel(PDO $pdo, ?int $onlyType = null): string
     return '<section class="panel budget-panel" aria-labelledby="budgetPanelTitle' . (int)$onlyType . '">'
         . '<div class="panel-head panel-head-row"><div><h2 id="budgetPanelTitle' . (int)$onlyType . '">Budget ' . $year . '</h2>'
         . '<p class="panel-sub">Approved amounts against the budget the office set</p></div>'
-        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/budget.php">' . ui_icon('wallet') . 'Manage budget</a></div>'
+        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/budget">' . ui_icon('wallet') . 'Manage budget</a></div>'
         . '<ul class="budget-list">' . $items . '</ul></section>';
 }
 

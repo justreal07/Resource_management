@@ -12,5 +12,5 @@ if (empty($_SESSION['user'])) {
           $_SESSION['oauth_state'], $_SESSION['oauth_return'], $_SESSION['oauth_error'], $_SESSION['auth_success']);
     session_regenerate_id(true);
 }
-header('Location: applicant_login.php');
+header('Location: applicant_login');
 exit;

@@ -38,9 +38,9 @@ auth_page_start('Confirm your email', 'login', function () { ?>
             <div><p>Thank you, <?php echo htmlspecialchars($account['firstname']); ?>! If you ever forget your password, use <strong>Forgot password?</strong> on the log-in page and we'll send the link to this address.</p></div>
         </div>
         <?php if ($signedIn): ?>
-            <a href="my_account.php" class="btn btn-primary btn-block"><i class="fas fa-user"></i> Go to My Account</a>
+            <a href="my_account" class="btn btn-primary btn-block"><i class="fas fa-user"></i> Go to My Account</a>
         <?php else: ?>
-            <a href="applicant_login.php" class="btn btn-primary btn-block"><i class="fas fa-sign-in-alt"></i> Log in</a>
+            <a href="applicant_login" class="btn btn-primary btn-block"><i class="fas fa-sign-in-alt"></i> Log in</a>
         <?php endif; ?>
     <?php else: ?>
         <div class="auth-card-head">
@@ -52,7 +52,7 @@ auth_page_start('Confirm your email', 'login', function () { ?>
             <i class="fas fa-exclamation-circle"></i>
             <div><p>Confirmation links work once and expire after <?php echo EMAIL_VERIFY_HOURS; ?> hours. Log in and open <strong>My Account</strong> to get a new one.</p></div>
         </div>
-        <a href="<?php echo $signedIn ? 'my_account.php' : 'applicant_login.php'; ?>" class="btn btn-primary btn-block">
+        <a href="<?php echo $signedIn ? 'my_account' : 'applicant_login'; ?>" class="btn btn-primary btn-block">
             <i class="fas fa-user"></i> <?php echo $signedIn ? 'Go to My Account' : 'Log in'; ?>
         </a>
     <?php endif; ?>

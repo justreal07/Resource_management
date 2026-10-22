@@ -16,7 +16,7 @@ require_once '../includes/announcements.php';
 $is_ajax = ($_POST['ajax'] ?? '') === '1' || stripos($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json') !== false;
 
 /** Answer: JSON for the page's script, or a redirect with a message. */
-function ann_respond(bool $ajax, int $status, array $data, string $back = 'announcements.php'): void
+function ann_respond(bool $ajax, int $status, array $data, string $back = 'announcements'): void
 {
     if ($ajax) {
         http_response_code($status);
@@ -39,7 +39,7 @@ function ann_respond(bool $ajax, int $status, array $data, string $back = 'annou
 }
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-    header('Location: announcements.php');
+    header('Location: announcements');
     exit();
 }
 
@@ -52,11 +52,11 @@ if (empty($_POST) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
 $user = decision_user();
 if ($user === null) {
     ann_respond($is_ajax, 401, ['ok' => false, 'code' => 'auth', 'message' => 'Your sign-in has ended. Please sign in again, then try once more. Nothing was saved.'],
-        '../login/login.php?role=admin');
+        '../login/login?role=admin');
 }
 if ($user['role'] !== 'admin') {
     ann_respond($is_ajax, 403, ['ok' => false, 'code' => 'forbidden', 'message' => 'Only an administrator can post or change announcements.'],
-        '../staff/staff_dashboard.php');
+        '../staff/staff_dashboard');
 }
 if (!decision_csrf_ok()) {
     ann_respond($is_ajax, 400, ['ok' => false, 'code' => 'stale',
@@ -168,7 +168,7 @@ try {
         if ((string)($_POST['version'] ?? '') !== (string)$current['updated_at']) {
             ann_respond($is_ajax, 409, ['ok' => false, 'code' => 'conflict', 'old' => $old,
                 'message' => 'Another admin changed this announcement after you opened it, so your changes were not saved. '
-                    . 'Copy your text, reload the page to see their version, then make your changes again.'], 'announcements.php?id=' . $id);
+                    . 'Copy your text, reload the page to see their version, then make your changes again.'], 'announcements?id=' . $id);
         }
     }
 
@@ -176,7 +176,7 @@ try {
     $nonce = $str('nonce');
     if ($id === 0 && preg_match('/^[a-f0-9]{32}$/', $nonce) && isset($_SESSION['ann_saved'][$nonce])) {
         $done = $_SESSION['ann_saved'][$nonce];
-        ann_respond($is_ajax, 200, ['ok' => true, 'duplicate' => true] + $done, 'announcements.php?id=' . (int)$done['id']);
+        ann_respond($is_ajax, 200, ['ok' => true, 'duplicate' => true] + $done, 'announcements?id=' . (int)$done['id']);
     }
 
     // The picture is checked last, and only stored when everything else is fine
@@ -192,7 +192,7 @@ try {
     if ($errors) {
         ann_respond($is_ajax, 422, ['ok' => false, 'code' => 'fields', 'errors' => $errors, 'old' => $old,
             'message' => count(array_diff_key($errors, ['image_note' => 1])) === 1 ? 'Please fix the highlighted field.' : 'Please fix the highlighted fields.'],
-            'announcements.php?' . ($id > 0 ? 'id=' . $id : 'new=1'));
+            'announcements?' . ($id > 0 ? 'id=' . $id : 'new=1'));
     }
 
     $newImage = $image['file'];   // null = no new picture
@@ -219,7 +219,7 @@ try {
                 // 0 rows means another admin changed or deleted it a moment ago
                 ann_delete_image($newImage);
                 ann_respond($is_ajax, 409, ['ok' => false, 'code' => 'conflict', 'old' => $old,
-                    'message' => 'Another admin changed or deleted this announcement while you were saving, so your changes were not saved. Reload the page to see the latest version.'], 'announcements.php?id=' . $id);
+                    'message' => 'Another admin changed or deleted this announcement while you were saving, so your changes were not saved. Reload the page to see the latest version.'], 'announcements?id=' . $id);
             }
             $verb = 'updated';
         }

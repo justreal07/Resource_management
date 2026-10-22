@@ -69,7 +69,7 @@ function avatar_files(): array
 function staff_avatar_url(int $userId): string
 {
     $file = avatar_files()[$userId] ?? '';
-    return $file === '' ? '' : '../Main_dashboard/avatar.php?id=' . $userId . '&v=' . substr(md5($file), 0, 8);   // v: a new picture is fetched again
+    return $file === '' ? '' : '../Main_dashboard/avatar?id=' . $userId . '&v=' . substr(md5($file), 0, 8);   // v: a new picture is fetched again
 }
 
 function avatar_initials(string $name): string
@@ -131,7 +131,7 @@ function ui_applicant_avatar(int $applicationId, string $name, string $extra = '
     $file = applicant_avatar_files([$applicationId])[$applicationId] ?? '';
     $class = 'avatar' . ($extra !== '' ? ' ' . $extra : '') . ($file !== '' ? ' avatar-photo' : '');
     if ($file !== '') {
-        return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true"><img src="../user/avatar_file.php?f=' . htmlspecialchars(rawurlencode($file), ENT_QUOTES, 'UTF-8') . '" alt="" loading="lazy"></span>';
+        return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true"><img src="../user/avatar_file?f=' . htmlspecialchars(rawurlencode($file), ENT_QUOTES, 'UTF-8') . '" alt="" loading="lazy"></span>';
     }
     return '<span class="' . htmlspecialchars($class, ENT_QUOTES, 'UTF-8') . '" aria-hidden="true">' . htmlspecialchars(avatar_initials($name), ENT_QUOTES, 'UTF-8') . '</span>';
 }
@@ -256,7 +256,7 @@ function ui_avatar_form(int $userId, string $name, string $returnTo = 'profile')
     return '<div class="avatar-box" data-avatar-box>'
         . ui_avatar($userId, $name, 'avatar-xl')
         . '<div class="avatar-box-main">'
-        . '<form method="POST" action="../Main_dashboard/avatar_action.php" enctype="multipart/form-data" class="avatar-form" data-avatar-form novalidate>'
+        . '<form method="POST" action="../Main_dashboard/avatar_action" enctype="multipart/form-data" class="avatar-form" data-avatar-form novalidate>'
         . decision_csrf_field()
         . '<input type="hidden" name="action" value="upload"><input type="hidden" name="return" value="' . htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') . '">'
         . '<input type="hidden" name="MAX_FILE_SIZE" value="' . AVATAR_MAX_BYTES . '">'
@@ -266,7 +266,7 @@ function ui_avatar_form(int $userId, string $name, string $returnTo = 'profile')
         . '<p class="field-error" data-avatar-error hidden></p>'
         . '<div class="avatar-actions"><button type="submit" class="btn btn-primary btn-sm" data-avatar-save disabled>' . ui_icon('check-circle') . 'Save picture</button></div>'
         . '</form>'
-        . ($has ? '<form method="POST" action="../Main_dashboard/avatar_action.php">' . decision_csrf_field()
+        . ($has ? '<form method="POST" action="../Main_dashboard/avatar_action">' . decision_csrf_field()
             . '<input type="hidden" name="action" value="remove"><input type="hidden" name="return" value="' . htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') . '">'
             . '<button type="submit" class="btn btn-secondary btn-sm">' . ui_icon('x-circle') . 'Remove my picture</button></form>' : '')
         . '</div></div>';

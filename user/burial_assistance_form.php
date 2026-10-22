@@ -4,20 +4,22 @@ require_once 'application_eligibility.php';
 require_once 'assistance_config.php';
 require_once 'person_rules.php';
 require_once 'apply_layout.php';
+require_once '../includes/application_changes.php';   // edit mode: ?edit=<id> changes a waiting application of this account
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
-    header('Location: applicant_login.php');
+    header('Location: applicant_login');
     exit;
 }
 
 $form_key = 'burial';
 $program = get_program($form_key);
 $account_id = $_SESSION['applicant']['id'];
+$edit = application_edit_context($pdo, $form_key, (int)$account_id);   // the application being edited, or null for a new one
 
-// Check eligibility
+// Check eligibility (editing your own waiting application needs none)
 $eligibility = checkApplicationEligibility($pdo, $account_id, $program['type_id']);
-$can_apply = $eligibility['eligible'];
+$can_apply = $eligibility['eligible'] || $edit !== null;
 
 // Form fields => required?
 $fields = [
@@ -44,31 +46,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $values = force_service_area(posted_fields(array_keys($fields)));
     $own = get_form_prefill($pdo, (int)$account_id, $form_key)['own'];   // the applicant's own age/birthdate, for the hints and the script
     $claimantName = trim(implode(' ', [$values['first_name'], $values['middle_name'], $values['last_name']]));
-    if (($ownAge = claimant_age_from_account($own, $claimantName)) !== null) {
+    if ($edit === null && ($ownAge = claimant_age_from_account($own, $claimantName)) !== null) {
         $values['claimant_age'] = $ownAge;   // the claimant is the account holder: their age comes from their saved birthdate, not the box
     }
     $errors = validate_application($values, array_keys(array_filter($fields)));
     $prefill = ['source' => 'post', 'own' => $own];
 
-    if (!$errors) {
+    if ($edit !== null && !csrf_valid()) {
+        $errors['person'] = 'This page was open for too long. Nothing was changed. Please check the details and press Save again.';
+    }
+
+    if (!$errors && $edit === null) {
         // Was a Burial application already filed for this person? (person_rules.php)
         $check = checkPersonConflict($pdo, $form_key, $values, (int)$account_id);
         if (!$check['ok']) $errors[$check['field']] = $check['message'];
     }
 
-    if (!$errors) {
+    if (!$errors && $edit !== null) {
+        // Editing: saved now (the same checks run again inside the save, with this application's own number left out)
+        $saved = application_edit_save($pdo, $edit, $form_key, $values, ['version' => (string)($_POST['version'] ?? '')]);
+        if ($saved['ok']) {
+            flash('success', $saved['message']);
+            header('Location: view_application?id=' . (int)$edit['id']);
+            exit;
+        }
+        $errors[$saved['field'] ?? 'person'] = $saved['message'];
+    } elseif (!$errors) {
         // Keep the answers in the session - saved to the database only after the photos are uploaded
         $values['assistance_type_id'] = $program['type_id'];
         $_SESSION[$form_key . '_form_data'] = $values;
         header('Location: ' . $program['doc_page']);
         exit;
     }
+} elseif ($edit !== null) {
+    // Editing: the form opens with what is saved
+    $prefill = ['source' => 'edit', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];
+    $values = application_values_from_row($edit, $form_key);
 } else {
     $prefill = get_form_prefill($pdo, $account_id, $form_key);
     $values = $prefill['values'];
 }
 
-apply_page_start($program['name'] . ' Form', $program, 1);
+apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : $program['name'] . ' Form', $program, 1, $edit);
 ?>
 
 <?php if (!$can_apply): ?>
@@ -85,14 +104,21 @@ apply_page_start($program['name'] . ' Form', $program, 1);
                     <div><strong>Please check the highlighted fields.</strong> Some information is missing or incorrect.</div>
                 <?php endif; ?>
             </div>
+        <?php elseif ($edit !== null): ?>
+            <?php render_edit_notice($edit); ?>
         <?php else: ?>
             <?php render_prefill_notice($prefill, $program); ?>
         <?php endif; ?>
 
         <form method="post" class="ap-card ap-form-card" id="applicationForm"
               data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
+            <?php if ($edit !== null) render_edit_fields($edit); ?>
             <div class="ap-form-top">
-                <span class="ap-eligible-chip"><i class="fas fa-check-circle"></i> You're eligible to apply</span>
+                <?php if ($edit !== null): ?>
+                    <span class="ap-eligible-chip ap-edit-chip"><i class="fas fa-pen"></i> Editing application #<?= (int)$edit['id'] ?></span>
+                <?php else: ?>
+                    <span class="ap-eligible-chip"><i class="fas fa-check-circle"></i> You're eligible to apply</span>
+                <?php endif; ?>
                 <p>Fields marked <span class="req">*</span> are required.</p>
             </div>
 
@@ -200,15 +226,23 @@ apply_page_start($program['name'] . ' Form', $program, 1);
             </fieldset>
 
 
+            <?php if ($edit !== null): ?>
             <div class="ap-actions">
-                <a href="landingpage.php" class="ap-btn ap-btn-ghost"><i class="fas fa-arrow-left"></i> Cancel</a>
+                <a href="view_application?id=<?= (int)$edit['id'] ?>" class="ap-btn ap-btn-ghost"><i class="fas fa-arrow-left"></i> Cancel</a>
+                <span class="ap-actions-note">To change the photos, use the Documents tab.</span>
+                <button type="submit" class="ap-btn ap-btn-primary"><i class="fas fa-floppy-disk"></i> Save changes</button>
+            </div>
+            <?php else: ?>
+            <div class="ap-actions">
+                <a href="landingpage" class="ap-btn ap-btn-ghost"><i class="fas fa-arrow-left"></i> Cancel</a>
                 <span class="ap-actions-note">Next, you'll upload photos of your requirements.</span>
                 <button type="submit" class="ap-btn ap-btn-primary">Continue <i class="fas fa-arrow-right"></i></button>
             </div>
+            <?php endif; ?>
         </form>
     </div>
 
-    <?php render_form_sidebar($program); ?>
+    <?php if ($edit !== null) render_edit_sidebar($edit, 'edit_documents?id=' . (int)$edit['id']); else render_form_sidebar($program); ?>
 </div>
 <?php endif; ?>
 

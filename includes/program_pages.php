@@ -8,7 +8,7 @@
  * files is a few lines that call a function here, and the URLs (which are what the menu, tabs and bookmarks use) are the same.
  *
  *   program_overview_page($typeId)      the program's overview: numbers, chart, latest applications (admin side)
- *   program_list_page($typeId, $page)   $page = all | pending | approved | disapproved
+ *   program_list_page($typeId, $page)   $page = all | pending | approved | disapproved | withdrawn
  *   program_view_page($typeId)          one application's record
  *   program_update_page($typeId)        the status / remarks form
  *
@@ -31,6 +31,7 @@ function program_texts(int $typeId): array
             'approved_head' => 'Approved Medical applications', 'approved_sub' => 'Approved applications and the amount given, newest first.',
             'approved_empty' => ['No approved Medical applications yet', 'Applications you approve will be listed here.'],
             'declined_head' => 'Declined Medical applications', 'declined_who' => 'Only administrators can see declined Medical applications.',
+            'withdrawn_head' => 'Withdrawn Medical applications',
             'view_fallback' => ['pending', 'Back to Medical applications to review'],
             'go_label' => 'Go to Medical applications', 'update_none' => ['No application was chosen', 'Open an application from the Medical lists.'],
             'update_missing' => ['Application not found', 'It may have been removed. Check the reference number.'], 'gives_money' => true,
@@ -44,6 +45,7 @@ function program_texts(int $typeId): array
             'approved_head' => 'Approved Burial applications', 'approved_sub' => 'Approved applications and the amount given, newest first.',
             'approved_empty' => ['No approved Burial applications yet', 'Applications you approve will be listed here.'],
             'declined_head' => 'Declined Burial applications', 'declined_who' => 'Only administrators can see declined Burial applications.',
+            'withdrawn_head' => 'Withdrawn Burial applications',
             'view_fallback' => ['all', 'Back to Burial applications'],
             'go_label' => 'Go to Burial applications', 'update_none' => ['No application was chosen', 'Open an application from the Burial lists.'],
             'update_missing' => ['Application not found', 'It may have been removed. Check the reference number.'], 'gives_money' => true,
@@ -57,6 +59,7 @@ function program_texts(int $typeId): array
             'approved_head' => 'Approved OPD requests', 'approved_sub' => 'Approved requests, newest first.',
             'approved_empty' => ['No approved OPD requests yet', 'Requests you approve will be listed here.'],
             'declined_head' => 'Declined OPD requests', 'declined_who' => 'Only OPD staff and administrators can see declined OPD requests.',
+            'withdrawn_head' => 'Withdrawn OPD requests',
             'view_fallback' => ['all', 'Back to OPD applications'],
             'go_label' => 'Go to OPD applications', 'update_none' => ['No request was chosen', 'Open a request from the OPD lists.'],
             'update_missing' => ['Request not found', 'It may have been removed. Check the reference number.'], 'gives_money' => false,
@@ -89,7 +92,7 @@ function program_columns(int $typeId, string $page): array
     $address = ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }];
     $contact = ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'];
     $deceased = ['label' => 'Deceased', 'type' => 'text', 'key' => 'petitioner_name'];   // Burial: petitioner_name is the deceased
-    $status = ['label' => 'Status', 'type' => 'status', 'key' => 'status'];
+    $status = ['label' => 'Status', 'type' => 'html', 'render' => 'ui_status_cell'];   // the badge, plus "Edited" when the applicant changed it while waiting
     $filed = ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'];
 
     if ($page === 'all') {
@@ -99,7 +102,7 @@ function program_columns(int $typeId, string $page): array
                 ['label' => 'Check-up date', 'type' => 'date', 'key' => 'checkup_date'],
                 $status,
                 ['label' => 'Hospital', 'type' => 'text', 'key' => 'hospital'],
-                ['label' => 'Diagnosis', 'type' => 'text', 'key' => 'diagnosis', 'class' => 'cell-clip'],
+                ['label' => 'Reason for check-up', 'type' => 'text', 'key' => 'checkup_reason', 'class' => 'cell-clip'],
                 ['label' => 'Age', 'type' => 'text', 'key' => 'age'],
                 ['label' => 'Accompanied by', 'type' => 'text', 'value' => 'ui_opd_companion'],
                 ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address(['barangay' => $r['barangay'], 'municipality' => $r['municipality']]); }],
@@ -138,12 +141,12 @@ function program_rows(int $typeId, string $page): array
         $order = $typeId === 3 ? 'a.checkup_date IS NULL, a.checkup_date ASC, a.created_at DESC' : 'a.created_at DESC';
         $stmt = $pdo->prepare("SELECT a.*, at.name as assistance_type FROM applicant a
                                LEFT JOIN assistance_types at ON a.assistance_type_id = at.id
-                               WHERE a.assistance_type_id = ? AND a.status <> 'Disapproved'
+                               WHERE a.assistance_type_id = ? AND a.status NOT IN ('Disapproved', 'Withdrawn')
                                ORDER BY $order");
     } elseif ($page === 'pending') {
         // The account's email is where the approval email goes (the Approve dialog shows it; NULL account = walk-in);
         // the check-up date is the OPD trip day
-        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at, a.status,
+        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at, a.status, a.edited_at, a.edit_count,
                                       " . ($typeId === 2 ? 'a.petitioner_name,' : '') . ($typeId === 3 ? 'a.checkup_date,' : '') . "
                                       a.account_id, acc.email AS account_email
                                FROM applicant a LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
@@ -189,22 +192,47 @@ function program_declined_body(int $typeId): string
     return '<section class="panel" aria-label="' . ui_e($t['declined_head']) . '">' . ui_disapproved_log($rows, false) . '</section>';
 }
 
-/** One list page: $page = all | pending | approved | disapproved. */
+/** The withdrawn list: the applicant took the application back while it was waiting. For the record only, like the declined one. */
+function program_withdrawn_body(int $typeId): string
+{
+    global $pdo;
+    $t = program_texts($typeId);
+    if (!decision_can(decision_user(), $typeId)) {
+        return ui_state('lock', 'Sign in to see this list', $t['declined_who']);
+    }
+    try {
+        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.created_at, a.withdrawn_at, a.withdrawal_reason
+                               FROM applicant a WHERE a.status = 'Withdrawn' AND a.assistance_type_id = ?
+                               ORDER BY a.withdrawn_at DESC, a.id DESC");
+        $stmt->execute([$typeId]);
+        $rows = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
+    } catch (PDOException $e) {
+        error_log('program_withdrawn_body(' . $typeId . '): ' . $e->getMessage());
+        return ui_load_error('the withdrawn list', program_file($typeId, 'withdrawn'));
+    }
+    return '<section class="panel" aria-label="' . ui_e($t['withdrawn_head']) . '">' . ui_withdrawn_log($rows, false) . '</section>';
+}
+
+/** One list page: $page = all | pending | approved | disapproved | withdrawn. */
 function program_list_page(int $typeId, string $page): void
 {
     $t = program_texts($typeId);
     $staff = ui_area() === 'staff';
-    $key = ['all' => 'all', 'pending' => 'pending', 'approved' => 'approved', 'disapproved' => 'disapproved'][$page];
-    $head = [$t[$key === 'disapproved' ? 'declined_head' : $key . '_head'], $t[$key . '_sub'] ?? 'Most recently declined first, with the reason given. Each applicant may apply again.'];
+    $key = ['all' => 'all', 'pending' => 'pending', 'approved' => 'approved', 'disapproved' => 'disapproved', 'withdrawn' => 'withdrawn'][$page];
+    if ($key === 'withdrawn') {
+        $head = [$t['withdrawn_head'], 'Applications the applicants took back while they were waiting, most recent first. They are off every list and count, and each applicant may apply again.'];
+    } else {
+        $head = [$t[$key === 'disapproved' ? 'declined_head' : $key . '_head'], $t[$key . '_sub'] ?? 'Most recently declined first, with the reason given. Each applicant may apply again.'];
+    }
 
     // The rows are read before the page starts, as before: a failing query shows the error page, not half a page
-    $rows = $page === 'disapproved' ? [] : program_rows($typeId, $page);
+    $rows = in_array($page, ['disapproved', 'withdrawn'], true) ? [] : program_rows($typeId, $page);
 
     admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId, $page)]);
     echo ui_page_head($head[0], $head[1]);
     echo ui_type_tabs($typeId, $key);
-    if ($page === 'disapproved') {
-        echo program_declined_body($typeId);
+    if ($page === 'disapproved' || $page === 'withdrawn') {
+        echo $page === 'withdrawn' ? program_withdrawn_body($typeId) : program_declined_body($typeId);
         admin_layout_end();
         return;
     }
@@ -238,7 +266,7 @@ function program_overview_page(int $typeId): void
 
     // Disapproved applications were discarded: they are not counted anywhere
     $stmt = $pdo->prepare("SELECT MONTH(created_at) AS month, COUNT(*) AS total FROM applicant
-                           WHERE YEAR(created_at) = ? AND assistance_type_id = ? AND status <> 'Disapproved'
+                           WHERE YEAR(created_at) = ? AND assistance_type_id = ? AND status NOT IN ('Disapproved', 'Withdrawn')
                            GROUP BY MONTH(created_at)");
     $stmt->execute([$year, $typeId]);
     $monthlyData = array_fill(1, 12, 0);
@@ -247,13 +275,13 @@ function program_overview_page(int $typeId): void
     }
 
     $stmt = $pdo->prepare("SELECT COUNT(*) AS total, COALESCE(SUM(status = 'Pending'), 0) AS pending, COALESCE(SUM(status = 'Approved'), 0) AS approved
-                           FROM applicant WHERE assistance_type_id = ? AND status <> 'Disapproved'");
+                           FROM applicant WHERE assistance_type_id = ? AND status NOT IN ('Disapproved', 'Withdrawn')");
     $stmt->execute([$typeId]);
     $stats = $stmt->fetch(PDO::FETCH_ASSOC);
 
     $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.last_name, a.barangay, a.status, a.created_at, at.name AS assistance_type
                            FROM applicant a JOIN assistance_types at ON a.assistance_type_id = at.id
-                           WHERE a.assistance_type_id = ? AND a.status <> 'Disapproved'
+                           WHERE a.assistance_type_id = ? AND a.status NOT IN ('Disapproved', 'Withdrawn')
                            ORDER BY a.created_at DESC LIMIT 10");
     $stmt->execute([$typeId]);
 
@@ -317,12 +345,12 @@ function program_view_page(int $typeId): void
 
     [$backHref, $backLabel] = ui_back_link(program_file($typeId, $t['view_fallback'][0]), $t['view_fallback'][1]);
     // After saving on the Update page, staff land here: "Back" then goes to the list, not to the form again
-    if ($staff && basename((string)parse_url($backHref, PHP_URL_PATH)) === 'Opdupdate.php') {
+    if ($staff && basename((string)parse_url($backHref, PHP_URL_PATH), '.php') === 'Opdupdate') {
         [$backHref, $backLabel] = [$list, $t['view_fallback'][1]];
     }
     admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId)]);
     // Update (status and remarks) from the record too, as on the lists; a declined request is closed
-    if ($staff && $applicant['status'] !== 'Disapproved' && decision_can(decision_user(), $typeId)) {
+    if ($staff && !in_array($applicant['status'], ['Disapproved', 'Withdrawn'], true) && decision_can(decision_user(), $typeId)) {
         echo '<div class="page-actions">' . ui_staff_update_link($applicant) . '</div>';
     }
     echo ui_applicant_record($applicant, $documents, $backHref, $backLabel);
@@ -336,7 +364,7 @@ function program_update_page(int $typeId): void
     $t = program_texts($typeId);
     $staff = ui_area() === 'staff';
     $id = (int)($_GET['id'] ?? $_GET['applicant_id'] ?? 0);
-    $self = basename($_SERVER['SCRIPT_NAME'] ?? '');
+    $self = basename($_SERVER['SCRIPT_NAME'] ?? '', '.php');
 
     if ($id <= 0) {
         program_not_found($typeId, $t['update_none'][0], $t['update_none'][1], $t['update_title']);

@@ -1,7 +1,7 @@
 <?php
 /**
- * Feedback: the applicant rates the service on each decided application (includes/feedback.php).
- *   feedback.php          every decided application: the ones waiting for a rating (with the survey), then the rated ones
+ * Feedback: the applicant rates the service on each application the office APPROVED (includes/feedback.php).
+ *   feedback.php          every approved application: the ones waiting for a rating (with the survey), then the rated ones
  *   feedback.php?id=149   the same, with application #149 first and highlighted (the link on view_application.php)
  * The form sends to feedback_submit.php, which comes back here with a message.
  */
@@ -33,13 +33,13 @@ function feedback_app_head(array $row, bool $focused): string {
         . '<div><h3>' . e($p['name'] ?? 'Assistance') . ' <span>#' . (int)$row['id'] . '</span>'
         . ($focused ? ' <span class="pui-fb-tag">Selected</span>' : '') . '</h3>'
         . '<p>' . e($decided) . ' on ' . e(date('F j, Y', strtotime($row['decided_at']))) . ' · '
-        . '<a href="view_application.php?id=' . (int)$row['id'] . '">View application</a></p></div></div>';
+        . '<a href="view_application?id=' . (int)$row['id'] . '">View application</a></p></div></div>';
 }
 
 account_page_start($ctx, 'Feedback', 'feedback', [
     'eyebrow'  => 'Client feedback',
     'title'    => 'Rate our service',
-    'subtitle' => 'Tell us how we did on your requests. Only the office sees your answers, and they never affect an application.',
+    'subtitle' => 'Tell us how we did on the requests the office approved. Only the office sees your answers, and they never affect an application.',
     'icon'     => 'fa-star',
 ]);
 ?>
@@ -49,15 +49,15 @@ account_page_start($ctx, 'Feedback', 'feedback', [
         <i class="fas fa-exclamation-triangle"></i>
         <h4>Feedback could not be loaded</h4>
         <p>Please try again in a moment.</p>
-        <a href="feedback.php" class="ap-btn ap-btn-primary acc-btn-sm"><i class="fas fa-rotate-right"></i> Try again</a>
+        <a href="feedback" class="ap-btn ap-btn-primary acc-btn-sm"><i class="fas fa-rotate-right"></i> Try again</a>
     </div>
 
 <?php elseif (!$list): ?>
     <div class="ap-card acc-card acc-empty">
         <i class="far fa-star"></i>
         <h4>Nothing to rate yet</h4>
-        <p>Once the office approves or decides on one of your applications, you can tell us how we did here.</p>
-        <a href="my_account.php#applications" class="ap-btn ap-btn-primary acc-btn-sm"><i class="fas fa-list"></i> My applications</a>
+        <p>Once the office approves one of your applications, you can tell us how we did here.</p>
+        <a href="my_account#applications" class="ap-btn ap-btn-primary acc-btn-sm"><i class="fas fa-list"></i> My applications</a>
     </div>
 
 <?php else: ?>
@@ -71,7 +71,7 @@ account_page_start($ctx, 'Feedback', 'feedback', [
                 </article>
             <?php endforeach; ?>
         <?php else: ?>
-            <div class="ap-card acc-card pui-fb-done"><i class="fas fa-circle-check"></i> You have rated all your decided applications. Thank you!</div>
+            <div class="ap-card acc-card pui-fb-done"><i class="fas fa-circle-check"></i> You have rated all your approved applications. Thank you!</div>
         <?php endif; ?>
     </section>
 

@@ -31,10 +31,10 @@ function walkin_respond(bool $is_ajax, int $status, array $data): void
         $_SESSION['admin_add_success'] = true;
         $_SESSION['admin_add_applicant_id'] = $data['applicant_id'];
         $_SESSION['admin_add_applicant_name'] = $data['applicant_name'];
-        header('Location: dashboard.php?added=1');
+        header('Location: dashboard?added=1');
     } else {
         $_SESSION['admin_add_error'] = $data['message'];
-        header('Location: dashboard.php?error=1');
+        header('Location: dashboard?error=1');
     }
     exit();
 }
@@ -45,7 +45,7 @@ if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
 }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: dashboard.php');
+    header('Location: dashboard');
     exit();
 }
 
@@ -88,13 +88,13 @@ $fields = [
     'burial'  => $person + ['claimant_age' => true] + $address
                + ['petitioner_name' => true, 'relationship' => true, 'beneficiary_birthdate' => true, 'date_of_death' => true],
     'opd'     => $person + ['beneficiary_birthdate' => true] + $address   // the age is worked out from the birthdate (opd_with_age())
-               + ['hospital' => true, 'checkup_date' => true, 'diagnosis' => true, 'petitioner_name' => false, 'relationship' => false],   // companion optional
+               + ['hospital' => true, 'checkup_date' => true, 'checkup_reason' => true, 'petitioner_name' => false, 'relationship' => false],   // companion optional
 ][$form_type];
 
 // A list with "Others" sends the picked choice or the typed answer (resolve_choice_post), as online
 $choice_error = null;
 if ($form_type === 'medical') $choice_error = resolve_choice_post('purpose', MEDICAL_PURPOSES, false);
-if ($form_type === 'opd') $choice_error = resolve_choice_post('diagnosis', OPD_REASONS, true);
+if ($form_type === 'opd') $choice_error = resolve_choice_post('checkup_reason', OPD_REASONS, true);
 
 $values = force_service_area(posted_fields(array_keys($fields)));   // GMA, Cavite whatever was sent, as online
 $required = array_keys(array_filter($fields));
@@ -132,7 +132,7 @@ if ($form_type === 'medical') {
 }
 if ($form_type === 'opd') {
     $errors += opd_companion_errors($values);   // no companion is fine; a name needs its relationship and the other way round
-    if ($choice_error) $errors['diagnosis'] = $choice_error;
+    if ($choice_error) $errors['checkup_reason'] = $choice_error;
 }
 
 if ($errors) {
@@ -171,7 +171,7 @@ $insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $
     ];
     if ($form_type === 'opd') {
         $row += ['age' => $v['age'] !== '' ? $v['age'] : null, 'hospital' => $v['hospital'], 'checkup_date' => $v['checkup_date'],
-                 'diagnosis' => $v['diagnosis'], 'wheelchair' => $v['wheelchair'], 'stretcher' => $v['stretcher']];
+                 'checkup_reason' => $v['checkup_reason'], 'wheelchair' => $v['wheelchair'], 'stretcher' => $v['stretcher']];
         if ($with_person_columns) {
             $row['beneficiary_birthdate'] = $v['beneficiary_birthdate'];   // no beneficiary_id: OPD has no person registry
         }

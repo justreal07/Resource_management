@@ -560,7 +560,7 @@
         const strong = document.createElement('strong');
         strong.textContent = 'Your sign-in has ended, so the application was not saved. ';
         const link = document.createElement('a');
-        link.href = cfg.loginUrl || '../login/login.php?role=admin';
+        link.href = cfg.loginUrl || '../login/login?role=admin';
         link.target = '_blank';
         link.rel = 'noopener';
         link.textContent = 'Sign in again in a new tab';
@@ -628,7 +628,7 @@
         const name = String(data.applicant_name || '').trim() || 'The applicant';
         $('modalSuccessMessage').textContent = name + ' was added as Ref #' + data.applicant_id +
             '. The application is Pending and is now in the ' + (type ? type.name : 'review') + ' queue.';
-        $('modalViewLink').href = (cfg.viewUrl || 'view_applicant.php?applicant_id=') + encodeURIComponent(data.applicant_id);
+        $('modalViewLink').href = (cfg.viewUrl || 'view_applicant?applicant_id=') + encodeURIComponent(data.applicant_id);
         dirty = false;
         needsReload = true;
         goTo('done');

@@ -258,7 +258,7 @@ $wiList = function (string $id, array $options): string {
                 <?= $wiList('hospitalList', OPD_HOSPITALS) ?>
                 <p class="field-help">Final referral depends on availability and evaluation.</p></div>
             <?= $wiDate('checkup_date', 'Check-up date', $today, date('Y-m-d', strtotime('+1 year')), 'From today up to a year ahead.') ?>
-            <?= $wiChoice('diagnosis', 'Diagnosis / reason for the check-up', OPD_REASONS, 'Choose a reason', 'Please state the reason, e.g. Follow-up check-up for asthma', true, 255) ?>
+            <?= $wiChoice('checkup_reason', 'Reason for the check-up', OPD_REASONS, 'Choose a reason', 'Please state the reason, e.g. Follow-up check-up for asthma', true, 255) ?>
         </div>
     </fieldset>
     <fieldset class="form-section">

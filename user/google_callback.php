@@ -3,7 +3,7 @@ require_once '../config.php';
 require_once 'account_helpers.php';
 require_once '../includes/password_reset.php';
 
-$returnPage = $_SESSION['oauth_return'] ?? 'applicant_login.php';
+$returnPage = $_SESSION['oauth_return'] ?? 'applicant_login';
 
 if (!GOOGLE_OAUTH_CONFIGURED || !function_exists('curl_init')) {
     $_SESSION['oauth_error'] = 'Google sign-in is not available right now. Please use your username and password.';
@@ -96,7 +96,7 @@ try {
 
     // A new account goes on to choose its first assistance; an existing one goes home as before
     // New accounts choose their first program; others go back to the account page they were opening, or home
-    header('Location: ' . ($isNewAccount ? 'choose_assistance.php' : take_after_login()));
+    header('Location: ' . ($isNewAccount ? 'choose_assistance' : take_after_login()));
     exit();
 } catch (Exception $e) {
     error_log('Google OAuth Error: ' . $e->getMessage());

@@ -335,23 +335,23 @@
 
     /* ---------- Approval details (the Approve dialog and the Update page) ----------
        ui_claim_fields() in admin_components.php. Medical / Burial: amount, where, date and time to claim.
-       OPD: departure time (4:00 AM unless changed) and pick-up point; the day is the patient's check-up date.
+       OPD: no place or time; the trip day is the patient's check-up date.
        All: the hard copies to bring and a note. The server checks the same rules again
        (decision_claim_parse() in application_decision.php). */
 
-    // The last place (and claim time) used for each program, offered for the next approval (this browser only)
+    // The last place and claim time used for Medical / Burial, offered for the next approval (this browser only)
     const claimKey = (scope, what) => 'lgu.claim' + what + '.' + (scope.dataset.claimType || '');
     function fillRememberedClaim(scope) {
         const place = scope.querySelector('[data-claim="place"]');
         const time = scope.querySelector('[data-claim="time"]');
         if (place && !place.value) place.value = store.get(claimKey(scope, 'Place')) || '';
-        if (time && !time.value) time.value = store.get(claimKey(scope, 'Time')) || '';   // OPD's time starts at 4:00 AM, so it stays
+        if (time && !time.value) time.value = store.get(claimKey(scope, 'Time')) || '';
     }
     function rememberClaim(scope) {
         const place = scope.querySelector('[data-claim="place"]');
         const time = scope.querySelector('[data-claim="time"]');
         if (place && place.value.trim()) store.set(claimKey(scope, 'Place'), place.value.trim());
-        if (time && time.value && !time.defaultValue) store.set(claimKey(scope, 'Time'), time.value);
+        if (time && time.value) store.set(claimKey(scope, 'Time'), time.value);
     }
 
     /* The budget note under the amount (Medical / Burial; ui_budget_note() in includes/budget.php): what is left of this year's
@@ -661,17 +661,18 @@
                 if (amount) {
                     extraLabel = 'Amount';
                     extra = peso(amount.value);
-                } else if (time) {
-                    const hm = time.value.split(':').map(Number);
-                    extraLabel = 'Departure';
-                    extra = (hm[0] % 12 || 12) + ':' + String(hm[1]).padStart(2, '0') + (hm[0] < 12 ? ' AM' : ' PM');
+                } else if (!time) {
+                    // OPD: the trip is on the patient's check-up date
+                    const day = claimSection.querySelector('[data-claim-schedule]');
+                    extraLabel = 'Trip day';
+                    extra = day ? day.textContent.trim() : '';
                 }
                 rememberClaim(claimSection);
             }
             confirmAction({
                 title: disapprove ? 'Decline this application for ' + (form.dataset.name || 'this applicant') + '?' : 'Approve this application?',
                 message: disapprove ? 'The applicant may apply again, and is told the reason.' : 'The application moves to the approved list'
-                    + (claimSection ? ', and the applicant is emailed the ' + (extraLabel === 'Departure' ? 'trip schedule.' : 'claim details.') : '.'),
+                    + (claimSection ? ', and the applicant is emailed the ' + (extraLabel === 'Trip day' ? 'trip schedule.' : 'claim details.') : '.'),
                 name: form.dataset.name,
                 ref: form.dataset.ref,
                 extraLabel: extraLabel,

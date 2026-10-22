@@ -1,18 +1,18 @@
 <?php
 /**
  * Saves the satisfaction survey (includes/feedback.php), sent from the Feedback page (user/feedback.php).
- * Signed-in applicants only, with the form token; an applicant can only rate their own decided applications.
+ * Signed-in applicants only, with the form token; an applicant can only rate their own approved applications.
  */
 require_once '../config.php';
 require_once 'account_helpers.php';
 require_once '../includes/feedback.php';
 
 if (!isset($_SESSION['applicant'])) {
-    header('Location: applicant_login.php');
+    header('Location: applicant_login');
     exit;
 }
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    header('Location: feedback.php');
+    header('Location: feedback');
     exit;
 }
 
@@ -21,7 +21,7 @@ $applicationId = (int)($_POST['application_id'] ?? 0);
 // Back to the Feedback page, which shows the message at the top
 $back = function (bool $ok, string $message) use ($applicationId): void {
     flash($ok ? 'success' : 'error', $message);
-    header('Location: feedback.php' . (!$ok && $applicationId > 0 ? '?id=' . $applicationId . '#app-' . $applicationId : ''));
+    header('Location: feedback' . (!$ok && $applicationId > 0 ? '?id=' . $applicationId . '#app-' . $applicationId : ''));
     exit;
 };
 

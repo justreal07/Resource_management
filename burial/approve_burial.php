@@ -5,8 +5,8 @@ require_once '../config.php';
 require_once '../includes/application_decision.php';
 
 decision_run_endpoint($pdo, 'approve', [
-    'fallback'       => '../burial/Bpending.php',
+    'fallback'       => '../burial/Bpending',
     'require_amount' => true,
     'expect_type'    => 2,
-    'on_success'     => function () { return '../burial/burialapproved.php'; },
+    'on_success'     => function () { return '../burial/burialapproved'; },
 ]);

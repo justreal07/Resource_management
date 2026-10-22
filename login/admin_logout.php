@@ -35,5 +35,5 @@ if (!empty($_SESSION['applicant'])) {
 }
 
 // Redirect to login page
-header('Location: login.php?role=' . $role . '&logged_out=1');
+header('Location: login?role=' . $role . '&logged_out=1');
 exit();

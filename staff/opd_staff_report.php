@@ -11,16 +11,14 @@ if ($selected_date === '') {
     $selected_date = date('Y-m-d');
 }
 
-// Fetch OPD applicants for selected date, with the departure time and pick-up point set when approving
-// (when those columns are there)
-$departureCols = decision_claim_ensure($pdo) ? ', a.claim_time, a.claim_place' : '';
+// Fetch OPD applicants for selected date
 $stmt = $pdo->prepare("
     SELECT a.id, a.first_name, a.last_name, a.age, a.barangay, a.street, a.municipality,
-           a.diagnosis, a.hospital, a.checkup_date, a.petitioner_name, a.relationship, a.wheelchair, a.stretcher,
-           a.status, a.created_at, at.name as assistance_type$departureCols
+           a.checkup_reason, a.hospital, a.checkup_date, a.petitioner_name, a.relationship, a.wheelchair, a.stretcher,
+           a.status, a.created_at, at.name as assistance_type
     FROM applicant a
     LEFT JOIN assistance_types at ON a.assistance_type_id = at.id
-    WHERE a.assistance_type_id = 3 AND a.status <> 'Disapproved'
+    WHERE a.assistance_type_id = 3 AND a.status NOT IN ('Disapproved', 'Withdrawn')
     AND DATE(a.checkup_date) = ?
     ORDER BY a.checkup_date ASC, a.created_at DESC
 ");
@@ -34,7 +32,7 @@ $stats_stmt = $pdo->prepare("
         SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
         SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved
     FROM applicant
-    WHERE assistance_type_id = 3 AND status <> 'Disapproved'
+    WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')
     AND DATE(checkup_date) = ?
 ");
 $stats_stmt->execute([$selected_date]);
@@ -48,7 +46,7 @@ if (count($applicants) === 0) {
     $available_dates_stmt = $pdo->prepare("
         SELECT DATE(checkup_date) as date
         FROM applicant
-        WHERE assistance_type_id = 3 AND status <> 'Disapproved' AND checkup_date IS NOT NULL
+        WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn') AND checkup_date IS NOT NULL
         GROUP BY DATE(checkup_date)
         ORDER BY ABS(DATEDIFF(DATE(checkup_date), ?))
         LIMIT 5
@@ -56,7 +54,7 @@ if (count($applicants) === 0) {
     $available_dates_stmt->execute([$selected_date]);
     $available_dates = $available_dates_stmt->fetchAll(PDO::FETCH_ASSOC);
     usort($available_dates, function ($a, $b) { return strcmp((string)$a['date'], (string)$b['date']); });
-    $has_any = (int)$pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 3 AND status <> 'Disapproved'")->fetchColumn();
+    $has_any = (int)$pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
 }
 
 $dayText = date('l, F j, Y', strtotime($selected_date));
@@ -80,13 +78,13 @@ echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you c
     . '<button type="button" class="btn btn-secondary" data-export-table="#reportContent .data-table" data-filename="OPD_Report_' . ui_e($selected_date) . '.xls">'
     . ui_icon('download') . 'Export table to Excel</button>');
 ?>
-<form class="panel report-filters" method="GET" action="opd_staff_report.php" data-busy>
+<form class="panel report-filters" method="GET" action="opd_staff_report" data-busy>
     <div class="field">
         <label for="reportDate">Check-up date</label>
         <input type="date" id="reportDate" name="date" value="<?= ui_e($selected_date) ?>" required>
     </div>
     <button type="submit" class="btn btn-primary">Show report</button>
-    <a class="btn btn-secondary" href="opd_staff_report.php?date=<?= ui_e(date('Y-m-d')) ?>">Today</a>
+    <a class="btn btn-secondary" href="opd_staff_report?date=<?= ui_e(date('Y-m-d')) ?>">Today</a>
 </form>
 
 <div class="report-section" id="reportContent">
@@ -105,10 +103,9 @@ echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you c
                 ['label' => 'Patient', 'type' => 'person', 'link' => function ($r) { return ui_type_url(3, 'view', ['id' => (int)$r['id']]); }],
                 ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
                 ['label' => 'Check-up date', 'type' => 'date', 'key' => 'checkup_date'],
-                ['label' => 'Departure', 'type' => 'text', 'value' => 'ui_opd_departure'],
                 ['label' => 'Age', 'type' => 'text', 'key' => 'age'],
                 ['label' => 'Hospital', 'type' => 'text', 'key' => 'hospital'],
-                ['label' => 'Diagnosis', 'type' => 'text', 'key' => 'diagnosis'],
+                ['label' => 'Reason for check-up', 'type' => 'text', 'key' => 'checkup_reason'],
                 ['label' => 'Accompanied by', 'type' => 'text', 'value' => 'ui_opd_companion'],
                 ['label' => 'Transport needs', 'type' => 'text', 'value' => $needs],
                 ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }],
@@ -118,7 +115,7 @@ echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you c
             $links = '';
             foreach ($available_dates as $d) {
                 if (!$d['date']) continue;
-                $links .= '<a class="btn btn-secondary btn-sm" href="opd_staff_report.php?date=' . ui_e($d['date']) . '">' . ui_e(ui_date($d['date'])) . '</a>';
+                $links .= '<a class="btn btn-secondary btn-sm" href="opd_staff_report?date=' . ui_e($d['date']) . '">' . ui_e(ui_date($d['date'])) . '</a>';
             }
             echo ui_state('inbox', 'No OPD check-ups on this day',
                 $has_any ? ($has_any === 1 ? 'There is 1 OPD record' : 'There are ' . number_format($has_any) . ' OPD records') . ' in the system. Pick another date' . ($links !== '' ? ', or open one of the nearest check-up days below.' : '.')

@@ -209,7 +209,7 @@ function password_reset_request(PDO $pdo, string $identifier, string $ip): void
         [$subject, $text, $html] = password_reset_email_google($name, $base);
     } else {
         $secret = password_reset_issue($pdo, (int)$account['id'], $ip);
-        $link = $base . '/user/reset_password.php?token=' . $secret;
+        $link = $base . '/user/reset_password?token=' . $secret;
         [$subject, $text, $html] = password_reset_email_link($name, $link);
     }
     mail_send($account['email'], $name, $subject, $text, $html);
@@ -242,7 +242,7 @@ function password_reset_email_link(string $name, string $link): array
 function password_reset_email_google(string $name, string $base): array
 {
     $h = function ($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); };
-    $login = $base . '/user/applicant_login.php';
+    $login = $base . '/user/applicant_login';
     $subject = 'How to sign in - LGU Assistance Portal';
     $text = "Hello {$name},\n\n"
         . "Someone asked to reset the password of this account on the LGU Assistance Portal. Your account signs in with Google, so it has no separate password to reset.\n\n"

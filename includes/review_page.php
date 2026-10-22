@@ -36,9 +36,9 @@ function review_next_after(PDO $pdo, array $app): ?int
 /** The page the Approve dialog posts to, for a program (the same files the Pending lists use). */
 function review_approve_action(int $typeId): string
 {
-    if ($typeId === 1) return '../medical/approve_medical.php';
-    if ($typeId === 2) return '../burial/approve_burial.php';
-    return ui_area() === 'staff' ? '../staff/approve_opd.php' : '../opd/approve_opd.php';
+    if ($typeId === 1) return '../medical/approve_medical';
+    if ($typeId === 2) return '../burial/approve_burial';
+    return ui_area() === 'staff' ? '../staff/approve_opd' : '../opd/approve_opd';
 }
 
 /** The page shown when there is nothing to review or the application can't be opened here. */
@@ -203,13 +203,16 @@ function review_page_run(): void
                 <a class="back-link" href="<?= ui_e($backToList) ?>"><?= ui_icon('chevron-left') ?><?= $pending ? 'Waiting for review' : 'Back to the list' ?></a>
                 <?= ui_badge($app['status']) ?>
             </div>
+            <?php if (!empty($app['edited_at'])): ?>
+                <p class="review-edited" role="note"><?= ui_icon('info') ?><span><strong>Edited by the applicant</strong> on <?= ui_e(ui_date($app['edited_at'], 'M j, Y, g:i A')) ?>. Check the details and photos below, not what you saw earlier.</span></p>
+            <?php endif; ?>
             <h2 id="reviewTitle"><?= ui_e(ui_full_name($app)) ?></h2>
             <p class="panel-sub">Ref #<?= (int)$id ?> · <?= ui_e($typeInfo['name']) ?> · Filed <?= ui_e(date('M j, Y, g:i A', strtotime($app['created_at']))) ?>
                 · <?= $app['account_id'] === null ? 'Walk-in' : 'Online' ?></p>
             <p class="review-links">
                 <a href="<?= ui_e(ui_type_url($typeId, 'view', ['id' => $id])) ?>"><?= ui_icon('file') ?>Full record</a>
                 <?php if (($user['role'] ?? '') === 'admin'): ?>
-                    <a href="../Main_dashboard/edit_applicant.php?<?= ui_e(http_build_query(['id' => $id, 'redirect' => ui_review_url($id)])) ?>"><?= ui_icon('edit') ?>Edit details</a>
+                    <a href="../Main_dashboard/edit_applicant?<?= ui_e(http_build_query(['id' => $id, 'redirect' => ui_review_url($id)])) ?>"><?= ui_icon('edit') ?>Edit details</a>
                 <?php endif; ?>
             </p>
         </header>
@@ -238,7 +241,7 @@ function review_page_run(): void
                 <?= ui_disapprove_button($app, $typeId, ['class' => 'btn btn-danger', 'hint' => 'D']) ?>
                 <?= ui_approve_button($app, review_approve_action($typeId), $typeId, ['class' => 'btn btn-primary', 'hint' => 'A']) ?>
             <?php elseif (!$pending): ?>
-                <p class="muted">This application was already decided, so there is nothing to approve here.</p>
+                <p class="muted"><?= $app['status'] === 'Withdrawn' ? 'The applicant withdrew this application, so there is nothing to approve here.' : 'This application was already decided, so there is nothing to approve here.' ?></p>
             <?php endif; ?>
         </div>
         <p class="visually-hidden" role="status" aria-live="polite" data-review-status></p>

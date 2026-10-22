@@ -24,7 +24,7 @@ foreach ($notifications as $n) {
     $groups[$label][] = $n;
 }
 
-$kinds = ['approved' => 0, 'not_approved' => 0, 'submitted' => 0, 'eligible' => 0];   // CHANGED: 'rejected' → 'not_approved'
+$kinds = ['approved' => 0, 'not_approved' => 0, 'withdrawn' => 0, 'submitted' => 0, 'eligible' => 0];   // CHANGED: 'rejected' → 'not_approved'
 foreach ($notifications as $n) $kinds[$n['kind']] = ($kinds[$n['kind']] ?? 0) + 1;
 
 account_page_start($ctx, 'Notifications', 'notifications', [
@@ -48,6 +48,9 @@ account_page_start($ctx, 'Notifications', 'notifications', [
                 <?php endif; ?>
                 <button type="button" class="acc-chip-btn" data-notif-filter="approved">Approved <span><?= $kinds['approved'] ?></span></button>
                 <button type="button" class="acc-chip-btn" data-notif-filter="not_approved">Declined <span><?= $kinds['not_approved'] ?></span></button>
+                <?php if ($kinds['withdrawn']): ?>
+                    <button type="button" class="acc-chip-btn" data-notif-filter="withdrawn">Withdrawn <span><?= $kinds['withdrawn'] ?></span></button>
+                <?php endif; ?>
                 <button type="button" class="acc-chip-btn" data-notif-filter="submitted">Received <span><?= $kinds['submitted'] ?></span></button>
                 <?php if ($kinds['eligible']): ?>
                     <button type="button" class="acc-chip-btn" data-notif-filter="eligible">Reminders <span><?= $kinds['eligible'] ?></span></button>
@@ -76,7 +79,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
                             <a href="<?= e($n['link']) ?>" class="ap-link-btn">
                                 <?= $n['kind'] === 'eligible' ? '<i class="fas fa-file-signature"></i> Apply now' : '<i class="fas fa-eye"></i> View application' ?>
                             </a>
-                            <?php if ($n['kind'] === 'not_approved' && ($p = get_program_by_type((int)($n['type_id'] ?? 0))) && !empty($p['form_page'])): ?>
+                            <?php if (in_array($n['kind'], ['not_approved', 'withdrawn'], true) && ($p = get_program_by_type((int)($n['type_id'] ?? 0))) && !empty($p['form_page'])): ?>
                                 <a href="<?= e(str_replace(' ', '%20', $p['form_page'])) ?>" class="ap-link-btn"><i class="fas fa-redo"></i> Apply again</a>
                             <?php endif; ?>
                         </div>
@@ -94,7 +97,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
                 <i class="far fa-bell-slash"></i>
                 <h4>No notifications yet</h4>
                 <p>You'll get updates here when you apply and when the office reviews your application.</p>
-                <a href="landingpage.php#programs" class="ap-btn ap-btn-primary"><i class="fas fa-plus"></i> Start an application</a>
+                <a href="landingpage#programs" class="ap-btn ap-btn-primary"><i class="fas fa-plus"></i> Start an application</a>
             </div>
         <?php endif; ?>
     </div>

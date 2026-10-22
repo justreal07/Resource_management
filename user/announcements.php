@@ -89,7 +89,7 @@ if (!$singleId && $ready) {
 $filtered = $category !== '' || $search !== '';
 $query = function (array $change = []) use ($category, $search): string {
     $q = array_filter(array_merge(['category' => $category, 'q' => $search], $change), function ($v) { return $v !== '' && $v !== null; });
-    return 'announcements.php' . ($q ? '?' . http_build_query($q) : '');
+    return 'announcements' . ($q ? '?' . http_build_query($q) : '');
 };
 $h = 'ann_e';
 ?>
@@ -116,18 +116,13 @@ $h = 'ann_e';
             <span><i class="fas fa-landmark" aria-hidden="true"></i> Municipality of General Mariano Alvarez, Cavite</span>
             <span><i class="fas fa-phone" aria-hidden="true"></i> (046) 123-4567</span>
         </div>
-        <div class="text-size" role="group" aria-label="Text size">
-            <span class="text-size-label">Text size:</span>
-            <button type="button" data-size="100" aria-label="Normal text">A</button>
-            <button type="button" data-size="112.5" aria-label="Larger text">A</button>
-            <button type="button" data-size="125" aria-label="Largest text">A</button>
-        </div>
+        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
 <header class="site-header ann-header">
     <div class="container ann-header-inner">
-        <a href="landingpage.php" class="brand">
+        <a href="landingpage" class="brand">
             <span class="brand-logos">
                 <img src="../asset/OGLOGO.jpg" alt="LGU Logo">
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
@@ -138,14 +133,14 @@ $h = 'ann_e';
             </span>
         </a>
         <nav class="ann-nav" aria-label="Main">
-            <a href="landingpage.php">Home</a>
-            <a href="announcements.php" aria-current="page">Announcements</a>
-            <a href="feedback.php">Feedback</a>
+            <a href="landingpage">Home</a>
+            <a href="announcements" aria-current="page">Announcements</a>
+            <a href="feedback">Feedback</a>
             <?php if ($isApplicant): ?>
-                <a href="my_account.php" class="btn btn-primary btn-sm"><i class="fas fa-user" aria-hidden="true"></i> My Account</a>
+                <a href="my_account" class="btn btn-primary btn-sm"><i class="fas fa-user" aria-hidden="true"></i> My Account</a>
             <?php else: ?>
-                <a href="applicant_login.php" class="btn btn-outline btn-sm">Log in</a>
-                <a href="applicant_register.php" class="btn btn-primary btn-sm">Sign up</a>
+                <a href="applicant_login" class="btn btn-outline btn-sm">Log in</a>
+                <a href="applicant_register" class="btn btn-primary btn-sm">Sign up</a>
             <?php endif; ?>
         </nav>
     </div>
@@ -157,17 +152,17 @@ $h = 'ann_e';
 <?php if ($singleId): ?>
         <!-- ONE ANNOUNCEMENT -->
         <div class="ann-single">
-            <a class="ann-back" href="announcements.php"><i class="fas fa-arrow-left" aria-hidden="true"></i> All announcements</a>
+            <a class="ann-back" href="announcements"><i class="fas fa-arrow-left" aria-hidden="true"></i> All announcements</a>
             <?php if ($failed): ?>
                 <div class="ann-state ann-state-error" role="alert"><?= ann_icon('alert') ?>
                     <h1 class="ann-heading">Could not load this announcement.</h1>
                     <p>Try again in a moment.</p>
-                    <a class="ann-btn" href="announcements.php?id=<?= (int)$singleId ?>">Try again</a></div>
+                    <a class="ann-btn" href="announcements?id=<?= (int)$singleId ?>">Try again</a></div>
             <?php elseif ($singleMissing): ?>
                 <div class="ann-state" role="status"><?= ann_icon('info') ?>
                     <h1 class="ann-heading">This announcement is not available</h1>
                     <p>It may have ended or been taken down. See the latest announcements instead.</p>
-                    <a class="ann-btn" href="announcements.php">See all announcements</a></div>
+                    <a class="ann-btn" href="announcements">See all announcements</a></div>
             <?php else:
                 $img = ann_image_url($single['image_path']); ?>
                 <article class="ann-card<?= (int)$single['is_pinned'] === 1 ? ' is-pinned' : '' ?>" aria-labelledby="annSingleTitle">
@@ -194,7 +189,7 @@ $h = 'ann_e';
             <p class="ann-lead">Schedules, office hours, advisories and news about Medical, Burial and OPD assistance.</p>
         </div>
 
-        <form class="ann-filters" method="GET" action="announcements.php" aria-label="Filter announcements">
+        <form class="ann-filters" method="GET" action="announcements" aria-label="Filter announcements">
             <div class="ann-field">
                 <label for="annCategoryFilter">Category</label>
                 <select id="annCategoryFilter" name="category" data-auto-submit>
@@ -206,7 +201,7 @@ $h = 'ann_e';
             </div>
             <?php /* Choosing a category reloads the list at once (js/announcements.js); the button is for when JavaScript is off */ ?>
             <noscript><button type="submit" class="ann-btn">Show</button></noscript>
-            <?php if ($filtered): ?><a class="ann-btn ann-btn-ghost" href="announcements.php">Show all</a><?php endif; ?>
+            <?php if ($filtered): ?><a class="ann-btn ann-btn-ghost" href="announcements">Show all</a><?php endif; ?>
         </form>
 
         <?php if (!$ready): ?>
@@ -226,7 +221,7 @@ $h = 'ann_e';
             <div class="ann-state" role="status"><?= ann_icon('info') ?>
                 <h2>No announcements in this category</h2>
                 <p>Choose another category, or "All categories".</p>
-                <a class="ann-btn ann-btn-ghost" href="announcements.php">Show all announcements</a></div>
+                <a class="ann-btn ann-btn-ghost" href="announcements">Show all announcements</a></div>
         <?php else: ?>
             <p class="ann-result" role="status" data-ann-count data-total="<?= $total ?>">
                 Showing <span data-ann-shown><?= count($rows) ?></span> of <?= number_format($total) ?> <?= $total === 1 ? 'announcement' : 'announcements' ?><?= $filtered ? ' in this category' : '' ?>
@@ -268,7 +263,7 @@ $h = 'ann_e';
         <div class="container">
             <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>
             <span class="gold">LGU Assistance Portal</span>
-            <span><a href="privacy.php" style="color:inherit;">Data Privacy Notice</a></span>
+            <span><a href="privacy" style="color:inherit;">Data Privacy Notice</a></span>
         </div>
     </div>
 </footer>

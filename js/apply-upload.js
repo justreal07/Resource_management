@@ -1,5 +1,7 @@
 // Step 2 - photo upload for the requirements (Medical / Burial / OPD)
 // (dialogs come from js/portal-ui.js, the clarity check from js/photo-quality.js)
+// Also runs the "Change documents" page of a waiting application (form data-edit="1"): the photos already saved are
+// shown with a Remove box, new photos are added beside them, and every requirement must keep at least one photo.
 (function () {
     const form = document.getElementById('uploadForm');
     if (!form) return;
@@ -11,6 +13,7 @@
         return UI ? UI.confirm(opts) : Promise.resolve(window.confirm(opts.title + (opts.text ? '\n\n' + opts.text : '')));
     }
 
+    const EDIT = form.dataset.edit === '1';
     const MAX_BYTES = Number(form.dataset.maxBytes);
     const MAX_PHOTOS = Number(form.dataset.maxPhotos);
     const POST_MAX = Number(form.dataset.postMax);
@@ -34,6 +37,7 @@
     const progressBar = document.getElementById('progressBar');
     const submitNote = document.getElementById('submitNote');
     const submitBtn = document.getElementById('submitBtn');
+    const submitHtml = submitBtn.innerHTML;
     const overlay = document.getElementById('uploadOverlay');
 
     const docs = Array.from(form.querySelectorAll('[data-doc]')).map(function (el, index) {
@@ -50,6 +54,7 @@
             cameraRow: el.querySelector('[data-camera-row]'),
             cameraBtn: el.querySelector('[data-camera]'),
             cameraInput: el.querySelector('[data-camera-input]'),
+            saved: Array.from(el.querySelectorAll('[data-existing-photo]')),   // edit page: the photos already on the application
             files: [],
             urls: [],
             busy: false
@@ -138,6 +143,24 @@
 
     function currentFiles(doc) {
         return canManage ? doc.files : Array.from(doc.input.files);
+    }
+
+    // Edit page: the saved photos not marked for removal, and what is marked
+    function keptCount(doc) {
+        return doc.saved.filter(function (fig) { return !fig.querySelector('[data-remove]').checked; }).length;
+    }
+    function removedCount(doc) {
+        return doc.saved.length - keptCount(doc);
+    }
+    // Photos the requirement will have after saving
+    function totalCount(doc) {
+        return keptCount(doc) + currentFiles(doc).length;
+    }
+    function changeCounts() {
+        return {
+            added: docs.reduce(function (n, d) { return n + currentFiles(d).length; }, 0),
+            removed: docs.reduce(function (n, d) { return n + removedCount(d); }, 0)
+        };
     }
 
     // Phones: the camera. Everything else: the usual file picker.
@@ -290,7 +313,7 @@
             doc.thumbs.appendChild(fig);
         });
 
-        if (canManage && files.length > 0 && files.length < MAX_PHOTOS) {
+        if (canManage && files.length > 0 && totalCount(doc) < MAX_PHOTOS) {
             if (touchDevice) {
                 const cam = document.createElement('button');
                 cam.type = 'button';
@@ -310,11 +333,16 @@
         renderNotes(doc, files);
         syncQualityFields(doc, files);
 
+        // Edit page: nothing more can be added once the requirement holds the most photos it may have
+        const maxed = EDIT && totalCount(doc) >= MAX_PHOTOS;
+        doc.dropzone.hidden = maxed;
         doc.dropzone.classList.toggle('is-full', canManage && files.length > 0);
-        if (doc.cameraRow) doc.cameraRow.hidden = !touchDevice || files.length > 0;
+        if (doc.cameraRow) doc.cameraRow.hidden = !touchDevice || files.length > 0 || maxed;
+        doc.saved.forEach(function (fig) { fig.classList.toggle('is-removed', fig.querySelector('[data-remove]').checked); });
 
         const waiting = files.filter(needsDecision).length;
-        const ready = files.length > 0;
+        const total = EDIT ? totalCount(doc) : files.length;
+        const ready = total > 0;
         doc.el.classList.toggle('is-ready', ready && waiting === 0);
         doc.el.classList.toggle('has-warning', waiting > 0);
         doc.status.innerHTML = doc.busy
@@ -322,18 +350,26 @@
             : waiting > 0
                 ? '<i class="fas fa-exclamation-triangle"></i> Check photo'
                 : ready
-                    ? '<i class="fas fa-check-circle"></i> ' + files.length + ' photo' + (files.length > 1 ? 's' : '') + ' added'
+                    ? '<i class="fas fa-check-circle"></i> ' + total + ' photo' + (total > 1 ? 's' : '') + (EDIT ? '' : ' added')
                     : '<i class="far fa-clock"></i> Needed';
 
         updateProgress();
     }
 
     function updateProgress() {
-        const done = docs.filter(function (d) { return currentFiles(d).length > 0; }).length;
+        const done = docs.filter(function (d) { return (EDIT ? totalCount(d) : currentFiles(d).length) > 0; }).length;
         const waiting = allPending().length;
         progressText.textContent = done + ' of ' + docs.length;
         progressBar.style.width = (docs.length ? (done / docs.length) * 100 : 0) + '%';
-        if (done === docs.length && waiting > 0) {
+        if (EDIT && done < docs.length) {
+            submitNote.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#b7791f"></i> ';
+            submitNote.appendChild(document.createTextNode('Every requirement needs at least one photo. Add a new photo before you remove the old one.'));
+        } else if (EDIT && done === docs.length && waiting === 0) {
+            const c = changeCounts();
+            submitNote.textContent = c.added + c.removed === 0
+                ? 'Remove or add a photo, then save.'
+                : [c.added ? c.added + ' to add' : '', c.removed ? c.removed + ' to remove' : ''].filter(Boolean).join(', ') + '. Press Save when you are ready.';
+        } else if (done === docs.length && waiting > 0) {
             submitNote.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#b7791f"></i> ';
             submitNote.appendChild(document.createTextNode(waiting + ' photo' + (waiting > 1 ? 's' : '') + ' may be hard to read. Retake ' + (waiting > 1 ? 'them' : 'it') + ' or choose “Use anyway”.'));
         } else if (done === docs.length) {
@@ -354,7 +390,7 @@
                 problems.push('"' + file.name + '" is not a photo. Only JPG, PNG or WEBP images are accepted — PDF, Word and other files are not allowed.');
                 continue;
             }
-            if (doc.files.length >= MAX_PHOTOS) {
+            if (keptCount(doc) + doc.files.length >= MAX_PHOTOS) {
                 problems.push('You can add up to ' + MAX_PHOTOS + ' photos for this requirement.');
                 break;
             }
@@ -385,6 +421,12 @@
             if (title) title.textContent = 'Choose from your gallery';
             if (hint) hint.textContent = 'JPG, PNG or WEBP · up to ' + MAX_PHOTOS + ' photos';
         }
+        doc.saved.forEach(function (fig) {
+            fig.querySelector('[data-remove]').addEventListener('change', function () {
+                showError(doc, '');
+                render(doc);
+            });
+        });
         if (doc.cameraBtn && doc.cameraInput) {
             doc.cameraBtn.addEventListener('click', function () { doc.cameraInput.click(); });
             doc.cameraInput.addEventListener('change', function () {
@@ -444,8 +486,12 @@
         const summary = document.createElement('div');
         summary.className = 'pui-dialog-summary';
         const photos = photoCount();
-        [['Program', form.dataset.program || ''], ['Requirements', docs.length + ' of ' + docs.length + ' added'],
-         ['Photos', photos + ' photo' + (photos === 1 ? '' : 's')]].forEach(function (row) {
+        const c = changeCounts();
+        const rows = EDIT
+            ? [['Program', form.dataset.program || ''], ['Photos to add', String(c.added)], ['Photos to remove', String(c.removed)]]
+            : [['Program', form.dataset.program || ''], ['Requirements', docs.length + ' of ' + docs.length + ' added'],
+               ['Photos', photos + ' photo' + (photos === 1 ? '' : 's')]];
+        rows.forEach(function (row) {
             if (!row[1]) return;
             const line = document.createElement('div');
             const label = document.createElement('span');
@@ -473,16 +519,22 @@
         }
 
         const note = document.createElement('p');
-        note.textContent = hard.length
-            ? "Photos the office can't read may delay or stop your application. You can't change your answers or photos after you submit."
-            : "Please make sure every photo is clear and easy to read. You can't change your answers or photos after you submit.";
+        if (EDIT) {
+            note.textContent = hard.length
+                ? "Photos the office can't read may delay or stop your application. Removed photos are deleted. The office will see that you changed the documents."
+                : 'Removed photos are deleted. The office will see that you changed the documents, and your application keeps its place in the line.';
+        } else {
+            note.textContent = hard.length
+                ? "Photos the office can't read may delay or stop your application. You can't change your answers or photos after you submit."
+                : "Please make sure every photo is clear and easy to read. You can't change your answers or photos after you submit.";
+        }
         box.appendChild(note);
 
         return UI.confirm({
-            title: hard.length ? 'Send photos that may be hard to read?' : 'Submit your application?',
+            title: hard.length ? 'Send photos that may be hard to read?' : (EDIT ? 'Save your documents?' : 'Submit your application?'),
             content: box,
             icon: hard.length ? 'warning' : 'question',
-            confirmText: hard.length ? 'Submit anyway' : 'Submit application',
+            confirmText: hard.length ? (EDIT ? 'Save anyway' : 'Submit anyway') : (EDIT ? 'Save documents' : 'Submit application'),
             cancelText: hard.length ? 'Retake photos' : 'Review again'
         });
     }
@@ -490,7 +542,7 @@
     function showSending() {
         allowLeave = true;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting…';
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (EDIT ? 'Saving…' : 'Submitting…');
         overlay.classList.add('show');
     }
 
@@ -502,11 +554,21 @@
         e.preventDefault();
         if (docs.some(function (d) { return d.busy; })) return;
 
-        const missing = docs.filter(function (d) { return currentFiles(d).length === 0; });
+        const missing = docs.filter(function (d) { return (EDIT ? totalCount(d) : currentFiles(d).length) === 0; });
         if (missing.length) {
-            missing.forEach(function (d) { showError(d, 'Please add a photo of this document.'); });
+            missing.forEach(function (d) {
+                showError(d, EDIT ? 'This requirement needs at least one photo. Add a new photo, or keep the saved one.' : 'Please add a photo of this document.');
+            });
             missing[0].el.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
+        }
+
+        if (EDIT) {
+            const c = changeCounts();
+            if (c.added + c.removed === 0) {
+                submitNote.textContent = 'Nothing has changed yet. Remove a photo or add a new one first.';
+                return;
+            }
         }
 
         const total = docs.reduce(function (sum, d) {
@@ -545,7 +607,8 @@
 
     /* ---------- Leaving with photos added: ask first (the photos would be lost) ---------- */
     window.addEventListener('beforeunload', function (e) {
-        if (!allowLeave && photoCount() > 0) {
+        const c = changeCounts();
+        if (!allowLeave && (EDIT ? c.added + c.removed > 0 : photoCount() > 0)) {
             e.preventDefault();
             e.returnValue = '';
         }
@@ -575,7 +638,7 @@
         allowLeave = false;
         overlay.classList.remove('show');
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Application';
+        submitBtn.innerHTML = submitHtml;
     });
 
     docs.forEach(render);

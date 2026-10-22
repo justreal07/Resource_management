@@ -11,11 +11,11 @@ require_once '../includes/avatar.php';
 
 $user = decision_user();
 if ($user === null) {
-    header('Location: ../login/login.php');
+    header('Location: ../login/login');
     exit;
 }
 // Back to the person's own page
-$back = $user['role'] === 'admin' ? 'admin_settings.php' : '../staff/my_account.php';
+$back = $user['role'] === 'admin' ? 'admin_settings' : '../staff/my_account';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . $back);

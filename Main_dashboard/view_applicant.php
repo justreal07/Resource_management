@@ -6,7 +6,7 @@ require_once '../includes/admin_layout.php';
 $applicant_id = isset($_GET['applicant_id']) ? (int)$_GET['applicant_id'] : 0;
 
 if ($applicant_id <= 0) {
-    header("Location: dashboard.php");
+    header("Location: dashboard");
     exit();
 }
 
@@ -21,7 +21,7 @@ $stmt->execute([$applicant_id]);
 $applicant = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$applicant) {
-    header("Location: dashboard.php");
+    header("Location: dashboard");
     exit();
 }
 
@@ -34,7 +34,7 @@ $docStmt = $pdo->prepare("
 $docStmt->execute([$applicant_id]);
 $documents = $docStmt->fetchAll(PDO::FETCH_ASSOC);
 
-[$backHref, $backLabel] = ui_back_link('dashboard.php', 'Back to the dashboard');
+[$backHref, $backLabel] = ui_back_link('dashboard', 'Back to the dashboard');
 admin_layout_start(['title' => 'Applicant record', 'section' => 'dashboard']);
 echo ui_applicant_record($applicant, $documents, $backHref, $backLabel);
 admin_layout_end();

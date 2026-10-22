@@ -1,7 +1,7 @@
 <?php
 // Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
 if (!defined('REPORT_ENGINE')) {
-    header('Location: reports.php?report=medical');
+    header('Location: reports?report=medical');
     exit;
 }
 // Medical (program 1) and Burial (program 2) reports. They give money and have the same columns, so one builder serves both.
@@ -41,11 +41,14 @@ function report_build_program(PDO $pdo, array $f, int $typeId): array
     foreach ($approved as $a) {
         [$claimantName, $claimantAge, $relationship] = report_claimant($a);
         $dates = [ui_date($a['created_at']), report_date_or_none($a['approved_at'] ?? '')];
-        $contact = [report_text($a['contact_number'] ?? ''), report_text(ui_address($a, true)), report_text($a['purpose'] ?? ''), report_peso_or_none($a)];
+        $contact = [report_text($a['contact_number'] ?? ''), report_text(ui_address($a, true))];
         if ($typeId === 1) {
-            $rows[] = array_merge($dates, [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), $claimantName, $claimantAge, $relationship], $contact);
+            // Medical also gives what the assistance is for; Burial has no purpose
+            $rows[] = array_merge($dates, [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), $claimantName, $claimantAge, $relationship],
+                $contact, [report_text($a['purpose'] ?? ''), report_peso_or_none($a)]);
         } else {
-            $rows[] = array_merge($dates, [report_text($a['petitioner_name'] ?? ''), $claimantName, $claimantAge, report_text($a['sex'] ?? ''), $relationship], $contact);
+            $rows[] = array_merge($dates, [report_text($a['petitioner_name'] ?? ''), $claimantName, $claimantAge, report_text($a['sex'] ?? ''), $relationship],
+                $contact, [report_peso_or_none($a)]);
         }
     }
     if ($typeId === 1) {
@@ -55,8 +58,8 @@ function report_build_program(PDO $pdo, array $f, int $typeId): array
         $note = 'The claimant is the person who applied for the patient and collects the assistance. When the patient applied for themself there is no separate claimant: the patient collects it, so the claimant columns show a dash.';
     } else {
         $head = ['Date filed', 'Date approved', 'Deceased', 'Claimant', "Claimant's age", "Claimant's sex", 'Relationship to the deceased',
-                 'Contact', 'Address', 'Purpose', 'Amount released'];
-        $numCols = [4, 10];
+                 'Contact', 'Address', 'Amount released'];
+        $numCols = [4, 9];
         $note = 'The claimant is the person who applied and collects the assistance; the deceased is the person the assistance is for.';
     }
 

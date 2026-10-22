@@ -1,7 +1,7 @@
 <?php
 // Opened by its own address (not inside reports.php, which checks the sign-in and the filters): go to reports.php.
 if (!defined('REPORT_ENGINE')) {
-    header('Location: reports.php?report=opd');
+    header('Location: reports?report=opd');
     exit;
 }
 // OPD (Outpatient Diagnosis, program 3): the vehicle schedule. Built by report_build() (includes/report_data.php).
@@ -21,9 +21,6 @@ function report_build_opd(PDO $pdo, array $f): array
                            ORDER BY a.checkup_date ASC, a.id ASC");
     $stmt->execute([$f['start'], $f['end_excl']]);
     $trips = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    usort($trips, function ($x, $y) {   // same day: the earlier departure first (claim_time is there once approvals record it)
-        return strcmp(($x['checkup_date'] ?? '') . ' ' . ($x['claim_time'] ?? ''), ($y['checkup_date'] ?? '') . ' ' . ($y['claim_time'] ?? ''));
-    });
     [$tripCounts] = report_series($b, $trips);
 
     $wheelchair = $stretcher = 0;
@@ -39,7 +36,7 @@ function report_build_opd(PDO $pdo, array $f): array
         ['label' => 'Need a stretcher', 'value' => number_format($stretcher), 'icon' => 'user', 'note' => 'Among the approved'],
     ];
 
-    // The approved requests counted by one answer (hospital, diagnosis): "Rizal Hospital" and "rizal hospital" are one place
+    // The approved requests counted by one answer (hospital, reason for the check-up): "Rizal Hospital" and "rizal hospital" are one place
     $countBy = function (string $field) use ($approved): array {
         $n = [];
         $label = [];
@@ -74,9 +71,9 @@ function report_build_opd(PDO $pdo, array $f): array
     $hospitals = $countBy('hospital');
     $charts[] = ui_chart_card('Approved requests by hospital', report_sub($f),
         $hospitals ? ui_bar_list($top($hospitals, 'All other hospitals'), $countFmt) . $twin($hospitals, 'Hospital') : '', 'No hospitals recorded in this period.');
-    $diagnoses = $countBy('diagnosis');
-    $charts[] = ui_chart_card('Top 10 diagnoses', report_sub($f, 'approved requests'),
-        $diagnoses ? ui_bar_list(array_slice($diagnoses, 0, 10), $countFmt) . $twin($diagnoses, 'Diagnosis') : '', 'No diagnoses recorded in this period.');
+    $reasons = $countBy('checkup_reason');
+    $charts[] = ui_chart_card('Top 10 reasons for check-up', report_sub($f, 'approved requests'),
+        $reasons ? ui_bar_list(array_slice($reasons, 0, 10), $countFmt) . $twin($reasons, 'Reason for check-up') : '', 'No reasons recorded in this period.');
     $who = report_who_parts($approved, 'patients', $f);
     $charts = array_merge($charts, $who['charts']);
 
@@ -90,16 +87,13 @@ function report_build_opd(PDO $pdo, array $f): array
     // Trip schedule: what the driver and the dispatcher need
     $tripRows = [];
     foreach ($trips as $a) {
-        $time = trim((string)($a['claim_time'] ?? ''));
         $tripRows[] = [
             ui_date($a['checkup_date']),
-            $time !== '' ? date('g:i A', strtotime($time)) : 'Not set',   // not set = approved before departure times were recorded
-            report_text($a['claim_place'] ?? '', 'Not set'),
             ui_person_name($a),
             report_list_age($a),
             report_text($a['sex'] ?? ''),
             report_text($a['hospital'] ?? ''),
-            report_text($a['diagnosis'] ?? ''),
+            report_text($a['checkup_reason'] ?? ''),
             ui_opd_companion($a),
             $needs($a),
             report_text($a['contact_number'] ?? ''),
@@ -116,7 +110,7 @@ function report_build_opd(PDO $pdo, array $f): array
             report_list_age($a),
             report_text($a['sex'] ?? ''),
             report_text($a['hospital'] ?? ''),
-            report_text($a['diagnosis'] ?? ''),
+            report_text($a['checkup_reason'] ?? ''),
             !empty($a['checkup_date']) ? ui_date($a['checkup_date']) : 'Not scheduled',
             // The companion is optional: "No companion" when the patient goes alone
             $hasCompanion ? $a['petitioner_name'] : 'No companion',
@@ -129,10 +123,10 @@ function report_build_opd(PDO $pdo, array $f): array
     $tables = [
         report_table('Trip schedule', 'Trip schedule (' . count($tripRows) . ')',
             'Approved requests whose check-up date is in ' . $f['label'] . ', soonest first. The vehicle leaves on the check-up date.',
-            ['Trip date', 'Departure', 'Pick-up point', 'Patient', 'Age', 'Sex', 'Hospital', 'Diagnosis', 'Companion', 'Transport needs', 'Contact'],
-            $tripRows, [4], null, 'No check-ups are scheduled in this period.'),
+            ['Trip date', 'Patient', 'Age', 'Sex', 'Hospital', 'Reason for check-up', 'Companion', 'Transport needs', 'Contact'],
+            $tripRows, [2], null, 'No check-ups are scheduled in this period.'),
         report_table('Approved OPD requests', 'Approved OPD requests (' . count($rows) . ')', report_sub($f, 'by date approved'),
-            ['Date filed', 'Date approved', 'Patient', 'Age', 'Sex', 'Hospital', 'Diagnosis', 'Check-up date', 'Accompanied by', 'Relationship', 'Contact', 'Address'],
+            ['Date filed', 'Date approved', 'Patient', 'Age', 'Sex', 'Hospital', 'Reason for check-up', 'Check-up date', 'Accompanied by', 'Relationship', 'Contact', 'Address'],
             $rows, [3], ['Total approved OPD requests', number_format(count($rows))], 'No approved OPD requests in this period.'),
         report_processing_table($pdo, $f, 3),
         report_series_table($f, $b, $counts, $amounts, 'Approved OPD requests', false),

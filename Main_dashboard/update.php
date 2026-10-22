@@ -6,7 +6,7 @@ $id = isset($_GET['id']) ? $_GET['id'] : (isset($_GET['applicant_id']) ? $_GET['
 
 if(!$id){
     admin_layout_start(['title' => 'Update application', 'section' => 'dashboard']);
-    echo ui_state('alert', 'No application was chosen', 'Open an application from the dashboard.', '<a class="btn btn-secondary btn-sm" href="dashboard.php">Go to the dashboard</a>', 'state-error');
+    echo ui_state('alert', 'No application was chosen', 'Open an application from the dashboard.', '<a class="btn btn-secondary btn-sm" href="dashboard">Go to the dashboard</a>', 'state-error');
     admin_layout_end();
     exit();
 }
@@ -17,7 +17,7 @@ $row = $applicant->fetch();
 
 if(!$row){
     admin_layout_start(['title' => 'Update application', 'section' => 'dashboard']);
-    echo ui_state('alert', 'Application not found', 'It may have been removed. Check the reference number.', '<a class="btn btn-secondary btn-sm" href="dashboard.php">Go to the dashboard</a>', 'state-error');
+    echo ui_state('alert', 'Application not found', 'It may have been removed. Check the reference number.', '<a class="btn btn-secondary btn-sm" href="dashboard">Go to the dashboard</a>', 'state-error');
     admin_layout_end();
     exit();
 }
@@ -29,7 +29,7 @@ if(!$row){
 if($_SERVER['REQUEST_METHOD'] == 'POST'){
     $result = decision_save_update_form($pdo, $row);
     $_SESSION[$result['ok'] ? 'success_message' : 'error_message'] = $result['message'];
-    header('Location: ' . ($result['ok'] ? 'dashboard.php' : 'update.php?id=' . (int)$row['id']));
+    header('Location: ' . ($result['ok'] ? 'dashboard' : 'update?id=' . (int)$row['id']));
     exit();
 }
 
@@ -38,5 +38,5 @@ $type->execute([$row['assistance_type_id']]);
 $type_name = $type->fetchColumn();
 
 admin_layout_start(['title' => 'Update application', 'section' => 'dashboard']);
-echo ui_status_update_form($row, $type_name ?: 'Not specified', 'dashboard.php');
+echo ui_status_update_form($row, $type_name ?: 'Not specified', 'dashboard');
 admin_layout_end();
