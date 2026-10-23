@@ -4,8 +4,9 @@
  *   search.php?q=maria cruz     every word must be in the applicant's, claimant's or deceased's name
  *   search.php?q=#12  or  12    reference number 12
  *   search.php?q=0917123        (6+ digits) a contact number
- * Read-only JSON, at most 8 results. Same visibility as the lists: an admin finds every program, OPD staff only OPD
- * (and are sent to the staff pages). A waiting application opens in the review page, any other in its record.
+ * Read-only JSON, at most 8 results. Same visibility as the lists: an admin finds every program, OPD staff only OPD,
+ * Medical & Burial staff only Medical/Burial (and are sent to the staff pages). A waiting application a role may
+ * decide opens in the review page, any other (or one it may only view) in its record.
  * Disapproved and Withdrawn ones are found too (marked as such): they are off the lists, but someone may ask about them.
  */
 require_once '../config.php';
@@ -23,7 +24,7 @@ if ($user === null) {
     echo json_encode(['ok' => false, 'signedOut' => true]);
     exit;
 }
-if ($user['role'] === 'staff') {
+if (in_array($user['role'], ['staff', 'aid_staff'], true)) {
     define('UI_AREA', 'staff');   // links into staff/ pages
 }
 require_once '../includes/admin_components.php';
@@ -35,7 +36,7 @@ if ($q === '') {
     exit;
 }
 
-$types = array_values(array_filter([1, 2, 3], function ($t) use ($user) { return decision_can($user, $t); }));
+$types = array_values(array_filter([1, 2, 3], function ($t) use ($user) { return staff_can_view($user, $t); }));
 $where = ['a.assistance_type_id IN (' . implode(',', array_fill(0, count($types), '?')) . ')'];
 $params = $types;
 
@@ -70,6 +71,7 @@ $results = [];
 foreach ($rows as $r) {
     $type = (int)$r['assistance_type_id'];
     $waiting = $r['status'] === 'Pending';
+    $canDecideThis = $waiting && decision_can($user, $type);   // may actually approve/decline this one, not just view it
     $sub = [$typesInfo[$type]['short'], $waiting ? 'Waiting for review' : ($r['status'] === 'Disapproved' ? 'Declined' : $r['status']), 'Ref #' . (int)$r['id']];
     // The name in petitioner_name depends on the program: Burial = the deceased, Medical = the claimant (unless the patient
     // filed for themself), OPD = who goes along. Shown because a search can match it, and the row would not say why.
@@ -86,8 +88,8 @@ foreach ($rows as $r) {
         'type'   => $type,
         'status' => $r['status'],
         'icon'   => $typesInfo[$type]['icon'],
-        'action' => $waiting ? 'Review' : 'View',
-        'href'   => $waiting ? ui_review_url((int)$r['id']) : ui_type_url($type, 'view', ['id' => (int)$r['id']]),
+        'action' => $canDecideThis ? 'Review' : 'View',
+        'href'   => $canDecideThis ? ui_review_url((int)$r['id']) : ui_type_url($type, 'view', ['id' => (int)$r['id']]),
     ];
 }
 echo json_encode(['ok' => true, 'q' => $q, 'results' => $results], JSON_UNESCAPED_UNICODE);

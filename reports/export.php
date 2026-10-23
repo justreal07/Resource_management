@@ -10,7 +10,9 @@
  * (includes/report_data.php), so the file always agrees with the page. Only the tables of applicants and their totals are
  * written: the figures behind the charts (per week, by sex ...) and the decision-time table are left out (export => false).
  *
- * Who: an admin (Reports is an admin page). Nothing is changed in the database; the download goes to the activity log.
+ * Who: an admin, any report (Reports is an admin page); Medical & Burial staff, the Medical/Burial tabs only, with
+ * every money figure left out (staff/aid_staff_report.php links here the same way reports.php does).
+ * Nothing is changed in the database; the download goes to the activity log.
  */
 require_once '../config.php';
 require_once '../includes/application_decision.php';
@@ -23,7 +25,7 @@ if ($user === null) {
     header('Location: ../login/login');
     exit;
 }
-if ($user['role'] !== 'admin') {
+if ($user['role'] !== 'admin' && $user['role'] !== 'aid_staff') {
     http_response_code(403);
     exit('Only an administrator can download reports.');
 }
@@ -33,7 +35,12 @@ decision_claim_ensure($pdo);   // the approval details columns
 budget_ensure($pdo);
 
 $f = report_filters($_GET);
-$model = report_build($pdo, $f);
+$hideAmounts = $user['role'] === 'aid_staff';
+if ($hideAmounts && !in_array($f['report'], ['medical', 'burial'], true)) {
+    http_response_code(403);
+    exit('Medical & Burial staff can only download the Medical and Burial reports.');
+}
+$model = report_build($pdo, $f, $hideAmounts);
 if (!empty($model['error'])) {
     http_response_code(500);
     exit('The report could not be made. Please try again, and tell the system administrator if it keeps happening.');

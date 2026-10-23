@@ -3,7 +3,8 @@
  * Side-by-side review of one application: its photos on the left, its details on the right, and Approve /
  * Disapprove in a bar at the bottom. Keys: J next, K previous, A approve, D disapprove (js/admin_review.js).
  *
- * Opened by Main_dashboard/review.php (admin: every program) and staff/review.php (staff side: OPD).
+ * Opened by Main_dashboard/review.php (admin: every program) and staff/review.php (staff side: OPD staff see
+ * OPD, Medical & Burial staff see Medical/Burial, read-only since they may never decide one).
  *   review.php?id=12            that application (a decided one is shown read-only)
  *   review.php?type=2           the first application waiting in program 2
  *   review.php?id=12&advance=1  where a decision comes back to: moves on to the next waiting application
@@ -55,9 +56,10 @@ function review_page_run(): void
     global $pdo;
     $user = decision_user();
     $staffSide = ui_area() === 'staff';
-    // The programs this person may review here: an admin all of them (OPD only on the staff side), staff OPD
-    $types = array_values(array_filter([1, 2, 3], function ($t) use ($user, $staffSide) {
-        return decision_can($user, $t) && (!$staffSide || $t === 3);
+    // The programs this person may even open here (view OR decide): an admin all of them, OPD staff OPD only,
+    // Medical & Burial staff Medical/Burial only. Whether a Pending one shows the decision bar is $canDecide below.
+    $types = array_values(array_filter([1, 2, 3], function ($t) use ($user) {
+        return staff_can_view($user, $t);
     }));
     $firstType = $types[0] ?? 3;
     $pendingList = ui_type_url($firstType, 'pending');
@@ -117,7 +119,7 @@ function review_page_run(): void
     admin_layout_start([
         'title'   => 'Review',
         'heading' => 'Review ' . $typeInfo['short'],
-        'section' => $staffSide ? 'pending' : $typeInfo['key'],
+        'section' => $staffSide && $typeId === 3 ? 'pending' : $typeInfo['key'],
     ]);
     ?>
 <div class="review" data-review

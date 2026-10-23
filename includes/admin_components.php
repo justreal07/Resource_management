@@ -31,16 +31,21 @@ function ui_types(): array
     return [
         1 => ['key' => 'medical', 'name' => 'Medical Assistance', 'short' => 'Medical', 'icon' => 'medical', 'dir' => 'medical',
               'pages' => ['overview' => 'medical_assistance_dashboard', 'all' => 'listmedical', 'pending' => 'Mpending',
-                          'approved' => 'medicalapproved', 'disapproved' => 'medical_disapproved', 'withdrawn' => 'medical_withdrawn', 'view' => 'view_medical_applicants']],
+                          'approved' => 'medicalapproved', 'disapproved' => 'medical_disapproved', 'withdrawn' => 'medical_withdrawn', 'view' => 'view_medical_applicants'],
+              // The Medical & Burial staff side (staff/) has its own copy of each list/view/update page (no overview: they share one dashboard)
+              'staff_pages' => ['all' => 'listmedical', 'pending' => 'Mpending', 'approved' => 'medicalapproved',
+                                'disapproved' => 'medicaldisapproved', 'withdrawn' => 'medicalwithdrawn', 'view' => 'view_medical_applicant', 'update' => 'Mupdate']],
         2 => ['key' => 'burial', 'name' => 'Burial Assistance', 'short' => 'Burial', 'icon' => 'burial', 'dir' => 'burial',
               'pages' => ['overview' => 'burial_assistance_dashboard', 'all' => 'listburial', 'pending' => 'Bpending',
-                          'approved' => 'burialapproved', 'disapproved' => 'burial_disapproved', 'withdrawn' => 'burial_withdrawn', 'view' => 'view_burial_applicant']],
+                          'approved' => 'burialapproved', 'disapproved' => 'burial_disapproved', 'withdrawn' => 'burial_withdrawn', 'view' => 'view_burial_applicant'],
+              'staff_pages' => ['all' => 'listburial', 'pending' => 'Bpending', 'approved' => 'burialapproved',
+                                'disapproved' => 'burialdisapproved', 'withdrawn' => 'burialwithdrawn', 'view' => 'view_burial_applicant', 'update' => 'Bupdate']],
         3 => ['key' => 'opd', 'name' => 'Outpatient Diagnosis', 'short' => 'OPD', 'icon' => 'van', 'dir' => 'opd',
               'pages' => ['overview' => 'opd_dashboard', 'all' => 'listopd', 'pending' => 'opd_pending',
                           'approved' => 'opdapproved', 'disapproved' => 'opd_disapproved', 'withdrawn' => 'opd_withdrawn', 'view' => 'view_opd_applicant'],
               // The OPD staff side (staff/) has its own copy of each page
               'staff_pages' => ['overview' => 'staff_dashboard', 'all' => 'listopd', 'pending' => 'staffpen',
-                                'approved' => 'opdapproved', 'disapproved' => 'opddisapproved', 'withdrawn' => 'opdwithdrawn', 'view' => 'view_opd_applicant']],
+                                'approved' => 'opdapproved', 'disapproved' => 'opddisapproved', 'withdrawn' => 'opdwithdrawn', 'view' => 'view_opd_applicant', 'update' => 'Opdupdate']],
     ];
 }
 
@@ -96,6 +101,39 @@ function ui_status_cell(array $row): string
         $html .= ' <span class="badge badge-edited" title="The applicant changed this application on ' . ui_e(ui_date($row['edited_at'], 'M j, Y, g:i A')) . '">' . ui_icon('info') . 'Edited</span>';
     }
     return $html;
+}
+
+/** The Pending list's Source column: "Online", or "Walk-in · <name>" who encoded it (applicant.account_id / encoded_by). */
+function ui_source_cell(array $row): string
+{
+    if (array_key_exists('account_id', $row) && $row['account_id'] !== null) return 'Online';
+    $name = trim((string)($row['encoded_by_name'] ?? ''));
+    return 'Walk-in' . ($name !== '' ? ' · ' . ui_e($name) : '');
+}
+
+/** The Source filter on a Pending list (?source=online|walkin): which one is chosen, or null for both. */
+function ui_source_query(): ?string
+{
+    $q = $_GET['source'] ?? '';
+    return in_array($q, ['online', 'walkin'], true) ? $q : null;
+}
+
+/** The Source filter control itself, placed above a Pending list's table. Keeps the name search (?name=) if one is active. */
+function ui_source_filter(): string
+{
+    $current = ui_source_query();
+    $nameQ = ui_name_query();
+    $html = '<form class="source-filter" method="GET" action="' . ui_e(ui_current_page()) . '" data-busy>';
+    if ($nameQ !== '') $html .= '<input type="hidden" name="name" value="' . ui_e($nameQ) . '">';
+    $html .= '<label for="sourceFilter">Source</label><select name="source" id="sourceFilter">'
+        . '<option value=""' . ($current === null ? ' selected' : '') . '>All sources</option>'
+        . '<option value="online"' . ($current === 'online' ? ' selected' : '') . '>Online</option>'
+        . '<option value="walkin"' . ($current === 'walkin' ? ' selected' : '') . '>Walk-in</option>'
+        . '</select><button type="submit" class="btn btn-secondary btn-sm">Filter</button>';
+    if ($current !== null) {
+        $html .= ' <a class="btn btn-link btn-sm" href="' . ui_e(ui_current_page() . ($nameQ !== '' ? '?name=' . rawurlencode($nameQ) : '')) . '">Clear</a>';
+    }
+    return $html . '</form>';
 }
 
 function ui_badge(?string $status): string
@@ -336,10 +374,12 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved', 'withdrawn' => 'Withdrawn'][$current] ?? null;
     if ($exportStatus === null) return $nameBar . $tabsHtml;
     $label = $exportStatus === 'all' ? 'all applications' : ($exportStatus === 'Disapproved' ? 'declined' : strtolower($exportStatus)) . ' applications';
-    // Admins: "Add walk-in" for THIS program. It opens the walk-in window on this very page with the program already
-    // chosen (admin_layout_end() adds the window, the form templates and js/admin_dashboard.js when this flag is set).
+    // Admins (every program) and Medical & Burial staff (Medical/Burial only): "Add walk-in" for THIS program. It opens
+    // the walk-in window on this very page with the program already chosen (admin_layout_end() adds the window, the
+    // form templates and js/admin_dashboard.js when this flag is set).
     $walkIn = '';
-    if (($_SESSION['user']['role'] ?? '') === 'admin') {
+    $walkInRole = $_SESSION['user']['role'] ?? '';
+    if ($walkInRole === 'admin' || ($walkInRole === 'aid_staff' && ($typeId === 1 || $typeId === 2))) {
         $GLOBALS['ui_walkin_on_page'] = true;
         $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
             . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
@@ -363,6 +403,8 @@ function ui_tabs(array $items, string $current, string $ariaLabel): string
 
 /**
  * Number cards that link to a list. Each card: label, value, href, optional status (for its badge icon).
+ * $c['live']: a key of live_counts.php's JSON (e.g. 'total_1'); js/admin_live.js then keeps the number up to
+ * date without a reload, the same way the dashboard's own cards already do (data-live).
  */
 function ui_stat_cards(array $cards): string
 {
@@ -370,7 +412,7 @@ function ui_stat_cards(array $cards): string
     foreach ($cards as $c) {
         $s = isset($c['status']) ? (ui_statuses()[$c['status']] ?? null) : null;
         $label = ($s ? ui_icon($s['icon']) : ui_icon($c['icon'] ?? 'inbox')) . ui_e($c['label']);
-        $inner = '<span class="stat-label">' . $label . '</span><span class="stat-value">' . ui_e($c['value']) . '</span>'
+        $inner = '<span class="stat-label">' . $label . '</span><span class="stat-value"' . (!empty($c['live']) ? ' data-live="' . ui_e($c['live']) . '"' : '') . '>' . ui_e($c['value']) . '</span>'
             . (!empty($c['note']) ? '<span class="stat-note">' . ui_e($c['note']) . '</span>' : '');
         $cls = 'stat-card' . ($s ? ' stat-' . $s['class'] : '');
         $html .= '<li>' . (!empty($c['href'])
@@ -565,10 +607,11 @@ function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPag
     return $html;
 }
 
-/** Staff side: the Update button (status and remarks, staff/Opdupdate.php). Staff use it where admins have Edit. */
-function ui_staff_update_link(array $row): string
+/** Staff side: the Update button (status and remarks). Staff use it where admins have Edit. Only shown to a role
+ *  that may decide this program (OPD staff; never Medical & Burial staff, who only encode and view). */
+function ui_staff_update_link(int $typeId, array $row): string
 {
-    return '<a class="btn btn-secondary btn-sm" href="../staff/Opdupdate?' . ui_e(http_build_query(['id' => (int)$row['id']])) . '">'
+    return '<a class="btn btn-secondary btn-sm" href="' . ui_e(ui_type_url($typeId, 'update', ['id' => (int)$row['id']])) . '">'
         . ui_icon('edit') . 'Update<span class="visually-hidden"> ' . ui_e(ui_person_name($row)) . ', Ref #' . (int)$row['id'] . '</span></a>';
 }
 
@@ -642,7 +685,15 @@ function ui_claim_fields(int $typeId, string $idPrefix, bool $required = true, a
             . ' data-claim="time" data-claim-msg="Choose the time the applicant will claim the assistance."></div>'
             . '</div>'
             // What is left of this year's budget, and the reason box that appears when the amount would pass it
-            . ui_budget_note($GLOBALS['pdo'], $typeId, $idPrefix);
+            . ui_budget_note($GLOBALS['pdo'], $typeId, $idPrefix)
+            // A past paper record Medical & Burial staff encoded as Pending: the admin backdates the approval date
+            // instead of using today's (decision_backdated_approved_at()), and no approval email is sent for it.
+            // Walk-ins only, so a live online applicant's email is never skipped by mistake: the Update page knows
+            // from $row; the Approve dialog has no row of its own (one dialog, reused per click), so it starts
+            // hidden and admin_ui.js reveals it from the same data-walkin the "no email" notice already uses.
+            . '<div data-backdated-field' . ((array_key_exists('account_id', $row) && $row['account_id'] === null) ? '' : ' hidden') . '><div class="field"><label for="' . $f('backdated') . '">Already approved on paper? <span class="muted">(optional)</span></label>'
+            . '<input type="date" id="' . $f('backdated') . '" name="backdated_approved_at" max="' . date('Y-m-d') . '" aria-describedby="' . $f('backdatedHelp') . '"></div>'
+            . '<p class="field-help" id="' . $f('backdatedHelp') . '">For an old paper record that was already approved: saved as the approval date (so Reports count it in the right period), and no approval email is sent. Leave blank for a normal approval today.</p></div>';
     }
     $requirements = ui_claim_requirements_text($typeId);
     return $html
@@ -1363,7 +1414,11 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         // At a glance: what the office looks at first
         . '<dl class="record-facts">'
         . ui_detail('Filed on', date('M j, Y, g:i A', $filed))
-        . ui_detail('Filed by', array_key_exists('account_id', $a) ? ($a['account_id'] === null ? 'Walk-in, added by the office' : 'Applicant, online') : '')
+        . ui_detail('Filed by', array_key_exists('account_id', $a)
+            ? ($a['account_id'] === null
+                ? 'Walk-in' . (!empty($a['encoded_by']) ? ', encoded by ' . ui_user_name((int)$a['encoded_by']) : ', added by the office')
+                : 'Applicant, online')
+            : '')
         . ui_detail('Contact number', $a['contact_number'] ?? '')
         . ui_detail('Documents', count($documents) === 1 ? '1 uploaded' : count($documents) . ' uploaded')
         . ($has('edited_at') ? ui_detail('Edited by applicant', ui_date($a['edited_at'], 'M j, Y, g:i A')) : '')

@@ -58,10 +58,25 @@ const CLAIM_NOTE_MAX = 1000;
    WHO MAY DECIDE
    ============================================================ */
 
-/** Roles that may approve or disapprove an application of this program. */
+/** Roles that may approve or disapprove an application of this program. Medical & Burial staff (aid_staff) encode
+ *  applications but never decide one: an admin always approves or declines Medical and Burial. */
 function decision_roles(int $typeId): array
 {
     return $typeId === 3 ? ['admin', 'staff'] : ['admin'];
+}
+
+/**
+ * Roles that may merely VIEW (lists, record, read-only review, search, live counts) an application of this
+ * program, whether or not they may decide it. Wider than decision_roles(): an aid_staff account views every
+ * Medical/Burial application including ones already decided, but can never approve or disapprove one.
+ */
+function staff_can_view(?array $user, int $typeId): bool
+{
+    if ($user === null) return false;
+    if ($user['role'] === 'admin') return true;
+    if ($user['role'] === 'staff') return $typeId === 3;
+    if ($user['role'] === 'aid_staff') return $typeId === 1 || $typeId === 2;
+    return false;
 }
 
 /**
@@ -113,7 +128,7 @@ function decision_user(): ?array
     if (!is_array($u)) return null;
     $id = (int)($u['id'] ?? 0);
     $role = (string)($u['role'] ?? '');
-    if ($id <= 0 || !in_array($role, ['admin', 'staff'], true)) return null;
+    if ($id <= 0 || !in_array($role, ['admin', 'staff', 'aid_staff'], true)) return null;
     if (!decision_account_active($id, $role)) return null;
     return ['id' => $id, 'role' => $role];
 }
@@ -323,6 +338,24 @@ function decision_not_pending_text(string $status): string
  *         code: approved | disapproved | invalid | auth | forbidden | already | amount | claim | budget | remarks | setup | error.
  *         message is always safe to show (no SQL, no table names). warning: the approval email was not sent.
  */
+/**
+ * The optional "already approved on paper" date from the Approve dialog/Update page (Medical/Burial only): a past
+ * paper record Medical & Burial staff encoded as Pending, which an admin now approves with its real approval
+ * date, so Reports count it in the period it actually happened. No approval email is sent for one of these
+ * (decide_application() skips it whenever this is set). Returns a DATETIME string (that date, now's time of day)
+ * or null when none was given, or it wasn't a real date, or it was in the future.
+ */
+function decision_backdated_approved_at(?string $raw): ?string
+{
+    $raw = trim((string)$raw);
+    if ($raw === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) return null;
+    $d = DateTime::createFromFormat('Y-m-d', $raw);
+    if (!$d || $d->format('Y-m-d') !== $raw) return null;
+    // A day of slack, in case the office PC's clock is ahead of the server's (same rule as the walk-in form)
+    if ($raw > date('Y-m-d', strtotime('+1 day'))) return null;
+    return $raw . ' ' . date('H:i:s');
+}
+
 function decide_application(PDO $pdo, $applicantId, string $decision, array $opts = []): array
 {
     $user = array_key_exists('user', $opts) ? $opts['user'] : decision_user();
@@ -379,6 +412,9 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
         $typeId = (int)$peek['assistance_type_id'];
         $app = ['id' => (int)$peek['id'], 'type' => $typeId, 'name' => decision_person_name($peek)];
+        // A past paper record already approved: Medical/Burial only (that is the only place staff encode old paper
+        // records). Saved with its real approval date; no approval email for one of these.
+        $backdatedAt = $decision === 'approve' && in_array($typeId, [1, 2], true) ? ($opts['backdated_approved_at'] ?? null) : null;
 
         if (isset($opts['expect_type']) && (int)$opts['expect_type'] !== $typeId) {
             return decision_result(false, 'invalid', 'That application belongs to another program. Open it from its own list.', $app);
@@ -464,8 +500,9 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
 
         if ($decision === 'approve') {
-            $set = "status = 'Approved', approved_by = ?, approved_at = NOW()";
+            $set = "status = 'Approved', approved_by = ?, approved_at = " . ($backdatedAt !== null ? '?' : 'NOW()');
             $params = [$user['id']];
+            if ($backdatedAt !== null) $params[] = $backdatedAt;
             if ($amount !== null) {
                 $set .= ', amount = ?';
                 $params[] = $amount;
@@ -518,7 +555,8 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
 
     $label = $app['name'] . ' (Ref #' . $app['id'] . ')';
     if ($decision === 'approve') {
-        $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 2) : '') . '.', $app);
+        $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 2) : '') . '.'
+            . ($backdatedAt !== null ? ' Saved with ' . ui_date($backdatedAt, 'M j, Y') . ' as the approval date; no email was sent (a past paper record).' : ''), $app);
         // What the approval did to the budget: told once, so the admin knows how much is left (or that it went over)
         if ($budgetCheck !== null && $budgetCheck['before']['budget'] !== null) {
             $b = $budgetCheck['before'];
@@ -532,8 +570,8 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
                 $result['message'] .= ' The ' . $name . ' is now ' . $percent . '% used (' . ui_peso($b['budget'] - $after) . ' left).';
             }
         }
-        // Only after the approval is saved: an email that fails must not undo it
-        if ($claim !== null && ($opts['send_email'] ?? true)) {
+        // Only after the approval is saved: an email that fails must not undo it. A backdated paper record gets none.
+        if ($claim !== null && ($opts['send_email'] ?? true) && $backdatedAt === null) {
             $mail = decision_send_approval_email($pdo, $id);
             if ($mail['sent']) {
                 $result['message'] .= ' ' . $mail['note'];
@@ -853,6 +891,7 @@ function decision_run_endpoint(PDO $pdo, string $decision, array $cfg = []): voi
             $opts['amount'] = is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null;
             $opts['claim'] = decision_claim_from_post();
             $opts['budget_reason'] = is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '';
+            $opts['backdated_approved_at'] = decision_backdated_approved_at(is_string($_POST['backdated_approved_at'] ?? null) ? $_POST['backdated_approved_at'] : null);
         } else {
             $opts['reasons'] = decision_reasons_from_post();
             $opts['remarks'] = is_string($_POST['disapproval_remarks'] ?? null) ? $_POST['disapproval_remarks'] : '';
@@ -937,10 +976,11 @@ function decision_save_update_form(PDO $pdo, array $row): array
         if ($choice === DECISION_APPROVED) decision_claim_ensure($pdo);   // before decide_application()'s transaction
         $result = $choice === DECISION_APPROVED
             ? decide_application($pdo, $row['id'], 'approve', [
-                'amount'         => is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null,
-                'require_amount' => decision_needs_amount($typeId),
-                'claim'          => decision_claim_from_post(),
-                'budget_reason'  => is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '',
+                'amount'                 => is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null,
+                'require_amount'         => decision_needs_amount($typeId),
+                'claim'                  => decision_claim_from_post(),
+                'budget_reason'          => is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '',
+                'backdated_approved_at'  => decision_backdated_approved_at(is_string($_POST['backdated_approved_at'] ?? null) ? $_POST['backdated_approved_at'] : null),
             ])
             : decide_application($pdo, $row['id'], 'disapprove', ['reasons' => decision_reasons_from_post(), 'remarks' => $remarks]);
         if (!$result['ok']) return ['ok' => false, 'message' => $result['message']];

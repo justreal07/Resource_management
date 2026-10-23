@@ -213,6 +213,11 @@ a { color: var(--navy); }
     backdrop-filter: saturate(160%) blur(12px);
     border-bottom: 1px solid var(--line);
     transition: box-shadow 0.25s;
+    /* The "Text size" buttons (A A A) make the PAGE's text bigger, not this navigation bar: the logo, title and
+       menu stayed one `rem` scale (the root's), so a larger text size made them outgrow the row and wrap onto a
+       second line (logo pushed up, a gap opening below it). Fixed at the normal 112.5%-of-16px size here, with
+       `em` instead of `rem` below, so the header always looks the same no matter what text size is chosen. */
+    font-size: 18px;
 }
 .site-header.scrolled { box-shadow: 0 6px 24px rgba(10, 36, 114, 0.10); }
 .site-header::before {
@@ -236,6 +241,7 @@ a { color: var(--navy); }
     gap: 16px;
     text-decoration: none;
     min-width: 0;
+    flex: 0 0 auto;   /* never let the nav links squeeze the logo/title down to force an extra line */
 }
 .brand-logos { display: flex; align-items: center; flex: none; }
 /* 112px: the same size as the seal in the admin and staff menu (.sidebar-brand img in css/admin_ui.css) */
@@ -252,22 +258,18 @@ a { color: var(--navy); }
 }
 .brand-logos img:first-child { z-index: 1; }
 .brand-logos img + img { margin-left: -36px; }
-.brand-text { max-width: 215px; display: flex; flex-direction: column; justify-content: center; align-self: center; gap: 3px; line-height: 1.15; min-width: 0; overflow: hidden; }
+/* 240px: room for "Municipal Assistance Portal" to wrap onto two short lines beside the logos (never "…":
+   the header is a fixed size now, so this never needs to change for a wider or narrower title). */
+.brand-text { max-width: 240px; display: flex; flex-direction: column; justify-content: center; align-self: center; gap: 3px; line-height: 1.15; min-width: 0; }
 .brand-text strong {
     font-family: 'Poppins', sans-serif;
-    font-size: 1.15rem;
+    font-size: 1.15em;
     color: var(--navy);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 .brand-text small {
-    font-size: 0.84rem;
+    font-size: 0.84em;
     color: var(--muted);
     font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .nav-menu {
@@ -286,7 +288,10 @@ a { color: var(--navy); }
     color: var(--ink);
     text-decoration: none;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.95em;   /* 17.1px, off the frozen 18px header base (em, not rem: rem would scale with the Text size buttons again).
+       At this width the menu already uses nearly all of .nav-container's 1480px, right up to Log in / Sign up: tested bigger
+       (1.15em already clips "Sign up"), so don't raise this without first doing one of: a wider hamburger-menu breakpoint,
+       tighter .nav-menu/.nav-link gaps and padding, or fewer links shown inline. */
     white-space: nowrap;
     transition: background 0.2s, color 0.2s;
     background: none;
@@ -315,7 +320,7 @@ a { color: var(--navy); }
     padding-left: 14px;
     border-left: 1px solid var(--line);
 }
-.nav-actions .btn-sm { padding: 10px 14px; }   /* Log in / Sign up: a little narrower, so the menu fits beside the logos */
+.nav-actions .btn-sm { padding: 10px 14px; font-size: 0.92em; }   /* Log in / Sign up: a little narrower, so the menu fits beside the logos */
 
 .nav-toggle {
     display: none;
@@ -325,7 +330,7 @@ a { color: var(--navy); }
     border: 1px solid var(--line);
     background: #fff;
     color: var(--navy);
-    font-size: 1.25rem;
+    font-size: 1.25em;
     cursor: pointer;
 }
 
@@ -341,7 +346,7 @@ a { color: var(--navy); }
     border: 1px solid var(--line);
     background: #fff;
     color: var(--navy);
-    font-size: 1.15rem;
+    font-size: 1.15em;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -360,7 +365,7 @@ a { color: var(--navy); }
     border-radius: 999px;
     background: var(--red);
     color: #fff;
-    font-size: 0.72rem;
+    font-size: 0.72em;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
@@ -449,14 +454,18 @@ a { color: var(--navy); }
     cursor: pointer;
     font-family: inherit;
     font-weight: 600;
-    font-size: 0.95rem;
+    font-size: 0.95em;
     transition: box-shadow 0.2s;
 }
 .user-avatar-btn:hover { box-shadow: var(--shadow-sm); }
-.user-avatar-btn .fa-chevron-down { font-size: 0.75rem; color: var(--muted); }
+/* Without this, a longer name wraps onto two lines and stretches the whole pill (and the circular
+   photo along with it) taller than it should be; it stays one line and trims instead. */
+.user-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+.user-avatar-btn .fa-chevron-down { font-size: 0.75em; color: var(--muted); flex: none; }
 .nav-avatar {
     width: 36px;
     height: 36px;
+    flex: none;   /* keeps it a circle instead of squashing into an oval when the button is squeezed for room */
     border-radius: 50%;
     object-fit: cover;
     border: 2px solid var(--gold);
@@ -1695,9 +1704,6 @@ a { color: var(--navy); }
     .brand-logos img + img { margin-left: -24px; }
 }
 @media (max-width: 1459px) {
-    /* The title wraps onto two lines inside its box instead of ending in "…" (as on wide screens and phones) */
-    .brand-text strong,
-    .brand-text small { white-space: normal; overflow: visible; text-overflow: clip; }
     .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
     .nav-menu {
         position: absolute;
@@ -1714,7 +1720,7 @@ a { color: var(--navy); }
         display: none;
     }
     .nav-menu.open { display: flex; }
-    .nav-link { padding: 14px 16px; font-size: 1.05rem; white-space: normal; }
+    .nav-link { padding: 14px 16px; font-size: 1.05em; white-space: normal; }
     .nav-link.active::after { display: none; }
     .nav-actions {
         margin: 8px 0 0;
@@ -1727,21 +1733,9 @@ a { color: var(--navy); }
     .notification-panel { left: 0; right: auto; }
     .user-dropdown-menu { right: auto; left: 0; }
 }
-
-/* Wide screens with larger text (the "Text size" buttons in the top bar make everything bigger):
-   the site title is never cut off. When the title and the menu don't fit on one line, the menu
-   drops to its own row, still lined up with the right edge of the top bar. At normal text size
-   everything still fits on one line, so nothing changes. */
-@media (min-width: 1460px) {
-    .nav-container { flex-wrap: wrap; row-gap: 6px; padding-top: 6px; padding-bottom: 6px; }
-    .brand { flex: 0 0 auto; }
-    .brand-text strong,
-    .brand-text small { white-space: normal; overflow: visible; text-overflow: clip; }
-    /* The title may wrap onto two lines beside the 112px logos, which leaves the menu room
-       to stay on the same row as the logos */
-    .brand-text { max-width: 12rem; }
-    .nav-menu { margin-left: auto; }
-}
+/* No "wide screen, larger text" fallback is needed above: the header's own font-size is fixed
+   (.site-header, above), so the "Text size" buttons never make the logo, title or menu outgrow
+   this row any more — the menu button at 1459px and down is the only reason it would wrap. */
 
 @media (max-width: 960px) {
     .steps-grid { grid-template-columns: repeat(2, 1fr); row-gap: 40px; }
@@ -1758,7 +1752,7 @@ a { color: var(--navy); }
     .topbar-info span:not(:first-child) { display: none; }
     .brand-text small { display: none; }
     /* On a phone the title wraps onto two lines instead of ending in "…" */
-    .brand-text strong { font-size: 0.95rem; line-height: 1.2; white-space: normal; overflow: visible; text-overflow: clip; }
+    .brand-text strong { font-size: 0.95em; line-height: 1.2; white-space: normal; overflow: visible; text-overflow: clip; }
     .brand-logos img { width: 50px; height: 50px; }
     .brand-logos img + img { margin-left: -14px; }
 

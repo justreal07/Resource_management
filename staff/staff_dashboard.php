@@ -2,6 +2,7 @@
 require_once '../config.php';
 define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
+staff_only_role('staff', 'Outpatient Schedule');
 require_once '../user/person_rules.php';   // name matching (Patients by barangay counts each patient once); BARANGAYS
 
 $year = isset($_GET['year']) ? $_GET['year'] : date("Y");
@@ -83,7 +84,7 @@ $upcomingPanel = '<section class="panel" aria-labelledby="upcomingTitle"><div cl
         'noun' => 'patient',
         'caption' => 'OPD check-ups today and tomorrow',
         'empty' => ['No check-ups today or tomorrow', 'Patients with a check-up on these days will be listed here.'],
-        'actions' => function ($row) { return ui_row_links(3, $row, false) . ui_staff_update_link($row); },
+        'actions' => function ($row) { return ui_row_links(3, $row, false) . ui_staff_update_link(3, $row); },
     ])
     . '</section>';
 
@@ -223,6 +224,6 @@ $brgyPanel = '<section class="panel" id="barangays" aria-labelledby="brgyTitle">
 admin_layout_start(['title' => 'Outpatient Schedule', 'section' => 'opd']);
 // Staff open a record with View and change its status with Update (the old page's only button)
 echo ui_type_overview(3, $stats, $applicants, $monthlyData, $year,
-    function ($row) { return ui_row_links(3, $row, false) . ui_staff_update_link($row); }, $upcomingPanel);
+    function ($row) { return ui_row_links(3, $row, false) . ui_staff_update_link(3, $row); }, $upcomingPanel);
 echo $brgyPanel;
 admin_layout_end(['scripts' => ['../js/staff_dashboard.js']]);

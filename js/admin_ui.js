@@ -459,12 +459,16 @@
 
                 // Where the email goes; without an address, the button only approves
                 const email = btn.dataset.email || '';
-                approveDialog.querySelector('[data-approve-email]').textContent = btn.hasAttribute('data-walkin')
+                const walkIn = btn.hasAttribute('data-walkin');
+                approveDialog.querySelector('[data-approve-email]').textContent = walkIn
                     ? 'No email: walk-in application. Tell the applicant the ' + (opd ? 'trip schedule' : 'claim details') + ' in person.'
                     : (email || 'No email on the applicant\'s account. They will see the details when they sign in.');
                 approveSubmit.innerHTML = submitLabel;
                 approveSubmit.disabled = false;
-                if (!email || btn.hasAttribute('data-walkin')) approveSubmit.lastChild.textContent = 'Approve';
+                if (!email || walkIn) approveSubmit.lastChild.textContent = 'Approve';
+                // "Already approved on paper?" (Medical/Burial, see ui_claim_fields()): walk-ins only
+                const backdated = approveForm.querySelector('[data-backdated-field]');
+                if (backdated) backdated.hidden = !walkIn;
 
                 // OPD: the trip is on the patient's check-up date; without a usable date it can't be approved here
                 let problem = '';

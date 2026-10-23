@@ -121,6 +121,43 @@ function schema_application_changes_ready(PDO $pdo): bool
 }
 
 /**
+ * Medical & Burial staff (role `aid_staff`; database/migrations/migration_aid_staff.sql does the same by hand).
+ * An older database is brought up to date here the first time any page runs (config.php); a new install already
+ * has it (database/lgu_assistance_system.sql). Adds:
+ *   users.role           gains 'aid_staff' alongside 'admin' and 'staff'
+ *   applicant.encoded_by who keyed in a walk-in (NULL for an online application)
+ * Safe to run again: it only acts on what is missing. A failure is logged, never shown, and tried again
+ * after ten minutes. It never runs inside a transaction (ALTER ends one).
+ */
+function schema_aid_staff_ready(PDO $pdo): void
+{
+    if (!empty($_SESSION['aid_staff_schema_ready'])) return;
+    if (isset($_SESSION['aid_staff_schema_failed_at']) && time() - (int)$_SESSION['aid_staff_schema_failed_at'] < 600) return;
+    try {
+        $roleType = $pdo->query("SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'users' AND COLUMN_NAME = 'role'")->fetchColumn();
+        if ($roleType === false) return;   // no users table yet (empty database): look again next time
+        if (stripos((string)$roleType, 'aid_staff') === false) {
+            $pdo->exec("ALTER TABLE `users` MODIFY COLUMN `role` ENUM('admin','staff','aid_staff') NOT NULL");
+        }
+        $hadEncodedBy = in_array('encoded_by', array_map('strtolower', $pdo->query("SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'applicant'")->fetchAll(PDO::FETCH_COLUMN)), true);
+        schema_add_columns($pdo, 'applicant', [
+            'encoded_by' => "INT(11) DEFAULT NULL COMMENT 'User ID of the admin/staff who keyed in a walk-in; NULL for an online application'",
+        ]);
+        if (!$hadEncodedBy) {
+            $pdo->exec("ALTER TABLE `applicant` ADD KEY `fk_applicant_encoded_by` (`encoded_by`),
+                        ADD CONSTRAINT `fk_applicant_encoded_by` FOREIGN KEY (`encoded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL");
+        }
+        $_SESSION['aid_staff_schema_ready'] = true;
+        unset($_SESSION['aid_staff_schema_failed_at']);
+    } catch (Throwable $e) {
+        error_log('schema_aid_staff_ready: ' . $e->getMessage());
+        $_SESSION['aid_staff_schema_failed_at'] = time();
+    }
+}
+
+/**
  * Make sure these columns exist in a table, adding the missing ones.
  *
  * @param string   $table   a table of this system (letters, digits and underscores only: it is written into the statement)

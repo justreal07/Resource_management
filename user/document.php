@@ -1,7 +1,8 @@
 <?php
 /**
  * Opens one uploaded photo, for the people who may see it:
- *   - an admin: any program;  OPD staff: OPD requests only (decision_can(), the same rule as the lists)
+ *   - an admin: any program;  OPD staff: OPD requests only;  Medical & Burial staff: Medical/Burial only
+ *     (staff_can_view(), the same "may view" rule as the lists; they may never decide one, but they do see the photos)
  *   - the applicant who sent it (their own applications only)
  * Everyone else gets "Not found", the same as for a photo that doesn't exist, so the numbers can't be probed.
  *
@@ -44,7 +45,7 @@ if (!$doc) {
 
 // Who is asking? (signed-in staff or admin who may handle this program, or the applicant who owns it)
 $staff = decision_user();
-$allowed = $staff !== null && decision_can($staff, (int)$doc['assistance_type_id']);
+$allowed = $staff !== null && staff_can_view($staff, (int)$doc['assistance_type_id']);
 $applicantId = (int)($_SESSION['applicant']['id'] ?? 0);
 if (!$allowed && $applicantId > 0 && $doc['account_id'] !== null && (int)$doc['account_id'] === $applicantId) {
     $allowed = true;

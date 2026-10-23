@@ -230,65 +230,75 @@
 .alert-success { background: var(--green-soft); color: #167a45; border: 1px solid #bfe8d2; }
 
 /* ============================================
-   SIGN UP: a wide card instead of a tall one (user/applicant_register.php, body.auth-page-register)
-   The intro text becomes a narrow column, and the card shows "Your account" and
-   "Contact & home address" side by side, so the page stays about one screen tall.
+   SIGN UP: two steps (user/applicant_register.php, body.auth-page-register)
+   "Your account" first, then (Next) "Contact & home address". The script in the page shows one
+   part at a time; without JavaScript both parts show, one under the other.
 ============================================ */
 .auth-page-register .auth-hero { padding: 48px 0 110px; }
-.auth-page-register .auth-grid {
-    grid-template-columns: minmax(0, 290px) minmax(0, 1fr);
-    gap: 40px;
-    align-items: start;
-}
+.auth-page-register .auth-card { padding: 32px 40px; }
+/* A wide, landscape card: the intro is a narrow column and the card takes the rest */
+.auth-page-register .auth-grid { grid-template-columns: minmax(0, 290px) minmax(0, 1fr); gap: 40px; align-items: start; }
 .auth-page-register .hero-text { padding-top: 12px; }
 .auth-page-register .hero-text h1 { font-size: clamp(1.9rem, 2.8vw, 2.4rem); }
-.auth-page-register .auth-card { padding: 28px 32px; }
 
 /* Icon and title on one line */
 .auth-card-head-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-bottom: 18px; }
 .auth-card-head-row .card-icon { margin-bottom: 0; }
 .auth-card-title { flex: 1 1 14rem; min-width: 0; }
 
-/* Google button on the left, "or sign up with a username" line filling the rest of the row */
-.auth-alt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-bottom: 20px; }
-.auth-alt-row .btn-google { width: auto; flex: 0 0 auto; padding: 11px 22px; }
+/* Google button across the card, then the "or sign up with a username" line */
+.auth-alt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-bottom: 20px; }
+.auth-alt-row .btn-google { width: auto; flex: 0 0 auto; padding: 11px 28px; }   /* normal size, not stretched across the card */
 .auth-alt-row .auth-divider { flex: 1 1 14rem; margin: 0; }
 .auth-alt-row .auth-divider::before { display: none; }   /* the line only runs to the right of the text */
 
-/* The two columns */
-.auth-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
-.auth-col { display: grid; gap: 16px; align-content: start; min-width: 0; margin: 0; padding: 0; border: 0; }
-.auth-col + .auth-col { padding-left: 28px; border-left: 1px solid var(--line); }
-.auth-col-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    float: left;          /* lets the legend sit inside the column's grid like the fields */
-    width: 100%;
-    margin: 0;
-    padding: 0;
-    font-family: 'Poppins', sans-serif;
-    font-weight: 600;
-    font-size: 1rem;
-    color: var(--ink);
+/* Where you are: 1 Your account - 2 Contact & address */
+.auth-stepper { display: flex; gap: 10px 18px; list-style: none; margin: 0; padding: 0; }
+.auth-stepper li { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+.auth-stepper li + li::before { content: ""; width: 28px; height: 2px; border-radius: 2px; background: var(--line); margin-right: 10px; }
+.auth-step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--bg); border: 1.5px solid var(--line);
+    font-size: 0.8rem; font-weight: 700; color: var(--muted);
 }
-.auth-col-title i { color: var(--navy); }
-.auth-col-note { margin: -12px 0 0; font-size: 0.85rem; color: var(--muted); }
+.auth-stepper .is-current { color: var(--ink); }
+.auth-stepper .is-current .auth-step-num { background: var(--navy); border-color: var(--navy); color: #fff; }
+.auth-stepper .is-done { color: var(--green); }
+.auth-stepper .is-done .auth-step-num { background: var(--green); border-color: var(--green); color: #fff; }
+.auth-form [hidden] { display: none !important; }   /* the step that is not showing */
+
+/* The parts of the form (one at a time) */
+.auth-cols { display: grid; gap: 22px; }
+/* Each step lays its fields out in two columns; a row of two fields (.field-row) joins that grid */
+.auth-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px 28px; align-content: start; min-width: 0; margin: 0; padding: 0; border: 0; }
+.auth-col .field-row { display: contents; }
+.auth-col > .pui-strength, .auth-col > .pui-consent, .auth-col > .auth-col-note { grid-column: 1 / -1; }
+.auth-col .order-first { order: -2; }
+.auth-col .order-second { order: -1; }
+.auth-col > .auth-col-note { order: -3; }
+.auth-col + .auth-col { padding-top: 22px; border-top: 1px solid var(--line); }
+/* The step indicator above already names the part, so the heading is for screen readers only */
+.auth-col-title {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+.auth-col-note { margin: 0; font-size: 0.85rem; color: var(--muted); }
 .auth-col .pui-consent { margin: 4px 0 0; }
 
-/* Create Account, "Already have an account?" and Back to Home on one line */
-.auth-form-foot {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px 24px;
-    padding-top: 18px;
-    border-top: 1px solid var(--line);
-}
-.auth-form-foot .btn[type="submit"] { margin-top: 0; min-width: 230px; }
-.auth-form-foot .auth-switch { margin: 0; padding: 0; border: 0; text-align: left; }
-.auth-form-foot .auth-back { margin: 0 0 0 auto; }
-
+/* Back / Next / Create Account, then "Already have an account?" and Back to Home */
+.auth-form-foot { display: grid; gap: 14px; padding-top: 18px; border-top: 1px solid var(--line); }
+.auth-step-actions { display: flex; gap: 10px; }
+.auth-step-actions .btn { flex: 1 1 0; margin-top: 0; }
+.auth-step-actions .btn[type="submit"] { flex: 2 1 0; margin-top: 0; }
+.auth-form-foot .auth-switch { margin: 0; padding: 0; border: 0; text-align: center; }
+.auth-form-foot .auth-back { margin: 0 auto; }
 /* Compact footer */
 .auth-footer { padding-top: 0; }
 .auth-footer::before { margin: 0; }
@@ -303,23 +313,21 @@
     .auth-hero .hero-trust { justify-content: center; }
     .auth-hero .mini-steps { display: none; }
     .auth-card { width: 100%; max-width: 520px; }
-    /* Sign up: the intro goes above, and the card keeps its two columns while there is room */
     .auth-page-register .auth-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
     .auth-page-register .hero-text { padding-top: 0; }
-    .auth-page-register .auth-card { max-width: 880px; }
+    .auth-page-register .auth-card { max-width: 900px; }
 }
 
-/* Too narrow for two columns: one column, address under the account details */
-@media (max-width: 760px) {
-    .auth-cols { grid-template-columns: minmax(0, 1fr); gap: 22px; }
-    .auth-col + .auth-col { padding: 22px 0 0; border-left: 0; border-top: 1px solid var(--line); }
-    .auth-alt-row .btn-google { width: 100%; }
-    .auth-alt-row .auth-divider::before { display: block; }   /* text centred between two lines again */
-    .auth-form-foot .btn[type="submit"] { width: 100%; }
-    .auth-form-foot .auth-switch, .auth-form-foot .auth-back { margin: 0 auto; text-align: center; }
+@media (max-width: 700px) {
+    .auth-col { grid-template-columns: minmax(0, 1fr); }
+    .auth-col .order-first, .auth-col .order-second { order: 0; }
 }
 
 @media (max-width: 640px) {
+    .auth-stepper li + li::before { width: 16px; margin-right: 6px; }
+    .auth-step-actions { flex-wrap: wrap; }
+    .auth-step-actions .btn, .auth-step-actions .btn[type="submit"] { flex: 1 1 100%; }
+    .auth-step-actions .btn[data-step-back] { order: 2; }
     .auth-hero { padding: 36px 0 110px; }
     .auth-hero .hero-text h1 { font-size: 1.85rem; }
     .auth-hero .hero-lead, .auth-hero .hero-trust { display: none; }

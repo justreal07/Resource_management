@@ -11,6 +11,7 @@ if (isset($_SESSION['applicant'])) {
 }
 
 $errors = [];
+$stepOneError = false;   // true when a problem is in "Your account" (step 1), not in the contact details (step 2)
 $consent_error = '';
 $consent = false;
 $old = ['firstname' => '', 'lastname' => '', 'username' => '', 'email' => ''];
@@ -40,9 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $contact_errors = validate_application($contact, ['contact_number', 'barangay']);
         // The email is required: it is how a forgotten password is reset (includes/password_reset.php)
-        if ($old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $old['email'] === '' || $password === '' || $confirm_password === ''
-            || in_array('This field is required.', $contact_errors, true)) {
+        $stepOneMissing = $old['firstname'] === '' || $old['lastname'] === '' || $old['username'] === '' || $old['email'] === '' || $password === '' || $confirm_password === '';
+        if ($stepOneMissing || in_array('This field is required.', $contact_errors, true)) {
             $errors[] = 'Please fill in all required fields.';
+            if ($stepOneMissing) $stepOneError = true;
         }
         $labels = ['contact_number' => 'Contact number', 'house_no' => 'House no.', 'street' => 'Street',
                    'barangay' => 'Barangay'];
@@ -51,14 +53,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         if ($old['username'] !== '' && !preg_match('/^[A-Za-z0-9._]{4,50}$/', $old['username'])) {
             $errors[] = 'Username must be 4–50 characters: letters, numbers, dots or underscores only.';
+            $stepOneError = true;
         }
         if ($old['email'] !== '' && !filter_var($old['email'], FILTER_VALIDATE_EMAIL)) {
             $errors[] = 'Please enter a valid email address.';
+            $stepOneError = true;
         }
         if ($password !== '' && (strlen($password) < 8 || !preg_match('/[A-Za-z]/', $password) || !preg_match('/[0-9]/', $password))) {
             $errors[] = 'Password must be at least 8 characters and include letters and numbers.';
+            $stepOneError = true;
         } elseif ($password !== $confirm_password) {
             $errors[] = 'Passwords do not match.';
+            $stepOneError = true;
         }
         // The Data Privacy Act needs the applicant's consent before the account (and its details) is kept
         $consent = privacy_consent_given();
@@ -75,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$old['username']]);
         if ($stmt->fetch()) {
             $errors[] = 'That username is already taken. Please choose another.';
+            $stepOneError = true;
         }
 
         if ($old['email'] !== '') {
@@ -82,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt->execute([$old['email'], $old['email']]);
             if ($stmt->fetch()) {
                 $errors[] = 'An account with this email already exists. Try logging in instead.';
+                $stepOneError = true;
             }
         }
     }
@@ -132,7 +140,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = $e->getCode() === '23000'
                 ? 'That username is already taken. Please choose another.'
                 : 'Failed to create your account. Please try again.';
+            if ($e->getCode() === '23000') $stepOneError = true;
         }
+    }
+
+    // The page always reopens on step 1 (a password is never sent back to the browser, so it has to be typed again).
+    // When the problem is in step 2, say so, so they know to just press Next again.
+    if ($errors && !$stepOneError) {
+        $errors[] = 'Your details were kept. Type your password again, press Next, and fix the problem on the next step.';
     }
 }
 
@@ -165,11 +180,18 @@ auth_page_start('Sign up', 'register', function () { ?>
 
     <div class="auth-alt-row">
         <?php google_button('register', 'Sign up with Google'); ?>
-        <div class="auth-divider">or sign up with a username</div>
+        <div class="auth-divider"></div>
     </div>
 
-    <form method="POST" class="auth-form" data-auth-form novalidate>
+    <form method="POST" class="auth-form" data-auth-form data-steps novalidate>
         <?php echo csrf_field(); ?>
+
+        <?php /* Two steps of one form: the browser shows "Your account" first, then (Next) the contact details.
+                 Without JavaScript both parts simply show one under the other. */ ?>
+        <ol class="auth-stepper" aria-label="Sign-up steps">
+            <li class="is-current" data-step-dot="1" aria-current="step"><span class="auth-step-num">1</span> Your account</li>
+            <li data-step-dot="2"><span class="auth-step-num">2</span> Contact &amp; address</li>
+        </ol>
 
         <div class="auth-cols">
         <fieldset class="auth-col">
@@ -239,7 +261,7 @@ auth_page_start('Sign up', 'register', function () { ?>
         <legend class="auth-col-title"><i class="fas fa-home"></i> Contact &amp; home address</legend>
         <p class="auth-col-note">Filled in for you on every application form.</p>
 
-        <div class="field">
+        <div class="field order-first">
             <label for="contact_number">Contact number</label>
             <div class="input-wrap">
                 <input type="tel" id="contact_number" name="contact_number" required inputmode="numeric" autocomplete="tel"
@@ -267,7 +289,7 @@ auth_page_start('Sign up', 'register', function () { ?>
             </div>
         </div>
 
-        <div class="field">
+        <div class="field order-second">
             <label for="barangay">Barangay</label>
             <div class="input-wrap">
                 <select id="barangay" name="barangay" required autocomplete="address-level3">
@@ -286,10 +308,86 @@ auth_page_start('Sign up', 'register', function () { ?>
         </div>
 
         <div class="auth-form-foot">
-            <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create Account</button>
+            <div class="auth-step-actions">
+                <button type="button" class="btn btn-outline" data-step-back hidden><i class="fas fa-arrow-left"></i> Back</button>
+                <button type="button" class="btn btn-primary" data-step-next hidden>Next <i class="fas fa-arrow-right"></i></button>
+                <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create Account</button>
+            </div>
             <p class="auth-switch">Already have an account? <a href="applicant_login">Log in here</a></p>
             <a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
         </div>
     </form>
+
+    <script>
+    // Step 1 "Your account" -> Next -> step 2 "Contact & address" -> Create Account.
+    // Next checks step 1 first (required fields, password letters + numbers, both passwords the same), so nobody
+    // reaches step 2 with a problem that would only show after sending. The form and its rules are unchanged.
+    (function () {
+        var form = document.querySelector('form[data-steps]');
+        if (!form) return;
+        var cols = form.querySelectorAll('.auth-col');
+        var next = form.querySelector('[data-step-next]');
+        var back = form.querySelector('[data-step-back]');
+        var submit = form.querySelector('button[type="submit"]');
+        var dots = document.querySelectorAll('[data-step-dot]');
+        var google = document.querySelector('.auth-alt-row');   // "Sign up with Google": only needed before the form is started
+        var pw = form.elements.password;
+        var again = form.elements.confirm_password;
+        var step = 1;
+        if (cols.length !== 2 || !next || !back || !submit || !pw || !again) return;
+
+        function show(n, focus) {
+            step = n;
+            cols[0].hidden = n !== 1;
+            cols[1].hidden = n !== 2;
+            next.hidden = n !== 1;
+            back.hidden = n !== 2;
+            submit.hidden = n !== 2;
+            if (google) google.hidden = n !== 1;
+            dots.forEach(function (d) {
+                var i = parseInt(d.getAttribute('data-step-dot'), 10);
+                d.classList.toggle('is-current', i === n);
+                d.classList.toggle('is-done', i < n);
+                if (i === n) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+            });
+            if (focus) {
+                var first = cols[n - 1].querySelector('input, select');
+                if (first) first.focus({ preventScroll: true });
+                form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            }
+        }
+
+        function stepOneOk() {
+            pw.setCustomValidity('');
+            again.setCustomValidity('');
+            if (pw.value && (!/[A-Za-z]/.test(pw.value) || !/[0-9]/.test(pw.value))) {
+                pw.setCustomValidity('Use at least 8 characters with letters and numbers.');
+            } else if (again.value !== pw.value) {
+                again.setCustomValidity('The passwords do not match.');
+            }
+            var fields = cols[0].querySelectorAll('input');
+            for (var i = 0; i < fields.length; i++) {
+                if (!fields[i].checkValidity()) { fields[i].reportValidity(); return false; }
+            }
+            return true;
+        }
+
+        pw.addEventListener('input', function () { pw.setCustomValidity(''); again.setCustomValidity(''); });
+        again.addEventListener('input', function () { again.setCustomValidity(''); });
+
+        next.addEventListener('click', function () { if (stepOneOk()) show(2, true); });
+        back.addEventListener('click', function () { show(1, true); });
+
+        // Enter inside a step-1 box means "Next", never "send the form"
+        form.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && step === 1 && e.target.tagName === 'INPUT') { e.preventDefault(); next.click(); }
+        });
+        form.addEventListener('submit', function (e) {
+            if (step === 1) { e.preventDefault(); next.click(); }
+        });
+
+        show(1, false);
+    })();
+    </script>
 <?php
 auth_page_end();

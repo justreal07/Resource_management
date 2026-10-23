@@ -32,7 +32,7 @@ if (($GLOBALS['pdo'] ?? null) instanceof PDO) {
    application_decision.php checks that on every request, whatever this switch says. */
 const ADMIN_LAYOUT_REQUIRE_LOGIN = true;
 
-if (ADMIN_LAYOUT_REQUIRE_LOGIN && !in_array($_SESSION['user']['role'] ?? '', ui_area() === 'staff' ? ['staff', 'admin'] : ['admin'], true)) {
+if (ADMIN_LAYOUT_REQUIRE_LOGIN && !in_array($_SESSION['user']['role'] ?? '', ui_area() === 'staff' ? ['staff', 'aid_staff', 'admin'] : ['admin'], true)) {
     header('Location: ' . ui_login_url());
     exit();
 }
@@ -46,6 +46,22 @@ if (ADMIN_LAYOUT_REQUIRE_LOGIN && decision_user() === null) {
 function ui_login_url(): string
 {
     return '../login/login?role=' . ui_area();
+}
+
+/**
+ * A custom staff page built for one specific staff role (a dashboard or report that is not one of the generic
+ * program pages, which guard themselves with program_staff_guard()): OPD staff and Medical & Burial staff share
+ * the staff/ folder and the same sign-in gate above, so each of their own pages must also check it is the right
+ * role. Any other staff role gets "not found", like a program page would; an admin always passes.
+ */
+function staff_only_role(string $role, string $pageTitle): void
+{
+    $current = $_SESSION['user']['role'] ?? '';
+    if ($current === $role || $current === 'admin') return;
+    admin_layout_start(['title' => $pageTitle, 'section' => '']);
+    echo ui_state('alert', 'Page not found', 'This page isn\'t part of your account.', '', 'state-error');
+    admin_layout_end();
+    exit();
 }
 
 /** Menu items. 'roles' lists who may see each one. */
@@ -65,16 +81,21 @@ function admin_nav(): array
 }
 
 /**
- * Menu of the OPD staff side (staff/ pages). An admin who opens a staff page sees it too.
- * "To review" (staffpen.php) is one click away and carries the waiting count, so the count isn't shown twice.
+ * Menu of the staff side (staff/ pages): OPD staff see the OPD items, Medical & Burial staff (aid_staff) see
+ * the Medical/Burial items, an admin who opens a staff page sees all of it. "To review" (staffpen.php) is one
+ * click away and carries the waiting count, so the count isn't shown twice.
  */
 function staff_nav(): array
 {
     return [
-        'opd'     => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['staff', 'admin']],
-        'pending' => ['href' => ui_type_url(3, 'pending'), 'label' => 'To review', 'icon' => 'clock', 'roles' => ['staff', 'admin'], 'type' => 3],
-        'reports' => ['href' => '../staff/opd_staff_report', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
-        'account' => ['href' => '../staff/my_account', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff']],
+        'opd'         => ['href' => ui_type_url(3, 'overview'), 'label' => 'Outpatient Schedule', 'icon' => 'van', 'roles' => ['staff', 'admin']],
+        'pending'     => ['href' => ui_type_url(3, 'pending'), 'label' => 'To review', 'icon' => 'clock', 'roles' => ['staff', 'admin'], 'type' => 3],
+        'reports'     => ['href' => '../staff/opd_staff_report', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['staff', 'admin']],
+        'dashboard'   => ['href' => '../staff/aid_staff_dashboard', 'label' => 'Dashboard', 'icon' => 'home', 'roles' => ['aid_staff', 'admin']],
+        'medical'     => ['href' => ui_type_url(1, 'all'), 'label' => 'Medical Assistance', 'icon' => 'medical', 'roles' => ['aid_staff', 'admin'], 'type' => 1],
+        'burial'      => ['href' => ui_type_url(2, 'all'), 'label' => 'Burial Assistance', 'icon' => 'burial', 'roles' => ['aid_staff', 'admin'], 'type' => 2],
+        'aid_reports' => ['href' => '../staff/aid_staff_report', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['aid_staff', 'admin']],
+        'account'     => ['href' => '../staff/my_account', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff', 'aid_staff']],
     ];
 }
 
@@ -99,7 +120,7 @@ function admin_commands(): array
               'approved' => ['Approved', 'approved done'], 'disapproved' => ['Declined', 'declined disapproved rejected not approved'],
               'withdrawn' => ['Withdrawn', 'withdrawn cancelled canceled applicant took back']];
     foreach (ui_types() as $id => $t) {
-        if (!decision_can($user, $id) || ($staffSide && $id !== 3)) continue;
+        if (!staff_can_view($user, $id)) continue;
         foreach ($pages as $page => [$label, $words]) {
             $cmds[] = ['label' => $t['short'] . ' · ' . $label, 'href' => ui_type_url($id, $page), 'icon' => $t['icon'], 'group' => 'Lists', 'words' => $t['name'] . ' ' . $words];
         }
@@ -109,6 +130,9 @@ function admin_commands(): array
     if (!$staffSide && $role === 'admin') {
         $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../Main_dashboard/dashboard#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant'];
         $cmds[] = ['label' => 'Add staff account', 'href' => '../login/register', 'icon' => 'user-plus', 'group' => 'Actions', 'words' => 'new staff admin user account register'];
+    }
+    if ($staffSide && $role === 'aid_staff') {
+        $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../staff/aid_staff_dashboard#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant medical burial'];
     }
     // The look of the pages: not a page but something the command bar does itself (js/admin_theme.js); 'theme' stands in for 'href'
     // (few extra words on purpose: every word is searched as a part of a word, so a long list would show these rows for unrelated names)
@@ -221,7 +245,7 @@ function admin_layout_start(array $page): void
     $section = $page['section'] ?? '';
     $user = $_SESSION['user'] ?? null;
     $role = $user['role'] ?? '';
-    $roleLabel = ['admin' => 'Administrator', 'staff' => 'Staff'][$role] ?? '';
+    $roleLabel = ['admin' => 'Administrator', 'staff' => 'Staff', 'aid_staff' => 'Medical & Burial staff'][$role] ?? '';
     $userName = $user ? ($user['name'] ?? $user['username'] ?? 'Admin') : '';
     $initials = '';
     foreach (array_slice(preg_split('/\s+/u', trim((string)$userName)) ?: [], 0, 2) as $word) {
@@ -411,8 +435,13 @@ function admin_layout_end(array $opts = []): void
         require_once __DIR__ . '/walkin_form.php';
         // assistance_config.php loaded from inside this function keeps its program list local: make it global for its own functions (get_program())
         if (!isset($GLOBALS['ASSISTANCE_PROGRAMS']) && isset($ASSISTANCE_PROGRAMS)) $GLOBALS['ASSISTANCE_PROGRAMS'] = $ASSISTANCE_PROGRAMS;
+        // Medical & Burial staff only add walk-ins for their own two programs; an admin sees all three.
+        $walkInRole = $_SESSION['user']['role'] ?? '';
         $typeInfo = [];
-        foreach (ui_types() as $id => $t) $typeInfo[$id] = $t;
+        foreach (ui_types() as $id => $t) {
+            if ($walkInRole === 'aid_staff' && !in_array($id, [1, 2], true)) continue;
+            $typeInfo[$id] = $t;
+        }
         $opts['after'] = ($opts['after'] ?? '') . walkin_form_html($typeInfo, '../Main_dashboard/submit_admin_applicant');
         $opts['scripts'] = array_merge($opts['scripts'] ?? [], ['../js/admin_dashboard.js']);
         $opts['config'] = array_merge([

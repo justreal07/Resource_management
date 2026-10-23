@@ -30,7 +30,7 @@ function program_texts(int $typeId): array
             'pending_empty' => ['No Medical applications to review', 'New applications will appear here.'],
             'approved_head' => 'Approved Medical applications', 'approved_sub' => 'Approved applications and the amount given, newest first.',
             'approved_empty' => ['No approved Medical applications yet', 'Applications you approve will be listed here.'],
-            'declined_head' => 'Declined Medical applications', 'declined_who' => 'Only administrators can see declined Medical applications.',
+            'declined_head' => 'Declined Medical applications', 'declined_who' => 'Only administrators and Medical & Burial staff can see declined Medical applications.',
             'withdrawn_head' => 'Withdrawn Medical applications',
             'view_fallback' => ['pending', 'Back to Medical applications to review'],
             'go_label' => 'Go to Medical applications', 'update_none' => ['No application was chosen', 'Open an application from the Medical lists.'],
@@ -44,7 +44,7 @@ function program_texts(int $typeId): array
             'pending_empty' => ['No Burial applications to review', 'New applications will appear here.'],
             'approved_head' => 'Approved Burial applications', 'approved_sub' => 'Approved applications and the amount given, newest first.',
             'approved_empty' => ['No approved Burial applications yet', 'Applications you approve will be listed here.'],
-            'declined_head' => 'Declined Burial applications', 'declined_who' => 'Only administrators can see declined Burial applications.',
+            'declined_head' => 'Declined Burial applications', 'declined_who' => 'Only administrators and Medical & Burial staff can see declined Burial applications.',
             'withdrawn_head' => 'Withdrawn Burial applications',
             'view_fallback' => ['all', 'Back to Burial applications'],
             'go_label' => 'Go to Burial applications', 'update_none' => ['No application was chosen', 'Open an application from the Burial lists.'],
@@ -68,10 +68,23 @@ function program_texts(int $typeId): array
     return $t[$typeId];
 }
 
-/** The menu item a program's pages belong to. On the staff side the "waiting" list is the menu's "To review". */
+/** The menu item a program's pages belong to. On the OPD staff side the "waiting" list is the menu's "To review". */
 function program_section(int $typeId, string $page = ''): string
 {
-    return ui_area() === 'staff' && $page === 'pending' ? 'pending' : ui_types()[$typeId]['key'];
+    return ui_area() === 'staff' && $page === 'pending' && $typeId === 3 ? 'pending' : ui_types()[$typeId]['key'];
+}
+
+/**
+ * Staff-side guard: is this signed-in role even allowed to see this program at all (OPD staff see OPD only,
+ * Medical & Burial staff see Medical/Burial only; an admin sees everything)? Called at the top of every staff
+ * list/record/update page, so someone can't reach another program's pages by typing its URL.
+ */
+function program_staff_guard(int $typeId): void
+{
+    if (ui_area() !== 'staff') return;
+    if (staff_can_view(decision_user(), $typeId)) return;
+    $t = program_texts($typeId);
+    program_not_found($typeId, 'Page not found', 'This page isn\'t part of your account.', $t['title']);
 }
 
 /** The file name of one of the program's pages in this area (admin or staff), e.g. 'Mpending.php'. */
@@ -94,6 +107,7 @@ function program_columns(int $typeId, string $page): array
     $deceased = ['label' => 'Deceased', 'type' => 'text', 'key' => 'petitioner_name'];   // Burial: petitioner_name is the deceased
     $status = ['label' => 'Status', 'type' => 'html', 'render' => 'ui_status_cell'];   // the badge, plus "Edited" when the applicant changed it while waiting
     $filed = ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'];
+    $source = ['label' => 'Source', 'type' => 'html', 'render' => 'ui_source_cell'];   // Online, or Walk-in and who encoded it
 
     if ($page === 'all') {
         $person['link'] = function ($r) use ($typeId) { return ui_type_url($typeId, 'view', ['id' => (int)$r['id']]); };
@@ -117,7 +131,7 @@ function program_columns(int $typeId, string $page): array
     }
     if ($page === 'pending') {
         return array_values(array_filter([
-            $person, $typeId === 2 ? $deceased : null, $status, $filed,
+            $person, $typeId === 2 ? $deceased : null, $status, $filed, $source,
             $typeId === 3 ? ['label' => 'Check-up date', 'type' => 'date', 'key' => 'checkup_date'] : null,
             $address, $contact,
         ]));
@@ -145,12 +159,17 @@ function program_rows(int $typeId, string $page): array
                                ORDER BY $order");
     } elseif ($page === 'pending') {
         // The account's email is where the approval email goes (the Approve dialog shows it; NULL account = walk-in);
-        // the check-up date is the OPD trip day
+        // the check-up date is the OPD trip day; encoded_by is who keyed in a walk-in (NULL for an online application)
+        $source = ui_source_query();
+        $sourceSql = $source === 'online' ? ' AND a.account_id IS NOT NULL' : ($source === 'walkin' ? ' AND a.account_id IS NULL' : '');
         $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at, a.status, a.edited_at, a.edit_count,
                                       " . ($typeId === 2 ? 'a.petitioner_name,' : '') . ($typeId === 3 ? 'a.checkup_date,' : '') . "
-                                      a.account_id, acc.email AS account_email
-                               FROM applicant a LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
-                               WHERE a.assistance_type_id = ? AND a.status = 'Pending'
+                                      a.account_id, acc.email AS account_email,
+                                      COALESCE(NULLIF(TRIM(u.full_name), ''), u.username) AS encoded_by_name
+                               FROM applicant a
+                               LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
+                               LEFT JOIN users u ON u.id = a.encoded_by
+                               WHERE a.assistance_type_id = ? AND a.status = 'Pending'$sourceSql
                                ORDER BY a.created_at DESC");
     } else {
         $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at,
@@ -170,7 +189,7 @@ function program_declined_body(int $typeId): string
     global $pdo;
     $t = program_texts($typeId);
     $user = decision_user();
-    if (!decision_can($user, $typeId)) {
+    if (!staff_can_view($user, $typeId)) {
         return ui_state('lock', 'Sign in to see this list', $t['declined_who']);
     }
     if (!decision_schema_ready($pdo)) {
@@ -197,7 +216,7 @@ function program_withdrawn_body(int $typeId): string
 {
     global $pdo;
     $t = program_texts($typeId);
-    if (!decision_can(decision_user(), $typeId)) {
+    if (!staff_can_view(decision_user(), $typeId)) {
         return ui_state('lock', 'Sign in to see this list', $t['declined_who']);
     }
     try {
@@ -216,6 +235,7 @@ function program_withdrawn_body(int $typeId): string
 /** One list page: $page = all | pending | approved | disapproved | withdrawn. */
 function program_list_page(int $typeId, string $page): void
 {
+    program_staff_guard($typeId);
     $t = program_texts($typeId);
     $staff = ui_area() === 'staff';
     $key = ['all' => 'all', 'pending' => 'pending', 'approved' => 'approved', 'disapproved' => 'disapproved', 'withdrawn' => 'withdrawn'][$page];
@@ -231,6 +251,7 @@ function program_list_page(int $typeId, string $page): void
     admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId, $page)]);
     echo ui_page_head($head[0], $head[1]);
     echo ui_type_tabs($typeId, $key);
+    if ($page === 'pending') echo ui_source_filter();
     if ($page === 'disapproved' || $page === 'withdrawn') {
         echo $page === 'withdrawn' ? program_withdrawn_body($typeId) : program_declined_body($typeId);
         admin_layout_end();
@@ -242,7 +263,18 @@ function program_list_page(int $typeId, string $page): void
     if ($page === 'pending' || $page === 'approved') {
         $review = $page === 'pending';
         $options['actions'] = $staff
-            ? function ($row) use ($review) { return ui_row_links(3, $row, false, '', $review) . ui_staff_update_link($row); }
+            ? function ($row) use ($typeId, $page, $review) {
+                $user = decision_user();
+                // Medical & Burial staff may fix their own mistake in a Pending application (edit_applicant.php,
+                // which checks the same two things again: their program, still Pending); never on Approved, and
+                // never for OPD staff. A button nobody can use here is left off, not shown disabled.
+                $canEdit = $page === 'pending' && $user !== null && $user['role'] === 'aid_staff';
+                $html = ui_row_links($typeId, $row, $canEdit, $canEdit ? ui_type_url($typeId, 'pending') : '', $review);
+                // Update (status and remarks) is only for a role that may actually decide this program (OPD staff; never
+                // Medical & Burial staff, who only encode and view): decision_save_update_form() enforces the same check.
+                if (decision_can($user, $typeId)) $html .= ui_staff_update_link($typeId, $row);
+                return $html;
+              }
             : function ($row) use ($typeId, $page, $review) { return ui_row_links($typeId, $row, true, ui_type_url($typeId, $page), $review); };
     }
     echo '<section class="panel" aria-label="' . ui_e($label) . '">' . ui_table($rows, program_columns($typeId, $page), $options);
@@ -308,6 +340,7 @@ function program_not_found(int $typeId, string $title, string $text, string $pag
 function program_view_page(int $typeId): void
 {
     global $pdo;
+    program_staff_guard($typeId);
     $t = program_texts($typeId);
     $staff = ui_area() === 'staff';
     $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -345,13 +378,14 @@ function program_view_page(int $typeId): void
 
     [$backHref, $backLabel] = ui_back_link(program_file($typeId, $t['view_fallback'][0]), $t['view_fallback'][1]);
     // After saving on the Update page, staff land here: "Back" then goes to the list, not to the form again
-    if ($staff && basename((string)parse_url($backHref, PHP_URL_PATH), '.php') === 'Opdupdate') {
+    if ($staff && basename((string)parse_url($backHref, PHP_URL_PATH), '.php') === (ui_types()[$typeId]['staff_pages']['update'] ?? '')) {
         [$backHref, $backLabel] = [$list, $t['view_fallback'][1]];
     }
     admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId)]);
-    // Update (status and remarks) from the record too, as on the lists; a declined request is closed
+    // Update (status and remarks) from the record too, as on the lists; a declined request is closed. Only for a role
+    // that may actually decide this program (OPD staff; never Medical & Burial staff, who only encode and view).
     if ($staff && !in_array($applicant['status'], ['Disapproved', 'Withdrawn'], true) && decision_can(decision_user(), $typeId)) {
-        echo '<div class="page-actions">' . ui_staff_update_link($applicant) . '</div>';
+        echo '<div class="page-actions">' . ui_staff_update_link($typeId, $applicant) . '</div>';
     }
     echo ui_applicant_record($applicant, $documents, $backHref, $backLabel);
     admin_layout_end();
@@ -361,6 +395,7 @@ function program_view_page(int $typeId): void
 function program_update_page(int $typeId): void
 {
     global $pdo;
+    program_staff_guard($typeId);
     $t = program_texts($typeId);
     $staff = ui_area() === 'staff';
     $id = (int)($_GET['id'] ?? $_GET['applicant_id'] ?? 0);

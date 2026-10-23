@@ -73,6 +73,8 @@ require_once __DIR__ . '/includes/schema.php';
 schema_checkup_reason_ready($pdo);
 // Withdrawing and editing an application: its columns, the 'Withdrawn' status and the Burial key (once; see includes/schema.php)
 schema_application_changes_ready($pdo);
+// Medical & Burial staff (role `aid_staff`) and applicant.encoded_by (once; see includes/schema.php)
+schema_aid_staff_ready($pdo);
 
 define('ASSISTANCE_DB_NAME', $dbname);
 define('ASSISTANCE_DB_HOST', $host);

@@ -11,6 +11,8 @@ require_once '../includes/application_decision.php';   // decision_csrf_ok(): th
 require_once '../user/assistance_config.php';          // the fields, limits and checks of the online forms
 require_once '../user/person_rules.php';
 
+admin_tools_ensure($pdo);   // the activity log table, in case this is reached before any admin page loaded it
+
 // Check if this is an AJAX request
 $is_ajax = isset($_POST['source']) && $_POST['source'] === 'modal';
 
@@ -39,8 +41,9 @@ function walkin_respond(bool $is_ajax, int $status, array $data): void
     exit();
 }
 
-// Security Check - Verify if user is logged in as admin
-if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
+// Security Check - an admin adds a walk-in for any program; Medical & Burial staff for Medical/Burial only
+$walkin_role = $_SESSION['user']['role'] ?? '';
+if (!isset($_SESSION['user']) || !in_array($walkin_role, ['admin', 'aid_staff'], true)) {
     walkin_respond($is_ajax, 403, ['success' => false, 'message' => 'Unauthorized']);
 }
 
@@ -60,6 +63,9 @@ $application_date = $_POST['application_date'] ?? date('Y-m-d');
 // Validate form type
 if (!in_array($form_type, ['medical', 'burial', 'opd'], true)) {
     walkin_respond($is_ajax, 400, ['success' => false, 'message' => 'Invalid form type']);
+}
+if ($walkin_role === 'aid_staff' && !in_array($form_type, ['medical', 'burial'], true)) {
+    walkin_respond($is_ajax, 403, ['success' => false, 'message' => 'Medical & Burial staff can only add Medical or Burial applicants']);
 }
 
 // Validate date format
@@ -158,11 +164,13 @@ $type_id = ['medical' => 1, 'burial' => 2, 'opd' => 3][$form_type];
 $with_person_columns = person_rules_installed($pdo);   // the birthdate / date of death columns
 $v = $values;
 
-// Account ID is NULL for walk-ins (they don't belong to an applicant account).
+// Account ID is NULL for walk-ins (they don't belong to an applicant account). encoded_by is who keyed it in
+// (the admin too), so the Pending list can show "Walk-in, added by <name>".
 // date_released stays empty: it is the day the assistance is handed over (it used to get the filing date).
-$insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $created_at, $with_person_columns): int {
+$encoded_by = (int)($_SESSION['user']['id'] ?? 0);
+$insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $created_at, $with_person_columns, $encoded_by): int {
     $row = [
-        'account_id' => null, 'assistance_type_id' => $type_id, 'status' => 'Pending', 'created_at' => $created_at,
+        'account_id' => null, 'encoded_by' => $encoded_by ?: null, 'assistance_type_id' => $type_id, 'status' => 'Pending', 'created_at' => $created_at,
         'first_name' => $v['first_name'], 'middle_name' => $v['middle_name'], 'last_name' => $v['last_name'],
         'sex' => $v['sex'], 'contact_number' => $v['contact_number'],
         'house_no' => $v['house_no'], 'street' => $v['street'], 'barangay' => $v['barangay'],
@@ -206,6 +214,8 @@ if ($applicant_id === null) {
     walkin_respond($is_ajax, 500, ['success' => false,
         'message' => 'The application could not be saved because of a problem on the server. Please try again; if it keeps happening, tell the system administrator.']);
 }
+
+activity_log('applicant_encoded', ucfirst($form_type) . ' walk-in added: ' . trim($v['first_name'] . ' ' . $v['last_name']) . ' (Ref #' . $applicant_id . ').');
 
 walkin_respond($is_ajax, 200, [
     'success' => true,

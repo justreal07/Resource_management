@@ -5,7 +5,8 @@
  *
  * Read-only, and the same rules as the pages themselves:
  *   waiting = status 'Pending';  all time = every application except Disapproved;  today = filed today.
- * Who: any signed-in admin; staff get OPD only (their menu shows nothing else).
+ * Who: any signed-in admin; OPD staff get OPD only; Medical & Burial staff get Medical/Burial only (their menu
+ * shows nothing else).
  */
 require_once '../config.php';
 require_once '../includes/application_decision.php';
@@ -26,7 +27,7 @@ if ($user === null) {
     exit;
 }
 
-$typeIds = $user['role'] === 'admin' ? [1, 2, 3] : [3];
+$typeIds = array_values(array_filter([1, 2, 3], function ($t) use ($user) { return staff_can_view($user, $t); }));
 $marks = implode(',', array_fill(0, count($typeIds), '?'));
 
 try {
@@ -37,12 +38,30 @@ try {
     $pending = array_fill_keys($typeIds, 0);
     $allTotal = $approved = 0;
     $newest = 0;
+    // Flat per-type total/pending/approved, for a stat card's own data-live="total_<id>" etc.
+    // (data-live reads a plain top-level key; data-live-nav/data-live-card already read $pending the same way.)
+    $flat = [];
+    foreach ($typeIds as $t) {
+        $flat['total_' . $t] = 0;
+        $flat['pending_' . $t] = 0;
+        $flat['approved_' . $t] = 0;
+    }
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $n = (int)$r['n'];
+        $type = (int)$r['assistance_type_id'];
         $newest = max($newest, (int)$r['newest']);
-        if ($r['status'] === 'Pending') $pending[(int)$r['assistance_type_id']] += $n;
-        if ($r['status'] === 'Approved') $approved += $n;
-        if (!in_array($r['status'], ['Disapproved', 'Withdrawn'], true)) $allTotal += $n;   // declined and withdrawn are off every count
+        if ($r['status'] === 'Pending') {
+            $pending[$type] += $n;
+            $flat['pending_' . $type] += $n;
+        }
+        if ($r['status'] === 'Approved') {
+            $approved += $n;
+            $flat['approved_' . $type] += $n;
+        }
+        if (!in_array($r['status'], ['Disapproved', 'Withdrawn'], true)) {   // declined and withdrawn are off every count
+            $allTotal += $n;
+            $flat['total_' . $type] += $n;
+        }
     }
 
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM applicant WHERE DATE(created_at) = CURDATE() AND status NOT IN ('Disapproved', 'Withdrawn') AND assistance_type_id IN ($marks)");
@@ -51,7 +70,7 @@ try {
 
     $trend = trend_daily_new($pdo, $typeIds);
 
-    echo json_encode([
+    echo json_encode($flat + [
         'ok'           => true,
         'pending'      => $pending,                      // {"1": n, "2": n, "3": n}
         'pendingTotal' => array_sum($pending),

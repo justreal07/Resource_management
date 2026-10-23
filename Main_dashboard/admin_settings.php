@@ -103,9 +103,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     elseif ($action === 'delete_staff') {
-        // Only a staff account can be removed here: never an admin, and so never the signed-in admin themselves
+        // Only a staff account (either kind) can be removed here: never an admin, and so never the signed-in admin themselves
         $staff_id = (int)($_POST['staff_id'] ?? 0);
-        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = 'staff'");
+        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role IN ('staff', 'aid_staff')");
         $stmt->execute([$staff_id]);
         $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 avatar_remove($pdo, $staff_id);   // their picture goes with the account
-                $pdo->prepare("DELETE FROM users WHERE id = ? AND role = 'staff'")->execute([$staff_id]);
+                $pdo->prepare("DELETE FROM users WHERE id = ? AND role IN ('staff', 'aid_staff')")->execute([$staff_id]);
                 activity_log('staff_removed', 'Removed staff account: ' . ($staff['full_name'] ?: $staff['username']) . ' (@' . $staff['username'] . ').');
                 // An account with no decisions on record: nothing on any application pointed to it
                 $_SESSION['staff_flash'] = ($staff['full_name'] ?: $staff['username']) . " no longer has access. They cannot sign in anymore.";
@@ -132,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'remove_staff_avatar') {
         // A picture that should not be there: the admin removes it (staff upload their own; nobody uploads for someone else)
         $staff_id = (int)($_POST['staff_id'] ?? 0);
-        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = 'staff'");
+        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role IN ('staff', 'aid_staff')");
         $stmt->execute([$staff_id]);
         $staff = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$staff) {
@@ -148,14 +148,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
     elseif ($action === 'toggle_staff' || $action === 'toggle_admin') {
-        // Turn a staff account (or another administrator's) off (it cannot sign in, and is signed out on its next page) or back on.
-        // Nothing is deleted. The signed-in admin can't turn themself off, so there is always one admin who can still sign in.
+        // Turn a staff account (either kind) or another administrator's off (it cannot sign in, and is signed out on
+        // its next page) or back on. Nothing is deleted. The signed-in admin can't turn themself off, so there is
+        // always one admin who can still sign in. The target's own role column decides the UPDATE, not the action name.
         $isAdminTarget = $action === 'toggle_admin';
-        $targetRole = $isAdminTarget ? 'admin' : 'staff';
         $staff_id = (int)($_POST['staff_id'] ?? 0);
         $turnOn = ($_POST['turn'] ?? '') === 'on';
-        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = ?");
-        $stmt->execute([$staff_id, $targetRole]);
+        $stmt = $pdo->prepare("SELECT id, username, full_name, role FROM users WHERE id = ? AND role " . ($isAdminTarget ? "= 'admin'" : "IN ('staff', 'aid_staff')"));
+        $stmt->execute([$staff_id]);
         $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if (!$staff) {
@@ -166,7 +166,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $errors[] = "Turning accounts off needs a small database update that could not be applied automatically. Import database/migrations/migration_admin_tools.sql in phpMyAdmin, then try again.";
         } else {
             try {
-                $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ? AND role = ?")->execute([$turnOn ? 1 : 0, $staff_id, $targetRole]);
+                $pdo->prepare("UPDATE users SET is_active = ? WHERE id = ? AND role = ?")->execute([$turnOn ? 1 : 0, $staff_id, $staff['role']]);
                 $name = $staff['full_name'] ?: $staff['username'];
                 activity_log($turnOn ? 'staff_enabled' : 'staff_disabled', ($turnOn ? 'Access turned on for ' : 'Access turned off for ')
                     . ($isAdminTarget ? 'administrator ' : '') . $name . ' (@' . $staff['username'] . ').');
@@ -186,7 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $staff_id = (int)($_POST['staff_id'] ?? 0);
         $new_password = trim($_POST['staff_new_password'] ?? '');
         $confirm_password = trim($_POST['staff_confirm_password'] ?? '');
-        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role = 'staff'");
+        $stmt = $pdo->prepare("SELECT id, username, full_name FROM users WHERE id = ? AND role IN ('staff', 'aid_staff')");
         $stmt->execute([$staff_id]);
         $staff = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -201,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 // The staff member is signed out wherever they are signed in: their open sign-ins carry the old password's fingerprint
-                $pdo->prepare("UPDATE users SET password = ? WHERE id = ? AND role = 'staff'")
+                $pdo->prepare("UPDATE users SET password = ? WHERE id = ? AND role IN ('staff', 'aid_staff')")
                     ->execute([password_hash($new_password, PASSWORD_DEFAULT), $staff_id]);
                 $name = $staff['full_name'] ?: $staff['username'];
                 activity_log('staff_password_reset', 'Password reset for ' . $name . ' (@' . $staff['username'] . ').');
@@ -287,12 +287,14 @@ $isGoogleApplicant = function (array $a): bool {
 };
 
 /**
- * Has this staff account decided any request? (approved or declined one, or left a line in the status history)
- * Then it must not be removed: that would erase who decided what. If a column is missing (older database), only what exists counts.
+ * Has this staff account decided any request (approved or declined one, or left a line in the status history), or
+ * encoded a walk-in? Then it must not be removed: that would erase who decided or encoded what. If a column is
+ * missing (older database), only what exists counts.
  */
 function staff_has_records(PDO $pdo, int $staffId): bool
 {
     foreach (["SELECT 1 FROM applicant WHERE approved_by = ? LIMIT 1", "SELECT 1 FROM applicant WHERE disapproved_by = ? LIMIT 1",
+              "SELECT 1 FROM applicant WHERE encoded_by = ? LIMIT 1",
               "SELECT 1 FROM application_status_history WHERE changed_by = ? LIMIT 1"] as $sql) {
         try {
             $stmt = $pdo->prepare($sql);
@@ -305,7 +307,8 @@ function staff_has_records(PDO $pdo, int $staffId): bool
     return false;
 }
 
-// Staff accounts: they can sign in and handle OPD requests (and nothing else)
+// Staff accounts: OPD staff handle OPD requests, Medical & Burial staff encode walk-ins for those two programs
+// (and nothing else either way)
 $staffFlash = (string)($_SESSION['staff_flash'] ?? '');
 unset($_SESSION['staff_flash']);
 $staffList = [];
@@ -315,18 +318,19 @@ $statusColumns = $toolsReady ? 'u.is_active, u.last_login_at' : '1 AS is_active,
 try {
     try {
         $staffList = $pdo->query("
-            SELECT u.id, u.username, u.full_name, u.created_at, $statusColumns,
+            SELECT u.id, u.username, u.full_name, u.role, u.created_at, $statusColumns,
                    (SELECT COUNT(*) FROM applicant a WHERE a.approved_by = u.id) AS approved_count,
-                   (SELECT COUNT(*) FROM applicant a WHERE a.disapproved_by = u.id) AS disapproved_count
-            FROM users u WHERE u.role = 'staff' ORDER BY u.created_at DESC, u.id DESC
+                   (SELECT COUNT(*) FROM applicant a WHERE a.disapproved_by = u.id) AS disapproved_count,
+                   (SELECT COUNT(*) FROM applicant a WHERE a.encoded_by = u.id) AS encoded_count
+            FROM users u WHERE u.role IN ('staff', 'aid_staff') ORDER BY u.created_at DESC, u.id DESC
         ")->fetchAll(PDO::FETCH_ASSOC);
     } catch (PDOException $e) {
-        // Database without migration_disapprove.sql: no disapproved_by column yet
+        // Database without migration_disapprove.sql / migration_aid_staff.sql: some columns not there yet
         $staffList = $pdo->query("
-            SELECT u.id, u.username, u.full_name, u.created_at, $statusColumns,
+            SELECT u.id, u.username, u.full_name, u.role, u.created_at, $statusColumns,
                    (SELECT COUNT(*) FROM applicant a WHERE a.approved_by = u.id) AS approved_count,
-                   0 AS disapproved_count
-            FROM users u WHERE u.role = 'staff' ORDER BY u.created_at DESC, u.id DESC
+                   0 AS disapproved_count, 0 AS encoded_count
+            FROM users u WHERE u.role IN ('staff', 'aid_staff') ORDER BY u.created_at DESC, u.id DESC
         ")->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (PDOException $e) {
@@ -356,7 +360,7 @@ $messageFor = function (string $formAction) use ($errors, $success): string {
 };
 
 admin_layout_start(['title' => 'Admin Settings', 'section' => 'settings']);
-echo ui_page_head('Admin settings', 'Your own account, and the staff accounts that can use the OPD pages.');
+echo ui_page_head('Admin settings', 'Your own account, and the staff accounts that can use the OPD or the Medical/Burial pages.');
 ?>
 <?php
 $profileSent  = ($_POST['action'] ?? '') === 'update_profile';
@@ -369,7 +373,7 @@ $active       = ($_POST['action'] ?? '') === 'change_password' ? 'security'
 $tabs = [
     'profile'    => ['Profile',    'user',   'Your name and the username you sign in with.'],
     'security'   => ['Password',   'lock',   'Choose a new password for your account.'],
-    'staff'      => ['OPD staff',  'van',    'Who can sign in as staff and handle OPD requests, and which other administrators can sign in. Turn an account off, or reset a staff password. An account that never decided a request can also be removed.'],
+    'staff'      => ['Staff',      'van',    'Who can sign in as OPD staff or Medical & Burial staff, and which other administrators can sign in. Turn an account off, or reset a staff password. An account that never decided or encoded anything can also be removed.'],
     'applicants' => ['Applicants', 'search', 'Help an applicant who forgot their password and has no email on the account.'],
 ];
 ?>
@@ -457,27 +461,30 @@ $tabs = [
             <?php if ($staffLoadError): ?>
                 <?= ui_state('alert', 'The staff list could not be loaded', 'Please reload the page. If it keeps happening, tell the system administrator.') ?>
             <?php elseif (!$staffList): ?>
-                <?= ui_state('inbox', 'No staff accounts yet', 'Nobody but admins can sign in right now. Add a staff account to let someone handle OPD requests.',
+                <?= ui_state('inbox', 'No staff accounts yet', 'Nobody but admins can sign in right now. Add a staff account to let someone handle OPD requests, or encode Medical and Burial walk-ins.',
                     '<a class="btn btn-secondary btn-sm" href="../login/register">' . ui_icon('user-plus') . 'Add staff account</a>') ?>
             <?php else:
                 $activeCount = count(array_filter($staffList, function ($s) { return (int)$s['is_active'] === 1; }));
                 $nowTs = time();
             ?>
-                <p class="staff-count"><strong><?= $activeCount ?></strong> of <?= count($staffList) ?> staff <?= count($staffList) === 1 ? 'account' : 'accounts' ?> can use OPD right now.
-                    <span class="muted">Staff can approve and decline OPD requests only. They cannot open Medical, Burial, Reports or Settings.</span></p>
+                <p class="staff-count"><strong><?= $activeCount ?></strong> of <?= count($staffList) ?> staff <?= count($staffList) === 1 ? 'account' : 'accounts' ?> can sign in right now.
+                    <span class="muted">OPD staff can approve and decline OPD requests only. Medical & Burial staff encode walk-in Medical and Burial applications for an admin to decide; they never approve, decline or see an amount outside a single record. Neither can open Reports in full or Settings.</span></p>
                 <div class="table-wrap">
                     <table class="data-table">
                         <thead><tr>
                             <th scope="col">Staff member</th>
+                            <th scope="col">Kind</th>
                             <th scope="col">Last signed in</th>
                             <th scope="col">Approved</th>
                             <th scope="col">Declined</th>
+                            <th scope="col">Encoded</th>
                             <th scope="col"><span class="visually-hidden">Manage</span></th>
                         </tr></thead>
                         <tbody>
                         <?php foreach ($staffList as $s):
                             $sname = trim((string)$s['full_name']) !== '' ? $s['full_name'] : $s['username'];
                             $isOn = (int)$s['is_active'] === 1;
+                            $kindLabel = $s['role'] === 'aid_staff' ? 'Medical & Burial staff' : 'OPD staff';
                         ?>
                             <tr>
                                 <td class="cell-main" data-label="Staff member">
@@ -490,9 +497,11 @@ $tabs = [
                                         </div>
                                     </div>
                                 </td>
+                                <td data-label="Kind"><?= ui_e($kindLabel) ?></td>
                                 <td data-label="Last signed in"><?= !empty($s['last_login_at']) ? ui_e(ui_ago(strtotime($s['last_login_at']), $nowTs)) : '<span class="muted">Never</span>' ?></td>
                                 <td data-label="Approved"><?= (int)$s['approved_count'] ?></td>
                                 <td data-label="Declined"><?= (int)$s['disapproved_count'] ?></td>
+                                <td data-label="Encoded"><?= (int)$s['encoded_count'] ?></td>
                                 <td class="cell-action">
                                     <details class="row-menu">
                                         <summary class="btn btn-secondary btn-sm">Manage<span class="visually-hidden"> <?= ui_e($sname) ?></span></summary>
@@ -527,7 +536,7 @@ $tabs = [
                                             </form>
                                             <?php endif; ?>
                                             <?php if (staff_has_records($pdo, (int)$s['id'])): ?>
-                                                <p class="row-menu-note muted">Has approved or declined requests, so the account is kept: the office always needs to see who decided what. Turn off access instead.</p>
+                                                <p class="row-menu-note muted">Has approved, declined or encoded requests, so the account is kept: the office always needs to see who decided or encoded what. Turn off access instead.</p>
                                             <?php else: ?>
                                             <form method="POST">
                                                 <?= decision_csrf_field() ?>
@@ -535,7 +544,7 @@ $tabs = [
                                                 <input type="hidden" name="staff_id" value="<?= (int)$s['id'] ?>">
                                                 <button type="submit" class="btn btn-link btn-sm row-menu-danger"
                                                     data-confirm="Remove this staff account?"
-                                                    data-confirm-message="This account has not decided any request yet, so nothing else changes. They will not be able to sign in anymore. This cannot be undone."
+                                                    data-confirm-message="This account has not decided or encoded any request yet, so nothing else changes. They will not be able to sign in anymore. This cannot be undone."
                                                     data-confirm-name="<?= ui_e($sname) ?>"
                                                     data-confirm-ref="<?= ui_e('@' . $s['username']) ?>"
                                                     data-confirm-ok="Remove account">Remove account</button>
@@ -559,8 +568,11 @@ $tabs = [
                         <label for="reset_staff_id">Staff member <span class="req" aria-hidden="true">*</span></label>
                         <select id="reset_staff_id" name="staff_id" required data-message="Choose a staff member.">
                             <option value="">Choose…</option>
-                            <?php foreach ($staffList as $s): ?>
-                                <option value="<?= (int)$s['id'] ?>"<?= (int)($_POST['staff_id'] ?? 0) === (int)$s['id'] && ($_POST['action'] ?? '') === 'reset_staff_password' ? ' selected' : '' ?>><?= ui_e(trim((string)$s['full_name']) !== '' ? $s['full_name'] . ' (@' . $s['username'] . ')' : '@' . $s['username']) ?></option>
+                            <?php foreach ($staffList as $s):
+                                $sKind = $s['role'] === 'aid_staff' ? 'Medical & Burial staff' : 'OPD staff';
+                                $sLabel = (trim((string)$s['full_name']) !== '' ? $s['full_name'] . ' (@' . $s['username'] . ')' : '@' . $s['username']) . ' — ' . $sKind;
+                            ?>
+                                <option value="<?= (int)$s['id'] ?>"<?= (int)($_POST['staff_id'] ?? 0) === (int)$s['id'] && ($_POST['action'] ?? '') === 'reset_staff_password' ? ' selected' : '' ?>><?= ui_e($sLabel) ?></option>
                             <?php endforeach; ?>
                         </select>
                     </div>

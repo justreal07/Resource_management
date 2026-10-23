@@ -1,27 +1,32 @@
 <?php
 require_once '../config.php';
+// Medical & Burial staff reach this page too (Pending, their two programs only): the staff-side layout for them.
+$editRole = $_SESSION['user']['role'] ?? '';
+if ($editRole === 'aid_staff') define('UI_AREA', 'staff');
 require_once '../includes/admin_layout.php';
 require_once '../user/person_rules.php';   // validate_application() and the choice lists of the online forms, and the person registry fix
 
-// Editing a record is for administrators (the lists only show Edit to them). This page saves changes,
-// so it checks the sign-in itself, whatever ADMIN_LAYOUT_REQUIRE_LOGIN says.
-if (($_SESSION['user']['role'] ?? '') !== 'admin') {
-    header('Location: ../login/login?role=admin');
+// Editing a record is for administrators, and for Medical & Burial staff fixing their own mistake while it is
+// still Pending (checked again below, once the record is loaded: their two programs, status Pending only).
+// This page saves changes, so it checks the sign-in itself, whatever ADMIN_LAYOUT_REQUIRE_LOGIN says.
+if (!in_array($editRole, ['admin', 'aid_staff'], true)) {
+    header('Location: ../login/login?role=' . ($editRole === '' ? 'admin' : $editRole));
     exit;
 }
+$fallbackPage = $editRole === 'aid_staff' ? '../staff/aid_staff_dashboard' : 'dashboard';
 
 // Get applicant ID from query string
 if (!isset($_GET['id'])) {
-    header('Location: dashboard');
+    header('Location: ' . $fallbackPage);
     exit;
 }
 $id = intval($_GET['id']);
 
-// Where to go after saving or Cancel. Only a page of this system is accepted (e.g. ../medical/Mpending.php),
-// so a link can't send the user to another website.
+// Where to go after saving or Cancel. Only a page of this system is accepted (e.g. ../medical/Mpending.php or
+// ../staff/Mpending.php), so a link can't send the user to another website.
 $redirect = isset($_GET['redirect']) && is_string($_GET['redirect'])
-    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/)?[A-Za-z_]+(\.php)?(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
-    ? $_GET['redirect'] : 'dashboard';
+    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/|staff/)?[A-Za-z_]+(\.php)?(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
+    ? $_GET['redirect'] : $fallbackPage;
 
 // Fetch applicant data
 $stmt = $pdo->prepare('SELECT * FROM applicant WHERE id = ?');
@@ -31,6 +36,16 @@ $applicant = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$applicant) {
     admin_layout_start(['title' => 'Edit applicant', 'section' => 'dashboard']);
     echo ui_state('alert', 'Applicant not found', 'It may have been removed. Check the reference number.',
+        '<a class="btn btn-secondary btn-sm" href="' . ui_e($redirect) . '">Go back</a>', 'state-error');
+    admin_layout_end();
+    exit;
+}
+
+// Medical & Burial staff: their own two programs, and only while it is still Pending (an admin's decision locks
+// it again, same as everyone else). Anything else here is "not found", not a greyed-out page.
+if ($editRole === 'aid_staff' && (!staff_can_view(decision_user(), (int)$applicant['assistance_type_id']) || $applicant['status'] !== 'Pending')) {
+    admin_layout_start(['title' => 'Edit applicant', 'section' => 'dashboard']);
+    echo ui_state('alert', 'Page not found', 'This page isn\'t part of your account.',
         '<a class="btn btn-secondary btn-sm" href="' . ui_e($redirect) . '">Go back</a>', 'state-error');
     admin_layout_end();
     exit;

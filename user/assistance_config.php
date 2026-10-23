@@ -53,13 +53,14 @@ $ASSISTANCE_PROGRAMS = [
         // How often: shown on the forms, My Account and to the chat assistant. Follows person_rules.php.
         'frequency' => 'Once per patient; again with office approval',
         'cooldown_days' => 0,      // no account-level wait: applying again for the same patient needs an admin's permission (person_rules.php)
-        // Document name => short hint shown under it
+        // Document name => short hint shown under it. Names are in UPPER CASE on purpose, matching the office's
+        // official requirements board; keep them that way if this list changes again.
         'documents' => [
-            'Letter of Intent'                                   => 'Photo of your signed letter of intent.',
-            'Brgy Indigency & Residency (Applicant & Patient)'   => 'Photos of the barangay certificates of both the applicant and the patient.',
-            'Valid ID with 3 specimen signatures'                => 'Front and back of the ID, with the 3 signatures visible.',
-            'Original copy medical certificate or certified true copy of clinical abstract' => 'Make sure the doctor\'s name and signature are readable.',
-            'MSWD Case Study'                                    => 'Photo of every page of the case study.',
+            'PHOTOCOPY OF VALID ID (PATIENT & CLAIMANT) WITH 3 SIGNATURES' => 'Front and back of the ID, with the 3 signatures visible.',
+            'BRGY. INDIGENCY / RESIDENCY (PATIENT & CLAIMANT)'             => 'Photos of the barangay certificates of both the patient and the claimant.',
+            'MEDICAL CERTIFICATE OR CLINICAL ABSTRACT (ORIGINAL COPY OR CERTIFIED TRUE COPY)' => 'Make sure the doctor\'s name and signature are readable.',
+            'LETTER OF INTENT'                                             => 'Photo of your signed letter of intent.',
+            'MSWD CASE STUDY'                                              => 'Photo of every page of the case study.',
         ],
         // Fields re-filled from the user's last application of this same program.
         // Ages are not: they go out of date. The claimant's age comes from their birthdate (get_form_prefill()).
@@ -76,12 +77,13 @@ $ASSISTANCE_PROGRAMS = [
         'tone'      => 'blue',
         'frequency' => 'Once per deceased person',
         'cooldown_days' => 0,      // no account-level wait: one application per deceased person (person_rules.php)
+        // Names are in UPPER CASE on purpose, matching the office's official requirements board.
         'documents' => [
-            'Letter of Intent'                                   => 'Photo of your signed letter of intent.',
-            'Brgy Indigency & Residency (Applicant & Patient)'   => 'Photos of the barangay certificates.',
-            'Valid ID with 3 specimen signatures'                => 'Front and back of the ID, with the 3 signatures visible.',
-            'Certified True Copy of Death Certificate'           => 'The whole certificate must be visible and readable.',
-            'MSWD Case Study'                                    => 'Photo of every page of the case study.',
+            'PHOTOCOPY OF VALID ID (CLAIMANT) WITH 3 SIGNATURES'      => 'Front and back of the ID, with the 3 signatures visible.',
+            'BRGY. INDIGENCY / RESIDENCY (PATIENT & CLAIMANT)'        => 'Photos of the barangay certificates.',
+            'DEATH CERTIFICATE AND FUNERAL CONTRACT (CERTIFIED TRUE COPY)' => 'The whole death certificate and the funeral contract must be visible and readable.',
+            'LETTER OF INTENT'                                        => 'Photo of your signed letter of intent.',
+            'MSWD CASE STUDY'                                         => 'Photo of every page of the case study.',
         ],
         'remember'  => [],   // the claimant's age comes from their birthdate (get_form_prefill())
     ],
@@ -96,9 +98,10 @@ $ASSISTANCE_PROGRAMS = [
         'tone'      => 'green',
         'frequency' => 'For every check-up your doctor schedules',
         'cooldown_days' => 0,      // no limit on how many: a vehicle for every check-up the doctor schedules (but one request per patient per check-up date: person_rules.php)
+        // Names are in UPPER CASE on purpose, same as Medical and Burial above.
         'documents' => [
-            'Blue Card Schedule' => 'Photo of the blue card showing your schedule.',
-            'Valid ID'           => 'Front and back of a valid government ID.',
+            'BLUE CARD SCHEDULE' => 'Photo of the blue card showing your schedule.',
+            'VALID ID'           => 'Front and back of a valid government ID.',
         ],
         // The patient's birthdate is remembered with the name (the same patient goes for the next check-up). The age is
         // not asked: it is worked out from the birthdate (opd_with_age()).

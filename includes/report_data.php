@@ -645,8 +645,12 @@ function report_model(array $parts = []): array
     return $parts + ['title' => '', 'cards' => [], 'charts' => [], 'tables' => [], 'notes' => [], 'empty' => null, 'error' => false, 'retry' => ''];
 }
 
-/** Builds the report the filters ask for. A database problem comes back as ['error' => true] (the details go to the error log). */
-function report_build(PDO $pdo, array $f): array
+/**
+ * Builds the report the filters ask for. A database problem comes back as ['error' => true] (the details go to the error log).
+ * $hideAmounts: Medical & Burial staff's own report page (staff/aid_staff_report.php) passes true, for the Medical/Burial
+ * tabs only (the other tabs never reach that page).
+ */
+function report_build(PDO $pdo, array $f, bool $hideAmounts = false): array
 {
     $base = report_model(['title' => report_types()[$f['report']], 'notes' => report_notes($f), 'retry' => report_query($f)]);
     try {
@@ -654,7 +658,7 @@ function report_build(PDO $pdo, array $f): array
             case 'medical':
             case 'burial':
                 require_once __DIR__ . '/../reports/program_report.php';
-                $part = report_build_program($pdo, $f, $f['report'] === 'medical' ? 1 : 2);
+                $part = report_build_program($pdo, $f, $f['report'] === 'medical' ? 1 : 2, $hideAmounts);
                 break;
             case 'opd':
                 require_once __DIR__ . '/../reports/opd_report.php';

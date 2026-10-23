@@ -2,7 +2,7 @@
 /**
  * A staff member's own account page: their picture (optional), name and role.
  * The picture is saved by Main_dashboard/avatar_action.php (includes/avatar.php). Staff cannot change their name,
- * username or password here: an admin does that in Admin settings > OPD staff.
+ * username or password here: an admin does that in Admin settings > Staff.
  */
 require_once '../config.php';
 define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
@@ -11,7 +11,7 @@ require_once '../includes/admin_layout.php';
 $me = $_SESSION['user'] ?? [];
 $myId = (int)($me['id'] ?? 0);
 $displayName = trim((string)($me['name'] ?? '')) !== '' ? $me['name'] : (string)($me['username'] ?? '');
-$roleLabel = ($me['role'] ?? '') === 'admin' ? 'Administrator' : 'Staff';
+$roleLabel = ['admin' => 'Administrator', 'aid_staff' => 'Medical & Burial staff'][$me['role'] ?? ''] ?? 'Staff';
 
 admin_layout_start(['title' => 'My account', 'section' => 'account']);
 echo ui_page_head('My account', 'Your picture and who you are signed in as.');

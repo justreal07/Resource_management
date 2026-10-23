@@ -183,12 +183,12 @@
 .auth-form .btn-block { margin-top: 8px; }
 
 /* ============================================
-   ACCOUNT TYPE (Register): Staff / Admin
+   ACCOUNT TYPE (Register): OPD staff / Medical & Burial staff / Admin
 ============================================ */
 .role-switch {
     position: relative;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
     gap: 4px;
     padding: 4px;
     background: var(--c-surface-2);

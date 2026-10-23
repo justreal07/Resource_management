@@ -4,8 +4,9 @@ require_once '../includes/admin_security.php';   // activity log, wrong-password
 
 // Where each role goes after signing in
 $dashboards = [
-    'admin' => '../Main_dashboard/dashboard',
-    'staff' => '../staff/staff_dashboard',
+    'admin'     => '../Main_dashboard/dashboard',
+    'staff'     => '../staff/staff_dashboard',
+    'aid_staff' => '../staff/aid_staff_dashboard',
 ];
 
 // Already signed in? No need to show the form again.
@@ -94,7 +95,7 @@ $noAdminYet = !(bool)$pdo->query("SELECT 1 FROM users WHERE role = 'admin' LIMIT
 auth_page_start('Sign in');
 auth_side(
     'Records system for Medical, Burial and OPD assistance requests.',
-    '<p class="side-note">' . auth_icon('user-shield') . ' Staff handle OPD requests. Admins oversee all three programs, reports and accounts.</p>'
+    '<p class="side-note">' . auth_icon('user-shield') . ' OPD staff handle OPD requests; Medical & Burial staff encode walk-ins for those two programs. Admins oversee all three programs, reports and accounts.</p>'
 );
 ?>
 

@@ -4,7 +4,8 @@
  *   export_applicants.php?type=1|2|3&status=all|Pending|Approved|Disapproved|Withdrawn
  * The "Export CSV" button on every list page (ui_type_tabs) links here.
  *
- * Who: an admin, any program; OPD staff, OPD only (same rule as the list pages).
+ * Who: an admin, any program; OPD staff, OPD only; Medical & Burial staff, Medical/Burial only, with no amount
+ * column (same rule as the list pages).
  * What: the same applications the list page shows. "all" leaves out Disapproved and Withdrawn, like the "All applications" lists.
  * Nothing is changed in the database; the download is written to the activity log.
  */
@@ -25,7 +26,7 @@ if (!isset($types[$typeId])) {
     http_response_code(400);
     exit('Choose a program to export.');
 }
-if (!decision_can($user, $typeId)) {
+if (!staff_can_view($user, $typeId)) {
     http_response_code(403);
     exit('You can only export the programs you handle.');
 }
@@ -105,6 +106,10 @@ array_push($columns,
     ['Edited by applicant on', function ($a) { return ui_date($a['edited_at'] ?? '', 'Y-m-d H:i'); }],
     ['Remarks',        function ($a) { return $a['remarks'] ?? ''; }]
 );
+// Medical & Burial staff never see money: no amount column in their CSV
+if ($user['role'] === 'aid_staff') {
+    $columns = array_values(array_filter($columns, function ($c) { return $c[0] !== 'Amount released'; }));
+}
 
 try {
     $where = 'a.assistance_type_id = ?';

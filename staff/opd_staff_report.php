@@ -2,6 +2,7 @@
 require_once '../config.php';
 define('UI_AREA', 'staff');   // menu, tabs and links stay on the staff side
 require_once '../includes/admin_layout.php';
+staff_only_role('staff', 'Reports');
 
 // Get selected date (only a real YYYY-MM-DD reaches the query and the page).
 // Opens on today: staff plan the day's trips. (It used to open on the latest check-up date, which could be

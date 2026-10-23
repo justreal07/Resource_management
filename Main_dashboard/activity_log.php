@@ -111,7 +111,7 @@ echo ui_page_head('Activity log', 'Who approved, declined or withdrew a request,
         <select id="fActor" name="actor">
             <option value="">Everyone</option>
             <?php foreach ($people as $p): ?>
-                <option value="<?= (int)$p['id'] ?>"<?= $actorId === (int)$p['id'] ? ' selected' : '' ?>><?= ui_e($p['name'] . ' (' . ($p['role'] === 'admin' ? 'admin' : 'staff') . ')') ?></option>
+                <option value="<?= (int)$p['id'] ?>"<?= $actorId === (int)$p['id'] ? ' selected' : '' ?>><?= ui_e($p['name'] . ' (' . ($p['role'] === 'admin' ? 'admin' : ($p['role'] === 'aid_staff' ? 'Medical & Burial staff' : 'staff')) . ')') ?></option>
             <?php endforeach; ?>
         </select>
     </div>
@@ -160,7 +160,7 @@ echo ui_page_head('Activity log', 'Who approved, declined or withdrew a request,
                                     <?= (!$isStranger && (int)$r['actor_id'] > 0) ? ui_avatar((int)$r['actor_id'], (string)$r['actor_name'], 'avatar-sm') : '' ?>
                                     <div>
                                         <strong class="row-name"><?= ui_e($r['actor_name']) ?></strong>
-                                        <span class="muted"><?= $isStranger ? 'Not signed in' : ($r['actor_role'] === 'admin' ? 'Admin' : ($r['actor_role'] === 'staff' ? 'Staff' : ($r['actor_role'] === 'applicant' ? 'Applicant' : ''))) ?></span>
+                                        <span class="muted"><?= $isStranger ? 'Not signed in' : ($r['actor_role'] === 'admin' ? 'Admin' : ($r['actor_role'] === 'staff' ? 'Staff' : ($r['actor_role'] === 'aid_staff' ? 'Medical & Burial staff' : ($r['actor_role'] === 'applicant' ? 'Applicant' : '')))) ?></span>
                                     </div>
                                 </div>
                             <?php elseif ($r['actor_id']): ?>

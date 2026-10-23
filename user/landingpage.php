@@ -157,7 +157,7 @@ $programs = [
         </button>
 
         <nav class="nav-menu" id="navMenu" aria-label="Main">
-            <a href="landingpage" class="nav-link active">Home</a>
+            <a href="landingpage" class="nav-link">Home</a>
             <a href="#programs" class="nav-link">Programs</a>
             <a href="announcements" class="nav-link">Announcements</a>
             <?php /* Rate our service (user/feedback.php); signed out, it asks to log in first and then opens */ ?>
@@ -247,7 +247,7 @@ $programs = [
 <section class="hero">
     <div class="hero-media" aria-hidden="true">
         <?php /* The photo shows first. The (small) video is only loaded on a wider screen, when the visitor isn't saving data and hasn't asked for less motion, so a phone on mobile data never downloads it. */ ?>
-        <video id="heroVideo" muted loop playsinline preload="none" poster="../asset/top.jpeg" data-src="../asset/muni-small.mp4"></video>
+        <video id="heroVideo" muted loop playsinline preload="none" poster="../asset/hero-municipal.jpg" data-src="../asset/muni-small.mp4"></video>
         <script>
         (function () {
             var v = document.getElementById('heroVideo');
@@ -268,15 +268,11 @@ $programs = [
                 <?php /* The greeting is re-written by the script below with the time on the visitor's own device, typed out */ ?>
                 <h1 class="hero-greeting" data-greeting data-name="<?php echo htmlspecialchars($_SESSION['applicant']['firstname']); ?>"><?php echo $greeting; ?>, <span class="accent"><?php echo htmlspecialchars($_SESSION['applicant']['firstname']); ?></span>!</h1>
                 <p class="hero-lead"><span data-greeting-fil>Magandang araw!</span> Apply for assistance, upload your requirements and follow your application — all in one place, anytime.</p>
-                <div class="hero-cta">
-                    <a href="#programs" class="btn btn-gold"><i class="fas fa-file-signature"></i> Apply for Assistance</a>
-                    <a href="my_account" class="btn btn-ghost-light"><i class="fas fa-search"></i> Track My Applications</a>
-                </div>
+                
             <?php else: ?>
                 <h1>Tulong para sa bawat <span class="accent">pamilyang GMA</span>.</h1>
                 <p class="hero-lead">Request Medical, Burial and OPD assistance from your municipal government online — no long lines, and you can follow your application every step of the way.</p>
                 <div class="hero-cta">
-                    <a href="applicant_register" class="btn btn-gold"><i class="fas fa-user-plus"></i> Create Free Account</a>
                     <a href="#programs" class="btn btn-ghost-light"><i class="fas fa-th-large"></i> View Programs</a>
                 </div>
             <?php endif; ?>
@@ -285,6 +281,7 @@ $programs = [
                 <li><i class="fas fa-check-circle"></i> For GMA, Cavite residents</li>
                 <li><i class="fas fa-check-circle"></i> Apply online 24/7</li>
                 <li><i class="fas fa-check-circle"></i> Real-time status updates</li>
+                <li><i class="fas fa-check-circle"></i> Office hours 8:00 AM - 5:00 PM</li>
             </ul>
         </div>
 
@@ -411,45 +408,6 @@ $programs = [
 
         <div class="dash-grid">
         <div class="dash-main">
-        <!-- RECENT APPLICATIONS -->
-        <div class="recent-card reveal">
-            <div class="card-head">
-                <h3><i class="fas fa-history"></i> Recent Applications</h3>
-                <?php if(!empty($recent_applications)): ?>
-                    <a href="my_account#applications" class="link-arrow">View all <i class="fas fa-arrow-right"></i></a>
-                <?php endif; ?>
-            </div>
-            <?php if(!empty($recent_applications)): ?>
-            <div class="applications-list">
-                <?php foreach($recent_applications as $app): ?>
-                <div class="app-card <?php echo strtolower($app['status']); ?>">
-                    <div class="app-info">
-                        <h4><?php echo htmlspecialchars($app['assistance_name']); ?></h4>
-                        <div class="app-meta">
-                            <span><i class="fas fa-hashtag"></i>Application <?php echo $app['id']; ?></span>
-                            <span><i class="far fa-calendar"></i><?php echo date('M d, Y', strtotime($app['created_at'])); ?></span>
-                        </div>
-                    </div>
-                    <span class="status-badge <?php echo strtolower($app['status']); ?>">
-                        <?php echo htmlspecialchars($app['status'] === 'Disapproved' ? 'Declined' : $app['status']); /* Pending, Approved, Withdrawn as stored */ ?>
-                    </span>
-                    <a href="view_application?id=<?php echo $app['id']; ?>" class="app-view-btn" aria-label="View application #<?php echo $app['id']; ?>">
-                        <i class="fas fa-eye"></i>
-                    </a>
-                </div>
-                <?php endforeach; ?>
-            </div>
-            <?php else: ?>
-            <div class="empty-state">
-                <i class="far fa-folder-open"></i>
-                <p>You haven't submitted any applications yet.<br>Choose a program below to get started.</p>
-                <a href="#programs" class="btn btn-primary btn-sm">Browse Programs</a>
-            </div>
-            <?php endif; ?>
-        </div>
-        </div>
-
-        <div class="dash-side">
             <!-- LATEST UPDATES -->
             <div class="recent-card reveal">
                 <div class="card-head">
@@ -474,9 +432,11 @@ $programs = [
                 <?php else: ?>
                     <p class="muted-note">No updates yet. We'll let you know when something changes.</p>
                 <?php endif; ?>
-            </div>
 
-            <?php if($profile_percent < 100): ?>
+            </div>
+        </div>
+        <div class="dash-side">
+<?php if($profile_percent < 100): ?>
             <!-- PROFILE PROMPT -->
             <a href="my_account#profile" class="profile-prompt reveal">
                 <span class="pp-ring" style="--p: <?php echo $profile_percent; ?>"><span><?php echo $profile_percent; ?>%</span></span>
@@ -487,6 +447,7 @@ $programs = [
                 <i class="fas fa-chevron-right"></i>
             </a>
             <?php endif; ?>
+
         </div>
         </div>
     </div>
@@ -633,7 +594,7 @@ $programs = [
                 <details class="faq-item">
                     <summary>How will I know if my application is approved?</summary>
                     <div class="faq-answer">
-                        Log in and check your <strong>dashboard</strong> or the <strong>notification bell</strong> at the top of the page.
+                        Log in and check your <strong>dashboard</strong> or the <strong>notification bell</strong> at the top of the page, and also check your email for updates.
                         Your application will show as <em>Pending</em>, <em>Approved</em> or <em>Declined</em>. If it is declined, you may apply again right away.
                     </div>
                 </details>
@@ -687,32 +648,7 @@ $programs = [
     </div>
 </section>
 
-<!-- CTA BAND -->
-<section class="section" style="padding-top: 0;">
-    <div class="container">
-        <div class="cta-band reveal">
-            <?php if($is_logged_in): ?>
-                <div>
-                    <h2>Ready to submit a new request?</h2>
-                    <p>Make sure your documents are ready, then choose a program to begin.</p>
-                </div>
-                <div class="btn-row">
-                    <a href="#programs" class="btn btn-gold"><i class="fas fa-file-signature"></i> Start Application</a>
-                    <a href="my_documents" class="btn btn-ghost-light"><i class="fas fa-folder-open"></i> My Documents</a>
-                </div>
-            <?php else: ?>
-                <div>
-                    <h2>Handa ka na bang mag-apply?</h2>
-                    <p>Create your account in minutes and submit your first request today.</p>
-                </div>
-                <div class="btn-row">
-                    <a href="applicant_register" class="btn btn-gold"><i class="fas fa-user-plus"></i> Create Account</a>
-                    <a href="applicant_login" class="btn btn-ghost-light"><i class="fas fa-sign-in-alt"></i> I already have an account</a>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-</section>
+
 
 <!-- CONTACT -->
 <section class="section section-alt" id="contact">

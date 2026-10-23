@@ -7,6 +7,7 @@ admin_tools_ensure($pdo);
 $errors = [];
 $fullname = '';
 $username = '';
+$roleLabels = ['admin' => 'Admin', 'staff' => 'OPD staff', 'aid_staff' => 'Medical & Burial staff'];
 
 // Accounts are given by the office: only a signed-in admin creates staff and admin accounts
 // ("Add staff account" on the dashboard). Staff can approve and disapprove OPD requests, so anyone
@@ -48,8 +49,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($password !== $confirm) {
             $errors[] = "The two passwords don't match.";
         }
-        if (!in_array($role, ['admin', 'staff'], true)) {
-            $errors[] = 'Please choose Staff or Admin.';
+        if (!in_array($role, ['admin', 'staff', 'aid_staff'], true)) {
+            $errors[] = 'Please choose a kind of account.';
         } elseif ($role === 'admin' && !$canMakeAdmin) {
             $errors[] = 'Admin accounts can only be created by a signed-in admin. Choose Staff, or ask your admin to make one for you.';
         }
@@ -68,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)");
             $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT), $fullname, $role]);
             // Activity log: who made the account (nobody signed in = the very first admin)
-            activity_log('staff_created', ucfirst($role) . ' account created: ' . $fullname . ' (@' . $username . ').',
+            activity_log('staff_created', ($roleLabels[$role] ?? ucfirst($role)) . ' account created: ' . $fullname . ' (@' . $username . ').',
                 $signedInAdmin ? null : ['name' => $fullname, 'role' => $role]);
 
             $_SESSION['register_flash'] = ['username' => $username, 'role' => $role];
@@ -83,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-if (!in_array($role, ['admin', 'staff'], true) || ($role === 'admin' && !$canMakeAdmin)) {
+if (!in_array($role, ['admin', 'staff', 'aid_staff'], true) || ($role === 'admin' && !$canMakeAdmin)) {
     $role = 'staff';
 }
 require_once '../includes/auth_layout.php';
@@ -94,7 +95,10 @@ auth_side(
     '<div class="side-roles">'
     . '<div class="side-card side-role ' . ($role === 'staff' ? 'is-active' : '') . '" data-role-panel="staff" aria-hidden="' . ($role === 'staff' ? 'false' : 'true') . '">'
     .   '<span class="side-icon">' . auth_icon('user') . '</span>'
-    .   '<div><strong>Staff account</strong><span>For office personnel who handle OPD applicants: pending requests, schedules and reports.</span></div></div>'
+    .   '<div><strong>OPD staff</strong><span>Handles OPD applicants: pending requests, schedules and reports.</span></div></div>'
+    . '<div class="side-card side-role ' . ($role === 'aid_staff' ? 'is-active' : '') . '" data-role-panel="aid_staff" aria-hidden="' . ($role === 'aid_staff' ? 'false' : 'true') . '">'
+    .   '<span class="side-icon">' . auth_icon('user') . '</span>'
+    .   '<div><strong>Medical & Burial staff</strong><span>Encodes walk-in Medical and Burial applications for an admin to approve or decline.</span></div></div>'
     . '<div class="side-card side-role ' . ($role === 'admin' ? 'is-active' : '') . '" data-role-panel="admin" aria-hidden="' . ($role === 'admin' ? 'false' : 'true') . '">'
     .   '<span class="side-icon">' . auth_icon('user-shield') . '</span>'
     .   '<div><strong>Admin account</strong><span>Oversees Medical, Burial and OPD assistance, approves requests, views reports and manages accounts.</span></div></div>'
@@ -123,7 +127,7 @@ auth_side(
             <?php if (!empty($errors)): ?>
                 <?= auth_alert('error', 'alert', implode('', array_map(fn($e) => '<div>' . auth_e($e) . '</div>', $errors))) ?>
             <?php elseif ($created): ?>
-                <?= auth_alert('success', 'check-circle', auth_e(ucfirst($created['role'])) . ' account <strong>' . auth_e($created['username']) . '</strong> was created.') ?>
+                <?= auth_alert('success', 'check-circle', auth_e($roleLabels[$created['role']] ?? ucfirst($created['role'])) . ' account <strong>' . auth_e($created['username']) . '</strong> was created.') ?>
             <?php endif; ?>
 
             <form method="POST" action="" class="auth-form" data-loading-text="Creating account…">
@@ -132,7 +136,10 @@ auth_side(
                     <span class="label" id="roleLabel">Account type</span>
                     <div class="role-switch" role="radiogroup" aria-labelledby="roleLabel">
                         <input type="radio" name="role" id="roleStaff" value="staff" autocomplete="off" <?= $role === 'staff' ? 'checked' : '' ?>>
-                        <label class="role-option" for="roleStaff"><?= auth_icon('user') ?> Staff</label>
+                        <label class="role-option" for="roleStaff"><?= auth_icon('user') ?> OPD staff</label>
+
+                        <input type="radio" name="role" id="roleAidStaff" value="aid_staff" autocomplete="off" <?= $role === 'aid_staff' ? 'checked' : '' ?>>
+                        <label class="role-option" for="roleAidStaff"><?= auth_icon('user') ?> Medical & Burial staff</label>
 
                         <input type="radio" name="role" id="roleAdmin" value="admin" autocomplete="off"
                                <?= $role === 'admin' ? 'checked' : '' ?> <?= $canMakeAdmin ? '' : 'disabled' ?>>

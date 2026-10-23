@@ -774,6 +774,13 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
 .spark-dot, .spark-hover { fill: var(--viz-series); stroke: var(--c-surface); stroke-width: 2; }
 .spark-note { color: var(--c-text-muted); font-size: var(--fs-sm); }
 .spark-note strong { color: var(--c-text); }
+
+/* A labelled sparkline per row (e.g. one program each), outside a stat card's own trend line. */
+.spark-rows { display: grid; gap: 18px; }
+.spark-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.spark-row-label { display: flex; align-items: center; gap: 8px; min-width: 140px; font-weight: 600; }
+.spark-row-label .icon { color: var(--c-primary); flex: none; }
+.spark-row .spark { margin-top: 0; }
 .spark-tip {
     position: fixed;
     z-index: 1200;
@@ -799,6 +806,10 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
 .year-form { display: flex; align-items: center; gap: 8px; }
 .year-form label { font-size: var(--fs-sm); font-weight: 600; }
 .year-form select { width: auto; min-width: 96px; }
+
+.source-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.source-filter label { font-size: var(--fs-sm); font-weight: 600; }
+.source-filter select { width: auto; min-width: 120px; }
 
 /* Fixed columns (not auto-fit): 3 types + the amount card always make an even 2 x 2 */
 .type-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
