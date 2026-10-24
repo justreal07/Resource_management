@@ -1,4 +1,9 @@
 <?php
+    // error tracking
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
 require_once '../config.php';
 require_once 'account_helpers.php';
 require_once 'auth_layout.php';
@@ -127,6 +132,6 @@ auth_page_start('Log in', 'login', function () { ?>
     </form>
 
     <p class="auth-switch">Don't have an account? <a href="applicant_register">Sign up for free</a></p>
-    <div class="auth-links"><a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
+       <a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
 <?php
 auth_page_end();
