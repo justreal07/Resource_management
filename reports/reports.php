@@ -30,9 +30,8 @@ $preparedBy = trim((string)($sessionUser['name'] ?? '')) !== '' ? $sessionUser['
 $model = report_build($pdo, $f);
 
 admin_layout_start(['title' => 'Reports', 'section' => 'reports']);
-echo ui_page_head('Reports', 'Totals and lists to print or open in Excel.',
-    '<button type="button" class="btn btn-secondary" data-print>' . ui_icon('print') . 'Print</button>'
-    . '<a class="btn btn-secondary" href="export?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>');
+echo ui_page_head('Reports', 'Totals and lists to open in Excel.',
+    '<a class="btn btn-secondary" href="export?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>');
 ?>
 <form class="panel report-filters" method="GET" action="reports" data-busy id="reportFilters">
     <input type="hidden" name="report" value="<?= ui_e($f['report']) ?>">

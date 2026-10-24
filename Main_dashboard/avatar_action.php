@@ -14,8 +14,9 @@ if ($user === null) {
     header('Location: ../login/login');
     exit;
 }
-// Back to the person's own page
+// Back to the person's own page (into the settings / account window when the picture was sent from there)
 $back = $user['role'] === 'admin' ? 'admin_settings' : '../staff/my_account';
+if (($_POST['embed'] ?? '') === '1') $back .= '?embed=1';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header('Location: ' . $back);

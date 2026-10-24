@@ -66,7 +66,7 @@ $todayCount = count(array_filter($upcoming, function ($r) use ($today) { return 
 $upcomingPanel = '<section class="panel" aria-labelledby="upcomingTitle"><div class="panel-head panel-head-row"><div>'
     . '<h3 id="upcomingTitle">Check-ups today and tomorrow</h3>'
     . '<p class="panel-sub">' . ui_e(number_format($todayCount) . ' today, ' . number_format(count($upcoming) - $todayCount) . ' tomorrow') . '</p></div>'
-    . '<a class="btn btn-secondary btn-sm" href="opd_staff_report?date=' . ui_e($today) . '">' . ui_icon('print') . 'Today\'s report</a></div>'
+    . '<a class="btn btn-secondary btn-sm" href="opd_staff_report?date=' . ui_e($today) . '">' . ui_icon('file') . 'Today\'s report</a></div>'
     . ui_table($upcoming, [
         ['label' => 'Patient', 'type' => 'person', 'link' => function ($r) { return ui_type_url(3, 'view', ['id' => (int)$r['id']]); }],
         ['label' => 'Day', 'type' => 'text', 'value' => function ($r) use ($today) {

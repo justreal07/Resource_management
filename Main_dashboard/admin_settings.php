@@ -2,11 +2,12 @@
 require_once '../config.php';
 require_once '../includes/admin_layout.php';
 require_once '../includes/password_reset.php';
+require_once '../includes/mailer.php';
+require_once '../includes/mail_settings.php';
 
 // Check if user is admin
 if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
-    header("Location: ../login/login?role=admin");
-    exit;
+    ui_leave_to_login();
 }
 
 $admin_id = $_SESSION['user']['id'];
@@ -14,15 +15,26 @@ $admin_username = $_SESSION['user']['username'];
 $errors = [];
 $success = "";
 
+// Inside the window over another page (js/admin_pagemodal.js) this page is asked for with ?embed=1 and draws only its content.
+// Every address it sends the person to must keep that, or a save would leave the window and show the whole page inside it.
+$embed = ui_embed_requested();
+$self = function (array $query = []) use ($embed): string {
+    if ($embed) $query['embed'] = '1';
+    return 'admin_settings' . ($query ? '?' . http_build_query($query) : '');
+};
+
 // Fetch current admin data
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ? AND role = 'admin'");
 $stmt->execute([$admin_id]);
 $admin = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$admin) {
-    header("Location: ../login/login?role=admin");
-    exit;
+    ui_leave_to_login();
 }
+
+// The Email tab's table (app_settings), made here before any save opens a transaction
+mail_settings_ensure($pdo);
+$postText = function (string $name): string { return is_string($_POST[$name] ?? null) ? $_POST[$name] : ''; };
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -102,6 +114,67 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+    elseif ($action === 'save_mail') {
+        // The Gmail account the system sends from. Saved only when the admin's own password is right AND Gmail accepts the
+        // address and app password, so a typo can never stop the approval emails. The password is never shown back.
+        $currentMail = mail_settings_stored($pdo);
+        $checked = mail_settings_check($postText('mail_username'), $postText('mail_password'), $postText('mail_from_name'), $currentMail);
+        if ($envSet = mail_settings_env_overrides()) {
+            $errors[] = 'The server sets these itself (' . implode(', ', $envSet) . '), so they can\'t be changed here. Ask the system administrator.';
+        } elseif (!mail_settings_ensure($pdo)) {
+            $errors[] = 'The email settings need a small database update that could not be applied automatically. Import database/migrations/migration_mail_settings.sql in phpMyAdmin, then try again.';
+        } elseif ($checked['errors']) {
+            $errors = $checked['errors'];
+        } elseif (!password_verify($postText('mail_admin_password'), $admin['password'])) {
+            $errors[] = 'Your own password is incorrect. Type the password you sign in with, to confirm this change.';
+        } elseif (($problem = mail_login_check($checked['username'], $checked['password'])) !== null) {
+            $errors[] = $problem;
+        } elseif (($problem = mail_settings_save($pdo, $checked['username'], $checked['password'], $checked['from_name'], (int)$admin_id)) !== null) {
+            $errors[] = $problem;
+        } else {
+            mail_sources(true);   // this page now shows (and a test sends with) the new account
+            $was = $currentMail['username'] ?? '';
+            $log = $was === '' ? 'Sending account set to ' . $checked['username'] . '.'
+                : (strcasecmp($was, $checked['username']) !== 0 ? 'Sending account changed from ' . $was . ' to ' . $checked['username'] . '.' : 'Sending account ' . $checked['username'] . ' kept.');
+            if ($checked['replaced']) $log .= ' App password replaced.';
+            if ($currentMail !== null && $currentMail['from_name'] !== $checked['from_name']) $log .= ' Sender name changed.';
+            activity_log('email_settings_changed', $log);
+            $success = 'Email settings saved. Gmail accepted the address and app password; emails are now sent from ' . $checked['username'];
+        }
+    }
+    elseif ($action === 'test_mail') {
+        // A test email with the account in use now, to see that it arrives (Gmail can accept a login and still put mail in Spam)
+        $testTo = trim($postText('test_to'));
+        if ($testTo === '' || !filter_var($testTo, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Enter the email address to send the test to.';
+        } elseif (!mail_ready()) {
+            $errors[] = 'Email is not set up yet. Save the Gmail address and app password first.';
+        } else {
+            $byName = (string)($admin['full_name'] ?: $admin['username']);
+            $sent = mail_send($testTo, '', 'Test email from the LGU Assistance System',
+                "This is a test email, sent from Admin settings > Email by $byName on " . date('F j, Y g:i A') . ".\n\n"
+                . "If you can read this, the approval and decline emails can be sent from " . mail_setting('MAIL_USERNAME') . ".\n\n"
+                . "Social Assistance Office\nLGU General Mariano Alvarez, Cavite\n");
+            if ($sent) {
+                $success = 'A test email was sent to ' . $testTo . ' from ' . mail_setting('MAIL_USERNAME') . '. Check that inbox, and its Spam folder';
+            } else {
+                $errors[] = 'The test email could not be sent (no internet, or Gmail refused the account). If Gmail refused it, save a new app password above.';
+            }
+        }
+    }
+    elseif ($action === 'create_staff') {
+        // A new OPD staff, Medical & Burial staff or admin account: the same checks as login/register.php (staff_account_create())
+        $field = function (string $name): string { return is_string($_POST[$name] ?? null) ? trim($_POST[$name]) : ''; };
+        $problems = staff_account_create($pdo, $field('new_staff_fullname'), $field('new_staff_username'), $field('new_staff_password'),
+            $field('new_staff_confirm'), $field('new_staff_role'), true);
+        if (!$problems) {
+            $_SESSION['staff_flash'] = (STAFF_ACCOUNT_KINDS[$field('new_staff_role')] ?? 'Staff') . ' account for ' . $field('new_staff_fullname')
+                . ' (@' . $field('new_staff_username') . ') was created. Tell them the username and password in person; the password is not shown or sent anywhere.';
+            header('Location: ' . $self(['tab' => 'staff']));
+            exit;
+        }
+        $errors = array_merge($errors, $problems);
+    }
     elseif ($action === 'delete_staff') {
         // Only a staff account (either kind) can be removed here: never an admin, and so never the signed-in admin themselves
         $staff_id = (int)($_POST['staff_id'] ?? 0);
@@ -121,7 +194,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 activity_log('staff_removed', 'Removed staff account: ' . ($staff['full_name'] ?: $staff['username']) . ' (@' . $staff['username'] . ').');
                 // An account with no decisions on record: nothing on any application pointed to it
                 $_SESSION['staff_flash'] = ($staff['full_name'] ?: $staff['username']) . " no longer has access. They cannot sign in anymore.";
-                header("Location: admin_settings?tab=staff");
+                header('Location: ' . $self(['tab' => 'staff']));
                 exit;
             } catch (PDOException $e) {
                 error_log('admin_settings delete_staff: ' . $e->getMessage());
@@ -141,7 +214,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $name = $staff['full_name'] ?: $staff['username'];
             activity_log('avatar_changed', 'Removed the profile picture of ' . $name . ' (@' . $staff['username'] . ').');
             $_SESSION['staff_flash'] = "The picture of " . $name . " was removed. Their initials show instead; they can upload another.";
-            header("Location: admin_settings?tab=staff");
+            header('Location: ' . $self(['tab' => 'staff']));
             exit;
         } else {
             $errors[] = "There was no picture to remove.";
@@ -173,7 +246,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['staff_flash'] = $turnOn
                     ? $name . " can sign in again."
                     : $name . " can no longer sign in. Their records are kept, and you can turn access back on any time.";
-                header("Location: admin_settings?tab=staff");
+                header('Location: ' . $self(['tab' => 'staff']));
                 exit;
             } catch (PDOException $e) {
                 error_log('admin_settings toggle_staff: ' . $e->getMessage());
@@ -206,7 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $name = $staff['full_name'] ?: $staff['username'];
                 activity_log('staff_password_reset', 'Password reset for ' . $name . ' (@' . $staff['username'] . ').');
                 $_SESSION['staff_flash'] = "New password saved for " . $name . ". Tell them in person; the password is not shown or sent anywhere.";
-                header("Location: admin_settings?tab=staff");
+                header('Location: ' . $self(['tab' => 'staff']));
                 exit;
             } catch (PDOException $e) {
                 error_log('admin_settings reset_staff_password: ' . $e->getMessage());
@@ -241,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $name = trim($applicantRow['firstname'] . ' ' . $applicantRow['lastname']);
                     activity_log('applicant_password_reset', 'Temporary password set for applicant ' . $name . ' (@' . $applicantRow['username'] . '); ID checked at the office.');
                     $_SESSION['applicant_flash'] = "Temporary password saved for " . $name . ". Tell them in person; it is not shown or sent anywhere. They will be asked to choose their own when they log in.";
-                    header("Location: admin_settings?tab=applicants&q=" . rawurlencode($applicantRow['username']));
+                    header('Location: ' . $self(['tab' => 'applicants', 'q' => $applicantRow['username']]));
                     exit;
                 }
             } catch (PDOException $e) {
@@ -355,33 +428,59 @@ $messageFor = function (string $formAction) use ($errors, $success): string {
         return '<div class="alert alert-error" role="alert">' . ui_icon('alert', 'alert-icon') . '<div class="alert-body">'
             . implode('<br>', array_map('ui_e', $errors)) . '</div></div>';
     }
+    // A changed name shows in the top bar of the page behind the window: it reloads that page when the window closes (js/admin_embed.js)
     return $success !== '' ? '<div class="alert alert-success" role="status">' . ui_icon('check-circle', 'alert-icon')
-        . '<div class="alert-body">' . ui_e(rtrim($success, '!') . '.') . '</div></div>' : '';
+        . '<div class="alert-body">' . ui_e(rtrim($success, '!') . '.') . '</div></div>'
+        . ($formAction === 'update_profile' ? '<span data-embed-refresh hidden></span>' : '') : '';
 };
 
-admin_layout_start(['title' => 'Admin Settings', 'section' => 'settings']);
-echo ui_page_head('Admin settings', 'Your own account, and the staff accounts that can use the OPD or the Medical/Burial pages.');
+admin_layout_start(['title' => 'Admin Settings', 'section' => 'settings', 'embed_ok' => true]);
+// The window has its own title bar; on its own the page keeps its heading
+if (!$embed) echo ui_page_head('Admin settings', 'Your own account, the staff accounts that can use the OPD or the Medical/Burial pages, and the Gmail account the system sends its emails from.');
 ?>
 <?php
 $profileSent  = ($_POST['action'] ?? '') === 'update_profile';
 $fullnameVal  = $profileSent ? ($_POST['new_fullname'] ?? '') : ($admin['full_name'] ?? '');
 $usernameVal  = $profileSent ? ($_POST['new_username'] ?? '') : $admin['username'];
 $staffActions = ['delete_staff', 'toggle_staff', 'toggle_admin', 'reset_staff_password', 'remove_staff_avatar'];
-$active       = ($_POST['action'] ?? '') === 'change_password' ? 'security'
-              : (($_POST['action'] ?? '') === 'reset_applicant_password' || ($_GET['tab'] ?? '') === 'applicants' ? 'applicants'
-              : ((in_array($_POST['action'] ?? '', $staffActions, true) || ($_GET['tab'] ?? '') === 'staff') ? 'staff' : 'profile'));
 $tabs = [
-    'profile'    => ['Profile',    'user',   'Your name and the username you sign in with.'],
-    'security'   => ['Password',   'lock',   'Choose a new password for your account.'],
-    'staff'      => ['Staff',      'van',    'Who can sign in as OPD staff or Medical & Burial staff, and which other administrators can sign in. Turn an account off, or reset a staff password. An account that never decided or encoded anything can also be removed.'],
-    'applicants' => ['Applicants', 'search', 'Help an applicant who forgot their password and has no email on the account.'],
+    'profile'    => ['Profile',    'user',      'Your name and the username you sign in with.'],
+    'security'   => ['Password',   'lock',      'Choose a new password for your account.'],
+    'staff'      => ['Staff',      'van',       'Who can sign in as OPD staff or Medical & Burial staff, and which other administrators can sign in. Turn an account off, or reset a staff password. An account that never decided or encoded anything can also be removed.'],
+    'addstaff'   => ['Add staff',  'user-plus', 'Give someone an account: OPD staff, Medical & Burial staff, or another administrator.'],
+    'applicants' => ['Applicants', 'search',    'Help an applicant who forgot their password and has no email on the account.'],
+    'email'      => ['Email',      'inbox',     'The Gmail account that sends the approval, decline and password emails. Change it here when the office changes the account or its app password.'],
 ];
+// The tab that opens: the one the saved form belongs to, else ?tab=, else Profile
+$tabOfAction = ['update_profile' => 'profile', 'change_password' => 'security', 'create_staff' => 'addstaff', 'reset_applicant_password' => 'applicants',
+                'save_mail' => 'email', 'test_mail' => 'email'];
+
+// The Email tab: what is used now and where it comes from. The app password itself is never put on the page.
+$mailSaved   = mail_settings_stored($pdo);
+$mailSource  = mail_source();
+$mailEnv     = mail_settings_env_overrides();
+$mailSent    = ($_POST['action'] ?? '') === 'save_mail';
+$mailUserVal = $mailSent ? $postText('mail_username') : mail_setting('MAIL_USERNAME');
+$mailFromVal = $mailSent ? $postText('mail_from_name') : (mail_setting('MAIL_FROM_NAME') ?: 'LGU General Mariano Alvarez - Social Assistance');
+$mailTestVal = ($_POST['action'] ?? '') === 'test_mail' ? $postText('test_to') : mail_setting('MAIL_USERNAME');
+$mailKeepOk  = $mailSaved !== null && $mailSaved['password'] !== null;   // the password box may be left empty for the same address
+$mailFrom    = mail_setting('MAIL_USERNAME');
+$mailReady   = $mailFrom !== '' && mail_setting('MAIL_PASSWORD') !== '';
+$mailWhere   = [
+    'env'   => 'Set by the server itself (environment variables)',
+    'saved' => 'Saved on this page' . ($mailSaved && $mailSaved['updated_at'] ? ' on ' . date('F j, Y g:i A', strtotime($mailSaved['updated_at'])) . ($mailSaved['updated_by'] ? ' by ' . $mailSaved['updated_by'] : '') : ''),
+    'file'  => 'From the settings file on this computer (mail.local.php). Saving here takes over from it.',
+    'none'  => 'Not set up yet, so no email is sent.',
+][$mailSource];
+foreach ($staffActions as $staffAction) $tabOfAction[$staffAction] = 'staff';
+$requestedTab = is_string($_GET['tab'] ?? null) ? $_GET['tab'] : '';
+$active       = $tabOfAction[$_POST['action'] ?? ''] ?? (isset($tabs[$requestedTab]) ? $requestedTab : 'profile');
 ?>
-<div class="iis" data-settings data-active="<?= ui_e($active) ?>">
-    <!-- Left: what can be changed -->
+<div class="iis<?= $embed ? ' is-embed' : '' ?>" data-settings data-active="<?= ui_e($active) ?>">
+    <!-- Top: what can be changed -->
     <nav class="iis-pane iis-nav" aria-label="Settings">
         <h2 class="iis-pane-title">Settings</h2>
-        <div role="tablist" aria-orientation="vertical">
+        <div role="tablist" aria-orientation="horizontal">
             <?php foreach ($tabs as $key => [$label, $icon]): ?>
                 <button type="button" role="tab" class="iis-tab" id="tab-<?= $key ?>" data-tab="<?= $key ?>" aria-controls="panel-<?= $key ?>" aria-selected="<?= $key === $active ? 'true' : 'false' ?>" tabindex="<?= $key === $active ? '0' : '-1' ?>">
                     <?= ui_icon($icon) ?><span><?= ui_e($label) ?></span>
@@ -398,7 +497,9 @@ $tabs = [
                 <div><h2><?= ui_e($tabs['profile'][0]) ?></h2><p><?= ui_e($tabs['profile'][2]) ?></p></div>
             </header>
             <?= ui_avatar_flash() ?>
-            <?= ui_avatar_form((int)$admin_id, (string)($admin['full_name'] ?: $admin['username'])) ?>
+            <div class="split">
+            <div class="split-side"><?= ui_avatar_form((int)$admin_id, (string)($admin['full_name'] ?: $admin['username'])) ?></div>
+            <div class="split-main">
             <form id="profileForm" class="iis-form" method="POST" novalidate data-busy="Saving…" data-profile-form>
                 <?= $messageFor('update_profile') ?>
                 <?= decision_csrf_field() ?>
@@ -418,6 +519,8 @@ $tabs = [
                 <?= ui_detail('Role', 'Administrator') ?>
                 <?= ui_detail('Account created', date('F j, Y g:i A', strtotime($admin['created_at']))) ?>
             </dl>
+            </div>
+            </div>
         </section>
 
         <section role="tabpanel" id="panel-security" aria-labelledby="tab-security"<?= $active === 'security' ? '' : ' hidden' ?>>
@@ -425,7 +528,7 @@ $tabs = [
                 <?= ui_icon('lock', 'iis-feature-icon') ?>
                 <div><h2><?= ui_e($tabs['security'][0]) ?></h2><p><?= ui_e($tabs['security'][2]) ?></p></div>
             </header>
-            <form id="passwordForm" class="iis-form" method="POST" novalidate data-busy="Saving…">
+            <form id="passwordForm" class="iis-form iis-cols" method="POST" novalidate data-busy="Saving…">
                 <?= $messageFor('change_password') ?>
                 <?= decision_csrf_field() ?>
                 <input type="hidden" name="action" value="change_password">
@@ -462,7 +565,7 @@ $tabs = [
                 <?= ui_state('alert', 'The staff list could not be loaded', 'Please reload the page. If it keeps happening, tell the system administrator.') ?>
             <?php elseif (!$staffList): ?>
                 <?= ui_state('inbox', 'No staff accounts yet', 'Nobody but admins can sign in right now. Add a staff account to let someone handle OPD requests, or encode Medical and Burial walk-ins.',
-                    '<a class="btn btn-secondary btn-sm" href="../login/register">' . ui_icon('user-plus') . 'Add staff account</a>') ?>
+                    '<button type="button" class="btn btn-secondary btn-sm" data-go-tab="addstaff">' . ui_icon('user-plus') . 'Add staff account</button>') ?>
             <?php else:
                 $activeCount = count(array_filter($staffList, function ($s) { return (int)$s['is_active'] === 1; }));
                 $nowTs = time();
@@ -559,7 +662,7 @@ $tabs = [
                     </table>
                 </div>
 
-                <form id="staffResetForm" class="iis-form staff-reset" method="POST" novalidate data-busy="Saving…" aria-labelledby="staffResetTitle">
+                <form id="staffResetForm" class="iis-form iis-cols staff-reset" method="POST" novalidate data-busy="Saving…" aria-labelledby="staffResetTitle">
                     <h3 id="staffResetTitle">Reset a staff password</h3>
                     <p class="field-help">For someone who forgot theirs. Choose a new password and tell them in person. It is not shown or sent anywhere.</p>
                     <?= decision_csrf_field() ?>
@@ -640,6 +743,52 @@ $tabs = [
             <?php endif; ?>
         </section>
 
+        <section role="tabpanel" id="panel-addstaff" aria-labelledby="tab-addstaff"<?= $active === 'addstaff' ? '' : ' hidden' ?>>
+            <header class="iis-feature">
+                <?= ui_icon('user-plus', 'iis-feature-icon') ?>
+                <div><h2>Add staff account</h2><p><?= ui_e($tabs['addstaff'][2]) ?></p></div>
+            </header>
+            <?php
+            // After a refused save the form comes back filled in (never the passwords)
+            $addSent = ($_POST['action'] ?? '') === 'create_staff';
+            $addRole = $addSent && is_string($_POST['new_staff_role'] ?? null) && isset(STAFF_ACCOUNT_KINDS[$_POST['new_staff_role']]) ? $_POST['new_staff_role'] : 'staff';
+            $addName = $addSent && is_string($_POST['new_staff_fullname'] ?? null) ? $_POST['new_staff_fullname'] : '';
+            $addUser = $addSent && is_string($_POST['new_staff_username'] ?? null) ? $_POST['new_staff_username'] : '';
+            $kindNotes = ['staff' => 'Approves and declines OPD requests', 'aid_staff' => 'Encodes Medical and Burial walk-ins', 'admin' => 'Opens everything, manages accounts'];
+            ?>
+            <form id="addStaffForm" class="iis-form iis-cols iis-cols-2" method="POST" novalidate data-busy="Creating…">
+                <?= $messageFor('create_staff') ?>
+                <?= decision_csrf_field() ?>
+                <input type="hidden" name="action" value="create_staff">
+                <div class="field span-all">
+                    <span class="label" id="addKindLabel">Account type <span class="req" aria-hidden="true">*</span></span>
+                    <div class="choice-row" role="radiogroup" aria-labelledby="addKindLabel">
+                        <?php foreach (STAFF_ACCOUNT_KINDS as $kind => $kindLabel): ?>
+                            <label class="choice"><input type="radio" name="new_staff_role" value="<?= ui_e($kind) ?>"<?= $addRole === $kind ? ' checked' : '' ?>><span><span class="choice-text"><strong><?= ui_e($kindLabel) ?></strong><small><?= ui_e($kindNotes[$kind]) ?></small></span></span></label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="new_staff_fullname">Full name <span class="req" aria-hidden="true">*</span></label>
+                    <input type="text" id="new_staff_fullname" name="new_staff_fullname" value="<?= ui_e($addName) ?>" maxlength="100" autocomplete="off"<?= $embed && $active === 'addstaff' ? ' data-embed-focus' : '' ?> required data-message="Enter the person's full name." placeholder="e.g. Juan D. Dela Cruz">
+                </div>
+                <div class="field">
+                    <label for="new_staff_username">Username <span class="req" aria-hidden="true">*</span></label>
+                    <input type="text" id="new_staff_username" name="new_staff_username" value="<?= ui_e($addUser) ?>" minlength="3" maxlength="50" pattern="[A-Za-z0-9._\-]+" autocomplete="off" required data-message="Enter a username of 3 to 50 letters, numbers, dots, dashes or underscores." aria-describedby="newStaffUsernameHelp">
+                    <p class="field-help" id="newStaffUsernameHelp">Letters, numbers, dot, dash or underscore. No spaces.</p>
+                </div>
+                <div class="field">
+                    <label for="new_staff_password">Password <span class="req" aria-hidden="true">*</span></label>
+                    <input type="password" id="new_staff_password" name="new_staff_password" minlength="8" autocomplete="new-password" required data-message="Enter a password of at least 8 characters, with letters and numbers." aria-describedby="newStaffPwHelp">
+                    <p class="field-help" id="newStaffPwHelp">At least 8 characters, with letters and numbers.</p>
+                </div>
+                <div class="field">
+                    <label for="new_staff_confirm">Type the password again <span class="req" aria-hidden="true">*</span></label>
+                    <input type="password" id="new_staff_confirm" name="new_staff_confirm" autocomplete="new-password" required data-message="Type the password again.">
+                </div>
+            </form>
+        </section>
+
         <section role="tabpanel" id="panel-applicants" aria-labelledby="tab-applicants"<?= $active === 'applicants' ? '' : ' hidden' ?>>
             <header class="iis-feature">
                 <?= ui_icon('search', 'iis-feature-icon') ?>
@@ -654,6 +803,7 @@ $tabs = [
 
             <form class="applicant-search" method="GET" action="admin_settings" role="search">
                 <input type="hidden" name="tab" value="applicants">
+                <?php if ($embed): ?><input type="hidden" name="embed" value="1"><?php endif; ?>
                 <label for="applicant_q" class="visually-hidden">Find an applicant</label>
                 <input type="search" id="applicant_q" name="q" value="<?= ui_e($applicantQuery) ?>" maxlength="100" placeholder="Name, username, email or mobile number" autocomplete="off">
                 <button type="submit" class="btn btn-secondary btn-sm"><?= ui_icon('search') ?>Find</button>
@@ -703,7 +853,7 @@ $tabs = [
                                     <?php if ($isGoogleApplicant($a)): ?>
                                         <span class="muted">Not needed</span>
                                     <?php else: ?>
-                                        <a class="btn btn-secondary btn-sm" href="admin_settings?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>&amp;pick=<?= (int)$a['id'] ?>#applicantResetTitle">Reset password<span class="visually-hidden"> for <?= ui_e($a['username']) ?></span></a>
+                                        <a class="btn btn-secondary btn-sm" href="<?= ui_e($self(['tab' => 'applicants', 'q' => $applicantQuery, 'pick' => (int)$a['id']])) ?>#applicantResetTitle">Reset password<span class="visually-hidden"> for <?= ui_e($a['username']) ?></span></a>
                                     <?php endif; ?>
                                 </td>
                             </tr>
@@ -714,7 +864,7 @@ $tabs = [
             <?php endif; ?>
 
             <?php if ($applicantPicked && !$isGoogleApplicant($applicantPicked)): ?>
-                <form id="applicantResetForm" class="iis-form staff-reset" method="POST" action="admin_settings?tab=applicants&amp;q=<?= rawurlencode($applicantQuery) ?>" novalidate data-busy="Saving…" aria-labelledby="applicantResetTitle">
+                <form id="applicantResetForm" class="iis-form iis-cols staff-reset" method="POST" action="<?= ui_e($self(['tab' => 'applicants', 'q' => $applicantQuery])) ?>" novalidate data-busy="Saving…" aria-labelledby="applicantResetTitle">
                     <h3 id="applicantResetTitle">Set a temporary password for <?= ui_e(trim($applicantPicked['firstname'] . ' ' . $applicantPicked['lastname'])) ?> (@<?= ui_e($applicantPicked['username']) ?>)</h3>
                     <p class="field-help">Choose a temporary password and tell the person in person. It is not shown or sent anywhere. They will be asked to choose their own the next time they log in.</p>
                     <?= decision_csrf_field() ?>
@@ -733,33 +883,126 @@ $tabs = [
                 </form>
             <?php endif; ?>
         </section>
+
+        <section role="tabpanel" id="panel-email" aria-labelledby="tab-email"<?= $active === 'email' ? '' : ' hidden' ?>>
+            <header class="iis-feature">
+                <?= ui_icon('inbox', 'iis-feature-icon') ?>
+                <div><h2>Sending email account</h2><p><?= ui_e($tabs['email'][2]) ?></p></div>
+            </header>
+            <!-- What is used now: the address, where the setting comes from, and whether there is an app password (never the password) -->
+            <div class="mail-status">
+                <?= ui_icon('inbox', 'mail-status-icon') ?>
+                <div class="mail-status-body">
+                    <span class="mail-status-label">Emails are sent from</span>
+                    <strong class="mail-status-address"><?= ui_e($mailFrom !== '' ? $mailFrom : 'No account yet') ?></strong>
+                    <span class="mail-status-meta"><?= ui_e($mailWhere) ?></span>
+                </div>
+                <span class="badge <?= $mailReady ? 'badge-approved' : 'badge-pending' ?>"><?= ui_icon($mailReady ? 'check-circle' : 'alert') ?><?= $mailReady ? 'App password set' : 'Not set up' ?></span>
+            </div>
+            <?php if ($mailEnv): ?>
+                <p class="alert alert-info" role="note"><?= ui_icon('info', 'alert-icon') ?><span class="alert-body">The server sets <?= ui_e(implode(', ', $mailEnv)) ?> itself, and that wins over this page, so it can't be changed here. Ask the system administrator.</span></p>
+            <?php elseif ($mailSaved && $mailSaved['password_unreadable']): ?>
+                <p class="alert alert-warning" role="alert"><?= ui_icon('alert', 'alert-icon') ?><span class="alert-body">The app password saved here can't be read any more (its key file, mail_key.local.php, is missing or was replaced), so emails use mail.local.php instead, if it is set. Enter the app password again and save.</span></p>
+            <?php endif; ?>
+
+            <form id="mailForm" class="iis-form mail-card" method="POST" action="<?= ui_e($self(['tab' => 'email'])) ?>" novalidate data-busy="Checking with Gmail…" autocomplete="off" aria-labelledby="mailFormTitle">
+                <div class="mail-card-head">
+                    <h3 id="mailFormTitle">Change the sending account</h3>
+                    <p class="field-help">Saving signs in to Gmail first (nothing is sent) and saves only if Gmail accepts the address and app password. The change goes in the activity log, without the password.</p>
+                </div>
+                <?= $messageFor('save_mail') ?>
+                <?= decision_csrf_field() ?>
+                <input type="hidden" name="action" value="save_mail">
+                <fieldset class="mail-grid"<?= $mailEnv ? ' disabled' : '' ?>>
+                    <legend class="visually-hidden">Sending account</legend>
+                    <div class="field">
+                        <label for="mail_username">Gmail address <span class="req" aria-hidden="true">*</span></label>
+                        <input type="email" id="mail_username" name="mail_username" value="<?= ui_e($mailUserVal) ?>" maxlength="254" autocomplete="off" spellcheck="false" required data-message="Enter the Gmail address that sends the emails." aria-describedby="mail_usernameHelp">
+                        <p class="field-help" id="mail_usernameHelp">The office's Gmail account. Applicants see it as the sender.</p>
+                    </div>
+                    <div class="field">
+                        <label for="mail_password">App password <?= $mailKeepOk ? '<span class="muted">(leave empty to keep the saved one)</span>' : '<span class="req" aria-hidden="true">*</span>' ?></label>
+                        <input type="password" id="mail_password" name="mail_password" maxlength="40" autocomplete="new-password" spellcheck="false"<?= $mailKeepOk ? '' : ' required data-message="Enter the 16-letter app password."' ?> aria-describedby="mail_passwordHelp">
+                        <p class="field-help" id="mail_passwordHelp">16 letters from myaccount.google.com/apppasswords (spaces are fine). Not the account's normal password.<?= $mailKeepOk ? ' A new address needs its own.' : '' ?></p>
+                    </div>
+                    <div class="field">
+                        <label for="mail_from_name">Sender name <span class="muted">(optional)</span></label>
+                        <input type="text" id="mail_from_name" name="mail_from_name" value="<?= ui_e($mailFromVal) ?>" maxlength="<?= MAIL_SETTINGS_FROM_MAX ?>" autocomplete="off">
+                        <p class="field-help">The name shown next to the address in the applicant's inbox.</p>
+                    </div>
+                    <div class="field">
+                        <label for="mail_admin_password">Your own password <span class="req" aria-hidden="true">*</span></label>
+                        <input type="password" id="mail_admin_password" name="mail_admin_password" autocomplete="current-password" required data-message="Type your own password to confirm." aria-describedby="mail_admin_passwordHelp">
+                        <p class="field-help" id="mail_admin_passwordHelp">The one you sign in with, to confirm this change.</p>
+                    </div>
+                </fieldset>
+            </form>
+
+            <form id="testMailForm" class="iis-form mail-card" method="POST" action="<?= ui_e($self(['tab' => 'email'])) ?>" novalidate data-busy="Sending…" aria-labelledby="testMailTitle">
+                <div class="mail-card-head">
+                    <h3 id="testMailTitle">Send a test email</h3>
+                    <p class="field-help">Sent from the account above, to see that the emails really arrive. Check the Spam folder too.</p>
+                </div>
+                <?= $messageFor('test_mail') ?>
+                <?= decision_csrf_field() ?>
+                <input type="hidden" name="action" value="test_mail">
+                <div class="mail-test-row">
+                    <div class="field">
+                        <label for="test_to">Send it to <span class="req" aria-hidden="true">*</span></label>
+                        <input type="email" id="test_to" name="test_to" value="<?= ui_e($mailTestVal) ?>" maxlength="254" autocomplete="email" spellcheck="false" required data-message="Enter the email address to send the test to.">
+                    </div>
+                    <button type="submit" class="btn btn-secondary"<?= $mailReady ? '' : ' disabled' ?>><?= ui_icon('inbox') ?>Send test email</button>
+                </div>
+            </form>
+
+            <details class="mail-howto">
+                <summary>How to get an app password</summary>
+                <ol>
+                    <li>Sign in to the office's Gmail account and open myaccount.google.com/security.</li>
+                    <li>Turn on 2-Step Verification (Google only gives app passwords when it is on).</li>
+                    <li>Open myaccount.google.com/apppasswords, type a name such as "LGU Assistance" and choose Create.</li>
+                    <li>Copy the 16 letters Google shows, paste them above and save.</li>
+                </ol>
+                <p class="field-help">Changing the Gmail account's own password cancels its app passwords: make a new one and save it here again.</p>
+            </details>
+        </section>
     </div>
 
-    <!-- Right: what you can do with it -->
+    <!-- What you can do with the selected setting: a row under the tabs, or (in the window) a bar at the bottom -->
     <aside class="iis-pane iis-actions" aria-label="Actions">
         <h2 class="iis-pane-title">Actions</h2>
         <div class="iis-action-group" data-actions="profile"<?= $active === 'profile' ? '' : ' hidden' ?>>
-            <button type="submit" form="profileForm" class="iis-action" data-save-profile disabled><?= ui_icon('check-circle') ?>Save changes</button>
+            <button type="submit" form="profileForm" class="iis-action iis-action-primary" data-save-profile disabled><?= ui_icon('check-circle') ?>Save changes</button>
             <button type="button" class="iis-action" data-discard-profile disabled><?= ui_icon('refresh') ?>Discard changes</button>
         </div>
         <div class="iis-action-group" data-actions="security"<?= $active === 'security' ? '' : ' hidden' ?>>
-            <button type="submit" form="passwordForm" class="iis-action"><?= ui_icon('check-circle') ?>Update password</button>
+            <button type="submit" form="passwordForm" class="iis-action iis-action-primary"><?= ui_icon('check-circle') ?>Update password</button>
             <button type="button" class="iis-action" data-clear-password><?= ui_icon('refresh') ?>Clear fields</button>
         </div>
         <div class="iis-action-group" data-actions="staff"<?= $active === 'staff' ? '' : ' hidden' ?>>
-            <a class="iis-action" href="../login/register"><?= ui_icon('user-plus') ?>Add staff account</a>
+            <button type="button" class="iis-action iis-action-primary" data-go-tab="addstaff"><?= ui_icon('user-plus') ?>Add staff account</button>
             <?php if ($staffList): ?>
                 <button type="submit" form="staffResetForm" class="iis-action"><?= ui_icon('lock') ?>Reset staff password</button>
             <?php endif; ?>
-            <a class="iis-action" href="activity_log?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
-            <a class="iis-action" href="admin_settings?tab=staff"><?= ui_icon('refresh') ?>Refresh list</a>
+            <a class="iis-action" href="activity_log?group=accounts"<?= $embed ? ' target="_top"' : '' ?>><?= ui_icon('clock') ?>See account activity</a>
+            <a class="iis-action" href="<?= ui_e($self(['tab' => 'staff'])) ?>"><?= ui_icon('refresh') ?>Refresh list</a>
+        </div>
+        <div class="iis-action-group" data-actions="addstaff"<?= $active === 'addstaff' ? '' : ' hidden' ?>>
+            <button type="submit" form="addStaffForm" class="iis-action iis-action-primary"><?= ui_icon('user-plus') ?>Create account</button>
+            <button type="button" class="iis-action" data-clear-form="addStaffForm"><?= ui_icon('refresh') ?>Clear fields</button>
         </div>
         <div class="iis-action-group" data-actions="applicants"<?= $active === 'applicants' ? '' : ' hidden' ?>>
             <?php if ($applicantPicked && !$isGoogleApplicant($applicantPicked)): ?>
-                <button type="submit" form="applicantResetForm" class="iis-action"><?= ui_icon('lock') ?>Save temporary password</button>
+                <button type="submit" form="applicantResetForm" class="iis-action iis-action-primary"><?= ui_icon('lock') ?>Save temporary password</button>
             <?php endif; ?>
-            <a class="iis-action" href="activity_log?group=accounts"><?= ui_icon('clock') ?>See account activity</a>
-            <a class="iis-action" href="admin_settings?tab=applicants"><?= ui_icon('refresh') ?>New search</a>
+            <a class="iis-action" href="activity_log?group=accounts"<?= $embed ? ' target="_top"' : '' ?>><?= ui_icon('clock') ?>See account activity</a>
+            <a class="iis-action" href="<?= ui_e($self(['tab' => 'applicants'])) ?>"><?= ui_icon('refresh') ?>New search</a>
+        </div>
+        <div class="iis-action-group" data-actions="email"<?= $active === 'email' ? '' : ' hidden' ?>>
+            <?php if (!$mailEnv): ?>
+                <button type="submit" form="mailForm" class="iis-action iis-action-primary"><?= ui_icon('check-circle') ?>Check with Gmail &amp; save</button>
+            <?php endif; ?>
+            <a class="iis-action" href="activity_log?group=settings"<?= $embed ? ' target="_top"' : '' ?>><?= ui_icon('clock') ?>See settings activity</a>
         </div>
         <div class="iis-action-group iis-action-group-last">
             <a class="iis-action" href="dashboard"><?= ui_icon('chevron-left') ?>Back to dashboard</a>
@@ -767,44 +1010,54 @@ $tabs = [
     </aside>
 </div>
 <style>
-    .iis { display: grid; grid-template-columns: 200px minmax(0, 1fr) 240px; gap: 0; max-width: 1080px;
+    /* On its own (a bookmark, a new tab): the tabs, a row of actions under them, then the setting */
+    .iis { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'nav' 'actions' 'main'; gap: 0;
            background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
     .iis-pane { min-width: 0; }
-    .iis-nav { background: var(--c-bg); border-right: 1px solid var(--c-border); }
-    .iis-actions { background: var(--c-bg); border-left: 1px solid var(--c-border); }
-    .iis-pane-title { padding: 10px 14px; font-size: var(--fs-sm); font-weight: 700; letter-spacing: .02em; color: var(--c-heading);
-                      background: var(--c-primary-soft); border-bottom: 1px solid var(--c-border); }
-    .iis-nav [role="tablist"] { display: grid; padding: 6px; gap: 2px; }
-    .iis-tab { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 10px; text-align: left;
+    .iis-nav { grid-area: nav; background: var(--c-primary-soft); border-bottom: 1px solid var(--c-border); }
+    .iis-actions { grid-area: actions; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 6px 10px;
+                   background: var(--c-bg); border-bottom: 1px solid var(--c-border); }
+    .iis-main { grid-area: main; padding: 18px 24px 22px; }
+    .iis-pane-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); padding: 0; border: 0; }   /* names the region for screen readers only */
+    .iis-nav [role="tablist"] { display: flex; flex-wrap: wrap; padding: 6px 10px 0; gap: 4px; }
+    .iis-tab { display: flex; align-items: center; gap: 10px; width: auto; min-height: 44px; padding: 8px 12px; text-align: left;
                border: 1px solid transparent; border-radius: var(--radius-sm); background: none; color: var(--c-text); font: inherit; cursor: pointer; }
     .iis-tab .icon { color: var(--c-primary); flex: none; }
     .iis-tab:hover { background: var(--c-primary-soft); }
     .iis-tab[aria-selected="true"] { background: var(--c-primary); color: var(--c-on-primary); font-weight: 600; }
     .iis-tab[aria-selected="true"] .icon { color: var(--c-on-primary); }
-    .iis-main { padding: 20px 24px 24px; }
-    .iis-feature { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--c-border); }
+    .iis-feature { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--c-border); }
     .iis-feature h2 { font-size: var(--fs-lg); line-height: 1.3; }
     .iis-feature p { color: var(--c-text-muted); font-size: var(--fs-sm); }
     .iis-feature-icon { width: 40px; height: 40px; padding: 8px; flex: none; border-radius: var(--radius); background: var(--c-primary-soft); color: var(--c-primary); }
-    .iis-form { display: grid; gap: 18px; max-width: 520px; }
-    .iis-facts { max-width: 520px; margin-top: 22px; padding-top: 6px; border-top: 1px solid var(--c-border); }
-    .iis-action-group { display: grid; padding: 6px; gap: 2px; border-bottom: 1px solid var(--c-border); }
+    .iis-form { display: grid; gap: 14px; max-width: 520px; }
+    /* Fields side by side where there is room: Password (3), Add staff (2), the reset forms */
+    .iis-form.iis-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 16px; max-width: none; align-items: start; }
+    .iis-form.iis-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: none; }
+    #applicantResetForm { grid-template-columns: repeat(2, minmax(0, 1fr)); max-width: 720px; }
+    .iis-form .choice-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }   /* the three kinds of account in one row */
+    .iis-form .choice > span { height: 100%; }
+    .iis-form.iis-cols > .alert, .iis-form.iis-cols > h3, .iis-form.iis-cols > p, .iis-form.iis-cols > .applicant-check, .iis-form.iis-cols > .span-all { grid-column: 1 / -1; }
+    .split-main > .iis-form { max-width: none; }   /* the Profile boxes fill the column next to the picture */
+    .iis-form .alert { margin-bottom: 0; }
+    .iis-facts { margin-top: 0; padding-top: 4px; border-top: 1px solid var(--c-border); }
+    .iis-action-group { display: flex; flex-wrap: wrap; gap: 2px 6px; padding: 0; }
     .iis-action-group[hidden] { display: none; }
-    .iis-action-group-last { border-bottom: 0; }
-    .iis-action { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 8px 10px; text-align: left; text-decoration: none;
+    .iis-action-group-last { margin-left: auto; }
+    .iis-action { display: flex; align-items: center; gap: 8px; width: auto; min-height: 40px; padding: 6px 12px; text-align: left; text-decoration: none; white-space: nowrap;
                   border: 0; border-radius: var(--radius-sm); background: none; color: var(--c-primary); font: inherit; font-weight: 600; cursor: pointer; }
     .iis-action:hover:not(:disabled) { background: var(--c-primary-soft); color: var(--c-primary-hover); }
     .iis-action:disabled { color: var(--c-text-muted); opacity: .6; cursor: not-allowed; }
     .iis-action .icon { flex: none; }
-    .iis-main .alert { margin-bottom: 16px; }
-    .applicant-note { margin-bottom: 14px; max-width: 60ch; }
-    .applicant-search { display: flex; gap: 8px; margin-bottom: 16px; max-width: 520px; }
+    .iis-main > section > .alert { margin-bottom: 12px; }
+    .applicant-note { margin-bottom: 10px; max-width: 70ch; }
+    .applicant-search { display: flex; gap: 8px; margin-bottom: 12px; max-width: 520px; }
     .applicant-search input[type="search"] { flex: 1; min-width: 0; }
     .applicant-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
     .applicant-check input { margin-top: 4px; flex: none; }
-    .staff-count { margin-bottom: 14px; }
+    .staff-count { margin-bottom: 10px; }
     .staff-count .muted { display: block; font-size: var(--fs-sm); }
-    .staff-reset { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--c-border); }
+    .staff-reset { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--c-border); }
     .staff-reset h3 { font-size: var(--fs-md); }
     .cell-main .muted { display: block; }
     .row-menu { display: inline-block; text-align: left; }
@@ -817,13 +1070,62 @@ $tabs = [
     .row-menu-list .btn:hover { background: var(--c-primary-soft); }
     .row-menu-list .row-menu-danger { color: var(--c-accent); }
     .row-menu-list .row-menu-note { max-width: 15rem; padding: 6px 10px; font-size: var(--fs-sm); }
-    .iis-subhead { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--c-border); font-size: var(--fs-md); }
-    @media (max-width: 900px) {
-        .iis { grid-template-columns: 1fr; }
-        .iis-nav { border-right: 0; border-bottom: 1px solid var(--c-border); }
-        .iis-nav [role="tablist"] { grid-auto-flow: column; grid-auto-columns: 1fr; }
-        .iis-actions { border-left: 0; border-top: 1px solid var(--c-border); }
-        .iis-main { padding: 16px; }
+    .iis-subhead { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--c-border); font-size: var(--fs-md); }
+    /* Email tab: what is used now (a strip on top), then one card per form, then the how-to */
+    .mail-status { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding: 14px 16px;
+                   background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--radius); }
+    .mail-status-icon { width: 40px; height: 40px; padding: 9px; flex: none; border-radius: 50%; background: var(--c-primary-soft); color: var(--c-primary); }
+    .mail-status-body { display: grid; gap: 2px; flex: 1; min-width: 0; }
+    .mail-status-label { color: var(--c-text-muted); font-size: var(--fs-sm); font-weight: 600; }
+    .mail-status-address { color: var(--c-heading); font-size: var(--fs-md); overflow-wrap: anywhere; }
+    .mail-status-meta { color: var(--c-text-muted); font-size: var(--fs-sm); }
+    .mail-status .badge { flex: none; }
+    .mail-card { max-width: none; padding: 16px 18px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius); }
+    .mail-card + .mail-card { margin-top: 14px; }
+    .mail-card-head { display: grid; gap: 2px; }
+    .mail-card-head h3 { font-size: var(--fs-md); }
+    .mail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; min-width: 0; margin: 0; padding: 0; border: 0; }
+    .mail-test-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; }
+    .mail-test-row .field { flex: 1 1 260px; max-width: 420px; }
+    .mail-test-row .btn { min-height: 44px; }
+    .mail-howto { margin-top: 14px; padding: 10px 16px; background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--radius); }
+    .mail-howto summary { display: flex; align-items: center; min-height: 32px; cursor: pointer; font-weight: 600; color: var(--c-primary); }
+    .mail-howto ol { display: grid; gap: 4px; margin: 6px 0 8px; padding-left: 22px; list-style: decimal; max-width: 70ch; }
+    .is-embed .mail-card { padding: 14px 16px; }
+
+    /* In the window over another page (?embed=1): the tabs on top, the setting, and the actions as a bar at the bottom,
+       like the walk-in window's buttons. Nothing is drawn that the window already has (its title, a border, a heading). */
+    .iis.is-embed { grid-template-areas: 'nav' 'main' 'actions'; background: transparent; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+    .is-embed .iis-nav { position: sticky; top: 0; z-index: 3; }
+    .is-embed .iis-nav [role="tablist"] { padding: 6px 14px 0; }
+    .is-embed .iis-tab { min-height: 40px; }
+    .is-embed .iis-main { padding: 14px 20px 18px; }
+    .is-embed .iis-feature { display: none; }   /* the tab already says what this is */
+    .is-embed .iis-actions { position: sticky; bottom: 0; z-index: 3; justify-content: flex-end; padding: 10px 16px;
+                             background: var(--c-surface-2); border-top: 1px solid var(--c-border); border-bottom: 0; }
+    .is-embed .iis-action-group { justify-content: flex-end; gap: 8px; }
+    .is-embed .iis-action-group-last { display: none; }   /* Back to dashboard: the window has its own Close */
+    .is-embed .iis-action { min-height: 38px; padding: 6px 14px; background: var(--c-surface); border: 1px solid var(--c-primary); }
+    .is-embed .iis-action:hover:not(:disabled) { background: var(--c-primary-soft); }
+    .is-embed .iis-action:disabled { border-color: var(--c-border-strong); }
+    .is-embed .iis-action-primary { order: 2; background: var(--c-primary); color: var(--c-on-primary); }
+    .is-embed .iis-action-primary:hover:not(:disabled) { background: var(--c-primary-hover); color: var(--c-on-primary); }
+    .is-embed .iis-action-primary:disabled { color: var(--c-on-primary); }
+    .is-embed .staff-reset { margin-top: 16px; padding-top: 14px; }
+    .is-embed .iis-subhead { margin-top: 16px; padding-top: 14px; }
+
+    @media (max-width: 700px) {
+        .iis-tab { flex: 1 1 40%; }
+        .iis-action-group-last { margin-left: 0; }
+        .iis-form.iis-cols, .iis-form.iis-cols-2, #applicantResetForm { grid-template-columns: 1fr; }
+        .iis-form .choice-row { grid-template-columns: 1fr; }
+        .mail-grid { grid-template-columns: 1fr; }
+        .mail-status { flex-wrap: wrap; }
+        .mail-test-row .btn { flex: 1 1 100%; justify-content: center; }
+        .iis-main, .is-embed .iis-main { padding: 14px; }
+        .is-embed .iis-actions { justify-content: stretch; }
+        .is-embed .iis-action-group { width: 100%; }
+        .is-embed .iis-action { flex: 1 1 auto; justify-content: center; }
     }
 </style>
 <script>
@@ -853,6 +1155,29 @@ $tabs = [
         });
     });
 
+    // A button that moves to another setting (Staff > "Add staff account"), landing on its first field
+    root.querySelectorAll('[data-go-tab]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            select(b.dataset.goTab);
+            var field = document.querySelector('#panel-' + b.dataset.goTab + ' input:not([type="hidden"]):not([type="radio"])');
+            if (field) field.focus();
+        });
+    });
+
+    // Clear fields: empty the typed boxes of the form it names (also what a refused save had put back)
+    root.querySelectorAll('[data-clear-form]').forEach(function (b) {
+        b.addEventListener('click', function () {
+            var form = document.getElementById(b.dataset.clearForm);
+            form.reset();
+            form.querySelectorAll('input[type="text"], input[type="password"]').forEach(function (f) {
+                f.value = '';
+                if (window.AdminUI) window.AdminUI.clearFieldError(f);
+            });
+            var first = form.querySelector('input[type="text"]');
+            if (first) first.focus();
+        });
+    });
+
     // Profile: Save and Discard stay off until a field differs from what is stored
     var profile = document.querySelector('[data-profile-form]');
     var save = root.querySelector('[data-save-profile]');
@@ -875,6 +1200,10 @@ $tabs = [
     document.addEventListener('click', function (e) {
         document.querySelectorAll('.row-menu[open]').forEach(function (m) { if (!m.contains(e.target)) m.removeAttribute('open'); });
     });
+
+    // After a save, the result of the form that was sent is brought into view (in the window it may be below the fold)
+    var result = root.querySelector('[role="tabpanel"]:not([hidden]) form .alert');
+    if (result) result.scrollIntoView({ block: 'center' });
 
     // Password: clear the three boxes
     root.querySelector('[data-clear-password]').addEventListener('click', function () {

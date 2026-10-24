@@ -12,7 +12,7 @@ function walkin_form_html(array $typeInfo, string $action): string
     ob_start();
 ?>
 <!-- ============ ADD WALK-IN APPLICANT (posts to submit_admin_applicant.php; same fields and checks as the online forms) ============ -->
-<dialog id="addApplicantModal" class="modal" aria-labelledby="modalTitle">
+<dialog id="addApplicantModal" class="modal modal-compact" aria-labelledby="modalTitle">
     <div class="modal-header">
         <div>
             <h2 id="modalTitle">Add walk-in applicant</h2>

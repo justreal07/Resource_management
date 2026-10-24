@@ -41,9 +41,9 @@ function walkin_respond(bool $is_ajax, int $status, array $data): void
     exit();
 }
 
-// Security Check - an admin adds a walk-in for any program; Medical & Burial staff for Medical/Burial only
+// Security Check - an admin adds a walk-in for any program; Medical & Burial staff for Medical/Burial only; OPD staff for OPD only
 $walkin_role = $_SESSION['user']['role'] ?? '';
-if (!isset($_SESSION['user']) || !in_array($walkin_role, ['admin', 'aid_staff'], true)) {
+if (!isset($_SESSION['user']) || !in_array($walkin_role, ['admin', 'aid_staff', 'staff'], true)) {
     walkin_respond($is_ajax, 403, ['success' => false, 'message' => 'Unauthorized']);
 }
 
@@ -66,6 +66,9 @@ if (!in_array($form_type, ['medical', 'burial', 'opd'], true)) {
 }
 if ($walkin_role === 'aid_staff' && !in_array($form_type, ['medical', 'burial'], true)) {
     walkin_respond($is_ajax, 403, ['success' => false, 'message' => 'Medical & Burial staff can only add Medical or Burial applicants']);
+}
+if ($walkin_role === 'staff' && $form_type !== 'opd') {
+    walkin_respond($is_ajax, 403, ['success' => false, 'message' => 'OPD staff can only add OPD applicants']);
 }
 
 // Validate date format

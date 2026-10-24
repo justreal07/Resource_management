@@ -35,51 +35,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Accounts are created by the system administrator. Please ask your admin to make one for you.';
     } elseif (!decision_csrf_ok()) {
         $errors[] = 'This page was open for too long. Nothing was saved. Please try again.';
-    } elseif ($fullname === '' || $username === '' || $password === '' || $confirm === '') {
-        $errors[] = 'Please fill in all the fields.';
     } else {
-        if (mb_strlen($fullname) > 100) {
-            $errors[] = 'Full name is too long (100 characters max).';
-        }
-        if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $username)) {
-            $errors[] = 'Username must be 3 to 50 characters, using only letters, numbers, dot, dash or underscore (no spaces).';
-        }
-        if ($problem = staff_password_problem($password)) {
-            $errors[] = $problem;
-        } elseif ($password !== $confirm) {
-            $errors[] = "The two passwords don't match.";
-        }
-        if (!in_array($role, ['admin', 'staff', 'aid_staff'], true)) {
-            $errors[] = 'Please choose a kind of account.';
-        } elseif ($role === 'admin' && !$canMakeAdmin) {
-            $errors[] = 'Admin accounts can only be created by a signed-in admin. Choose Staff, or ask your admin to make one for you.';
-        }
-    }
-
-    if (!$errors) {
-        $stmt = $pdo->prepare("SELECT 1 FROM users WHERE username = ?");
-        $stmt->execute([$username]);
-        if ($stmt->fetchColumn()) {
-            $errors[] = 'That username is already taken. Please try another one.';
-        }
-    }
-
-    if (!$errors) {
-        try {
-            $stmt = $pdo->prepare("INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)");
-            $stmt->execute([$username, password_hash($password, PASSWORD_DEFAULT), $fullname, $role]);
-            // Activity log: who made the account (nobody signed in = the very first admin)
-            activity_log('staff_created', ($roleLabels[$role] ?? ucfirst($role)) . ' account created: ' . $fullname . ' (@' . $username . ').',
-                $signedInAdmin ? null : ['name' => $fullname, 'role' => $role]);
-
+        // The same checks as Admin settings > Add staff (includes/admin_security.php); the activity log credits
+        // whoever is signed in, or the new account itself when it is the very first admin
+        $errors = staff_account_create($pdo, $fullname, $username, $password, $confirm, $role, $canMakeAdmin,
+            $signedInAdmin ? null : ['name' => $fullname, 'role' => $role]);
+        if (!$errors) {
             $_SESSION['register_flash'] = ['username' => $username, 'role' => $role];
             // An admin adding accounts stays here; everyone else goes on to sign in
             header('Location: ' . ($signedInAdmin ? 'register' : 'login?role=' . $role));
             exit;
-        } catch (PDOException $e) {
-            $errors[] = $e->getCode() === '23000'
-                ? 'That username is already taken. Please try another one.'
-                : 'Something went wrong while saving the account. Please try again.';
         }
     }
 }

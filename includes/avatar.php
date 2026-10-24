@@ -253,12 +253,14 @@ function ui_avatar_form(int $userId, string $name, string $returnTo = 'profile')
 {
     $has = staff_avatar_url($userId) !== '';
     $id = 'avatarFile' . $userId;
+    // Inside the settings / account window the saver sends the person back into the window (avatar_action.php)
+    $embed = function_exists('ui_embed_requested') && ui_embed_requested() ? '<input type="hidden" name="embed" value="1">' : '';
     return '<div class="avatar-box" data-avatar-box>'
         . ui_avatar($userId, $name, 'avatar-xl')
         . '<div class="avatar-box-main">'
         . '<form method="POST" action="../Main_dashboard/avatar_action" enctype="multipart/form-data" class="avatar-form" data-avatar-form novalidate>'
         . decision_csrf_field()
-        . '<input type="hidden" name="action" value="upload"><input type="hidden" name="return" value="' . htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') . '">'
+        . '<input type="hidden" name="action" value="upload"><input type="hidden" name="return" value="' . htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') . '">' . $embed
         . '<input type="hidden" name="MAX_FILE_SIZE" value="' . AVATAR_MAX_BYTES . '">'
         . '<label for="' . $id . '" class="label">Profile picture <span class="muted">(optional)</span></label>'
         . '<input type="file" id="' . $id . '" name="avatar" accept="image/jpeg,image/png,image/webp" aria-describedby="' . $id . 'Help">'
@@ -267,7 +269,7 @@ function ui_avatar_form(int $userId, string $name, string $returnTo = 'profile')
         . '<div class="avatar-actions"><button type="submit" class="btn btn-primary btn-sm" data-avatar-save disabled>' . ui_icon('check-circle') . 'Save picture</button></div>'
         . '</form>'
         . ($has ? '<form method="POST" action="../Main_dashboard/avatar_action">' . decision_csrf_field()
-            . '<input type="hidden" name="action" value="remove"><input type="hidden" name="return" value="' . htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') . '">'
+            . '<input type="hidden" name="action" value="remove"><input type="hidden" name="return" value="' . htmlspecialchars($returnTo, ENT_QUOTES, 'UTF-8') . '">' . $embed
             . '<button type="submit" class="btn btn-secondary btn-sm">' . ui_icon('x-circle') . 'Remove my picture</button></form>' : '')
         . '</div></div>';
 }
@@ -280,5 +282,7 @@ function ui_avatar_flash(): string
     if (!is_array($flash) || empty($flash[1])) return '';
     $ok = ($flash[0] ?? '') === 'ok';
     return '<div class="alert alert-' . ($ok ? 'success' : 'error') . '" role="' . ($ok ? 'status' : 'alert') . '">' . ui_icon($ok ? 'check-circle' : 'alert', 'alert-icon')
-        . '<div class="alert-body">' . htmlspecialchars((string)$flash[1], ENT_QUOTES, 'UTF-8') . '</div></div>';
+        . '<div class="alert-body">' . htmlspecialchars((string)$flash[1], ENT_QUOTES, 'UTF-8') . '</div></div>'
+        // A new picture shows in the top bar of the page behind the settings window: it reloads that page when the window closes (js/admin_embed.js)
+        . ($ok ? '<span data-embed-refresh hidden></span>' : '');
 }

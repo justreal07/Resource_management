@@ -199,6 +199,59 @@ function staff_password_problem(string $password): ?string
     return null;
 }
 
+/** The kinds of office account that can be made, as people read them (users.role => label). */
+const STAFF_ACCOUNT_KINDS = ['staff' => 'OPD staff', 'aid_staff' => 'Medical & Burial staff', 'admin' => 'Admin'];
+
+/**
+ * Make an OPD staff, Medical & Burial staff or admin account. Used by Admin settings > Add staff (a signed-in admin) and by
+ * login/register.php (the same admin, or the very first admin while the system has none), so both check the same things.
+ * The caller has already checked who is asking and the form token; this checks the details, saves, and writes the activity log.
+ *
+ * @param bool       $canMakeAdmin whether an Admin account may be made (a signed-in admin, or the first admin)
+ * @param array|null $actor        who the activity log credits: null = whoever is signed in; ['name' =>, 'role' =>] for the first admin (nobody is signed in yet)
+ * @return string[]  what is wrong, in plain words; empty = the account was made
+ */
+function staff_account_create(PDO $pdo, string $fullname, string $username, string $password, string $confirm, string $role, bool $canMakeAdmin, ?array $actor = null): array
+{
+    if ($fullname === '' || $username === '' || $password === '' || $confirm === '') {
+        return ['Please fill in all the fields.'];
+    }
+    $errors = [];
+    if (mb_strlen($fullname) > 100) {
+        $errors[] = 'Full name is too long (100 characters max).';
+    }
+    if (!preg_match('/^[A-Za-z0-9._-]{3,50}$/', $username)) {
+        $errors[] = 'Username must be 3 to 50 characters, using only letters, numbers, dot, dash or underscore (no spaces).';
+    }
+    if ($problem = staff_password_problem($password)) {
+        $errors[] = $problem;
+    } elseif ($password !== $confirm) {
+        $errors[] = "The two passwords don't match.";
+    }
+    if (!in_array($role, array_keys(STAFF_ACCOUNT_KINDS), true)) {
+        $errors[] = 'Please choose a kind of account.';
+    } elseif ($role === 'admin' && !$canMakeAdmin) {
+        $errors[] = 'Admin accounts can only be created by a signed-in admin. Choose Staff, or ask your admin to make one for you.';
+    }
+    if ($errors) return $errors;
+
+    $stmt = $pdo->prepare('SELECT 1 FROM users WHERE username = ?');
+    $stmt->execute([$username]);
+    if ($stmt->fetchColumn()) {
+        return ['That username is already taken. Please try another one.'];
+    }
+    try {
+        $pdo->prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
+            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), $fullname, $role]);
+    } catch (PDOException $e) {
+        return [$e->getCode() === '23000'
+            ? 'That username is already taken. Please try another one.'
+            : 'Something went wrong while saving the account. Please try again.'];
+    }
+    activity_log('staff_created', STAFF_ACCOUNT_KINDS[$role] . ' account created: ' . $fullname . ' (@' . $username . ').', $actor);
+    return [];
+}
+
 /**
  * A short fingerprint of an account's stored password hash. It is kept in the signed-in session ($_SESSION['user']['pwv']):
  * when the password is changed or reset, the fingerprint no longer matches and every other open sign-in of that account
@@ -237,6 +290,7 @@ function activity_actions(): array
         'profile_updated'         => ['Profile changed',            'settings',  'neutral'],
         'avatar_changed'          => ['Profile picture changed',    'settings',  'neutral'],
         'password_changed'        => ['Password changed',           'settings',  'neutral'],
+        'email_settings_changed'  => ['Changed the sending email',  'settings',  'pending'],
         'export_csv'              => ['Exported a list',            'exports',   'neutral'],
         'export_report'           => ['Downloaded a report',        'exports',   'neutral'],
         'budget_start'            => ['Set the budget',             'budget',    'approved'],
@@ -251,5 +305,5 @@ function activity_actions(): array
 function activity_groups(): array
 {
     return ['decisions' => 'Approvals, declines, withdrawals, edits and walk-ins encoded', 'signins' => 'Sign-ins', 'accounts' => 'Staff accounts',
-            'settings' => 'Own settings', 'exports' => 'Exports', 'budget' => 'Budget'];
+            'settings' => 'Settings', 'exports' => 'Exports', 'budget' => 'Budget'];
 }

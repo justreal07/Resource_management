@@ -74,9 +74,8 @@ $cards = [
 ];
 
 admin_layout_start(['title' => 'Reports', 'section' => 'reports']);
-echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you choose. Print it, or open the table in Excel.',
-    '<button type="button" class="btn btn-secondary" data-print>' . ui_icon('print') . 'Print</button>'
-    . '<button type="button" class="btn btn-secondary" data-export-table="#reportContent .data-table" data-filename="OPD_Report_' . ui_e($selected_date) . '.xls">'
+echo ui_page_head('OPD daily report', 'Patients with a check-up on the day you choose. Open the table in Excel.',
+    '<button type="button" class="btn btn-secondary" data-export-table="#reportContent .data-table" data-filename="OPD_Report_' . ui_e($selected_date) . '.xls">'
     . ui_icon('download') . 'Export table to Excel</button>');
 ?>
 <form class="panel report-filters" method="GET" action="opd_staff_report" data-busy>

@@ -3,7 +3,8 @@
 -- Import this into an empty database named lgu_assistance_system (phpMyAdmin > Import, or `mysql -u root lgu_assistance_system < this-file`).
 -- It is the COMPLETE current structure: the applicant, account and document tables, the person rules and Disapprove, the
 -- approval/claim details, the admin tools (activity log, sign-in limit, accounts turned off), the budget, announcements,
--- feedback, password reset and email confirmation, profile pictures and the photo-clarity note. A fresh install therefore needs
+-- feedback, password reset and email confirmation, profile pictures, the photo-clarity note and the sending email account
+-- saved in Admin settings (app_settings). A fresh install therefore needs
 -- NO migration, and the pages have nothing to create or alter by themselves (the ensure_* helpers find everything in place and do nothing).
 -- An older database is brought up to date by the files in database/migrations/ (they are safe to run again).
 --
@@ -76,6 +77,20 @@ CREATE TABLE `announcements` (
   CONSTRAINT `chk_announcement_pinned` CHECK (`is_pinned` in (0,1)),
   CONSTRAINT `chk_announcement_expiry` CHECK (`expires_at` is null or `expires_at` > `publish_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `app_settings`
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `app_settings` (
+  `setting_key` varchar(64) NOT NULL,
+  `setting_value` text DEFAULT NULL COMMENT 'mail_password is encrypted (includes/mail_settings.php); never shown back',
+  `updated_by` int(11) DEFAULT NULL COMMENT 'users.id of the admin who saved it',
+  `updated_at` datetime NOT NULL,
+  PRIMARY KEY (`setting_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='Settings saved by an admin (the sending Gmail account)';
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

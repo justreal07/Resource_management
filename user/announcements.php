@@ -147,6 +147,18 @@ $h = 'ann_e';
 </header>
 
 <main id="main" class="ann-main ann-scope">
+<?php if (!$singleId): ?>
+    <section class="ann-hero">
+        <div class="container ann-hero-inner">
+            <span class="ann-hero-icon" aria-hidden="true"><?= ann_icon('bullhorn') ?></span>
+            <div>
+                <span class="ann-eyebrow">From the Municipal Hall</span>
+                <h1 class="ann-heading">Announcements</h1>
+                <p class="ann-lead">Schedules, office hours, advisories and news about Medical, Burial and OPD assistance.</p>
+            </div>
+        </div>
+    </section>
+<?php endif; ?>
     <div class="container">
 
 <?php if ($singleId): ?>
@@ -183,26 +195,19 @@ $h = 'ann_e';
 
 <?php else: ?>
         <!-- THE FEED -->
-        <div class="ann-head">
-            <span class="ann-eyebrow">From the Municipal Hall</span>
-            <h1 class="ann-heading">Announcements</h1>
-            <p class="ann-lead">Schedules, office hours, advisories and news about Medical, Burial and OPD assistance.</p>
-        </div>
-
-        <form class="ann-filters" method="GET" action="announcements" aria-label="Filter announcements">
-            <div class="ann-field">
-                <label for="annCategoryFilter">Category</label>
-                <select id="annCategoryFilter" name="category" data-auto-submit>
-                    <option value="">All categories</option>
-                    <?php foreach ($cats as $key => [$label]): ?>
-                        <option value="<?= $h($key) ?>"<?= $category === $key ? ' selected' : '' ?>><?= $h($label) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <?php /* Choosing a category reloads the list at once (js/announcements.js); the button is for when JavaScript is off */ ?>
-            <noscript><button type="submit" class="ann-btn">Show</button></noscript>
-            <?php if ($filtered): ?><a class="ann-btn ann-btn-ghost" href="announcements">Show all</a><?php endif; ?>
-        </form>
+        <?php /* Plain links, not a <select>+submit: works with JavaScript off, needs no "Show" button,
+                 and the colour of each chip previews the category's own badge colour (ann-cat-*). */ ?>
+        <nav class="ann-cat-filters" aria-label="Filter by category">
+            <a class="ann-cat-chip<?= $category === '' ? ' is-active' : '' ?>" href="announcements"<?= $category === '' ? ' aria-current="page"' : '' ?>>
+                <?= ann_icon('star') ?>All
+            </a>
+            <?php foreach ($cats as $key => [$label, $icon]): ?>
+                <a class="ann-cat-chip ann-cat-<?= $h($key) ?><?= $category === $key ? ' is-active' : '' ?>"
+                   href="<?= $h($query(['category' => $key])) ?>"<?= $category === $key ? ' aria-current="page"' : '' ?>>
+                    <?= ann_icon($icon) ?><?= $h($label) ?>
+                </a>
+            <?php endforeach; ?>
+        </nav>
 
         <?php if (!$ready): ?>
             <div class="ann-state" role="status"><?= ann_icon('info') ?>

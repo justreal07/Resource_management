@@ -178,6 +178,12 @@
             return;
         }
         if (!data || !data.href) return;
+        // "Admin Settings", "My account", "Add staff account": a window over this page, not a new page (js/admin_pagemodal.js)
+        if (data.modal && !newTab && window.AdminPageModal) {
+            UI.closeDialog(dialog);
+            window.AdminPageModal.open(data.modal.url, data.modal);
+            return;
+        }
         // "Add walk-in applicant" while already on the dashboard: open the form instead of reloading the page
         const addButton = document.querySelector('[data-open-add]');
         if (/dashboard(\.php)?#add$/.test(data.href) && addButton) {

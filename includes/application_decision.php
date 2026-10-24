@@ -716,7 +716,7 @@ function decision_email_recipient($a, string $status, string $what, string $tell
         return ['note' => 'no email was sent: the applicant\'s account has no email address. They can see the ' . $what . ' when they sign in; you may also call them.'];
     }
     if (!mail_ready()) {
-        return ['note' => 'no email was sent because email isn\'t set up on this computer (mail.local.php). The applicant can see the ' . $what . ' when they sign in.'];
+        return ['note' => 'no email was sent because the sending email account isn\'t set up (Admin settings > Email). The applicant can see the ' . $what . ' when they sign in.'];
     }
     $greet = trim(preg_replace('/\s+/u', ' ', $a['account_firstname'] . ' ' . $a['account_lastname']) ?? '') ?: decision_person_name($a);
     return ['to' => $to, 'name' => $greet];

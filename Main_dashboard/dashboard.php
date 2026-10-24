@@ -36,7 +36,7 @@ $userRole = $_SESSION['user']['role'];
 
 $quickActions = [
     ['href' => '../reports/reports', 'label' => 'Generate report', 'icon' => 'chart', 'roles' => ['admin']],
-    ['href' => '../login/register', 'label' => 'Add staff account', 'icon' => 'user-plus', 'roles' => ['admin']],
+    ['href' => '../login/register', 'label' => 'Add staff account', 'icon' => 'user-plus', 'roles' => ['admin'], 'modal' => 'addstaff'],   // opens Admin settings > Add staff as a window
 ];
 
 /* Each part of the page loads in its own try block: if one query fails, that part
@@ -431,7 +431,7 @@ admin_layout_start([
                 </button>
                 <?php foreach ($quickActions as $action): ?>
                     <?php if (!in_array($userRole, $action['roles'], true)) continue; ?>
-                    <a class="btn btn-secondary" href="<?= ui_e($action['href']) ?>"><?= ui_icon($action['icon']) ?><?= ui_e($action['label']) ?></a>
+                    <a class="btn btn-secondary" href="<?= ui_e($action['href']) ?>"<?= isset($action['modal']) ? ui_modal_attrs($action['modal']) : '' ?>><?= ui_icon($action['icon']) ?><?= ui_e($action['label']) ?></a>
                 <?php endforeach; ?>
             </div>
             <!-- KPI_ROW_HERE -->

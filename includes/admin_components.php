@@ -379,7 +379,7 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     // form templates and js/admin_dashboard.js when this flag is set).
     $walkIn = '';
     $walkInRole = $_SESSION['user']['role'] ?? '';
-    if ($walkInRole === 'admin' || ($walkInRole === 'aid_staff' && ($typeId === 1 || $typeId === 2))) {
+    if ($walkInRole === 'admin' || ($walkInRole === 'aid_staff' && ($typeId === 1 || $typeId === 2)) || ($walkInRole === 'staff' && $typeId === 3)) {
         $GLOBALS['ui_walkin_on_page'] = true;
         $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
             . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
@@ -387,7 +387,6 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     return $nameBar . '<div class="tabs-bar">' . $tabsHtml . '<div class="tabs-tools">' . $walkIn
         . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
         . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
-        . '<button type="button" class="btn btn-secondary btn-sm" onclick="window.print()">' . ui_icon('print') . 'Print</button>'
         . '</div></div>';
 }
 

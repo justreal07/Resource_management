@@ -177,6 +177,10 @@
     const confirmDialog = $('confirmDialog');
 
     function confirmAction(opts) {
+        // Inside the settings / account window (a small frame): ask in the page around it, where there is room for the question
+        if (cfg.embedded && window.parent && window.parent !== window && typeof window.parent.confirmAction === 'function') {
+            try { return window.parent.confirmAction(opts); } catch (e) { /* ask here instead */ }
+        }
         if (swalReady()) {
             return window.Swal.fire(swalOptions({
                 title: opts.title || 'Are you sure?',
@@ -1160,7 +1164,7 @@
 
     if (document.querySelector('[data-chart]')) loadLib('chart').then(initCharts).catch(keepBuiltIn);
     if (document.querySelector('table[data-sortable]')) loadLib('tablesort').then(initSorting).catch(keepBuiltIn);
-    loadLib('swal').then(showToasts).catch(keepBuiltIn);
+    if (!cfg.embedded) loadLib('swal').then(showToasts).catch(keepBuiltIn);   // the window's page keeps its messages on the page (no toasts)
 
     window.AdminUI = {
         cfg, store, serverNow, iconHtml, setButtonBusy, showFieldError, clearFieldError, formatDate,

@@ -78,10 +78,16 @@
     font-size: 1rem;
     line-height: 1.6;
     min-width: 0;
+    transition: transform 0.2s, box-shadow 0.2s;
 }
+/* The feed cards only (not the one-announcement page, not the admin's static preview) lift a little
+   on hover, so the grid feels like something you can browse rather than a flat list. */
+.ann-grid > .ann-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(10, 36, 114, 0.16); }
 .ann-scope .ann-card.is-pinned { border-color: #f0c64a; box-shadow: 0 0 0 2px #ffe9a8, var(--ann-shadow); }
+.ann-grid > .ann-card.is-pinned:hover { box-shadow: 0 0 0 2px #ffe9a8, 0 16px 36px rgba(10, 36, 114, 0.16); }
 .ann-scope .ann-card-media { aspect-ratio: 16 / 9; background: #eef2fb; overflow: hidden; }
-.ann-scope .ann-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ann-scope .ann-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.3s; }
+.ann-grid > .ann-card:hover .ann-card-media img { transform: scale(1.04); }
 .ann-scope .ann-card-body { display: flex; flex-direction: column; gap: 10px; padding: 20px 22px 22px; flex: 1; min-width: 0; }
 .ann-scope .ann-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .ann-scope .ann-card-title {
@@ -144,11 +150,54 @@
    PUBLIC PAGE (user/announcements.php)
 ============================================ */
 .ann-page { background: #F6F8FC; }
-.ann-main { padding: 36px 0 64px; }
+.ann-main { padding: 0 0 64px; }
 .ann-head { margin-bottom: 22px; }
 .ann-eyebrow { display: inline-block; margin-bottom: 8px; font-size: 0.875rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #a4161a; }
 .ann-heading { margin: 0 0 8px; font-size: clamp(1.7rem, 3vw, 2.4rem); line-height: 1.2; color: var(--ann-ink); }
 .ann-lead { margin: 0; max-width: 680px; color: var(--ann-body); font-size: 1.05rem; }
+
+/* Hero banner above the feed (not shown on one announcement's own page): the same navy/red/gold the
+   rest of the portal uses, so this reads as part of the site and not a bolted-on page. */
+.ann-hero {
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(110deg, var(--ann-navy-dark) 0%, var(--ann-navy) 55%, #7a0d1f 100%);
+    margin-bottom: 28px;
+}
+.ann-hero::after {   /* the tricolour stripe every header/hero on the portal has, along the bottom edge */
+    content: "";
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 4px;
+    background: linear-gradient(90deg, var(--ann-navy) 0 33%, #E63946 33% 66%, var(--ann-gold) 66% 100%);
+}
+.ann-hero-inner {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding-top: 40px;
+    padding-bottom: 36px;
+}
+.ann-hero-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: var(--ann-gold);
+}
+.ann-hero-icon .ann-icon { width: 2rem; height: 2rem; }
+.ann-hero .ann-eyebrow { color: #ffd27a; }
+.ann-hero .ann-heading { color: #fff; }
+.ann-hero .ann-lead { color: rgba(255, 255, 255, 0.85); max-width: 640px; }
+@media (max-width: 560px) {
+    .ann-hero-inner { padding-top: 28px; padding-bottom: 24px; gap: 16px; }
+    .ann-hero-icon { width: 56px; height: 56px; border-radius: 16px; }
+    .ann-hero-icon .ann-icon { width: 1.5rem; height: 1.5rem; }
+}
 
 /* Header: brand on the left, the page links on the right (they wrap on a phone) */
 .ann-header-inner {
@@ -181,6 +230,40 @@
 /* Footer: only the copyright line (its stripe normally sits in a top padding this page doesn't use) */
 .ann-footer { padding: 0; }
 .ann-footer::before { margin: 0; }
+
+/* Category chips, centred above the cards: plain links (no JavaScript needed), each tinted like its
+   own category badge so the colour already means something by the time someone reaches the cards. */
+.ann-cat-filters {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 0 26px;
+}
+.ann-cat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 0 12px;
+    border-radius: 999px;
+    border-width: 1px;   /* colour comes from the category's own .ann-cat-* rule */
+    border-style: solid;
+    font-weight: 700;
+    font-size: 0.9rem;
+    text-decoration: none;
+    transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+/* Only "All" has no category colours of its own: it gets the plain white chip */
+.ann-cat-filters .ann-cat-chip:first-child { background: var(--ann-surface); color: var(--ann-body); border-color: var(--ann-line); }
+.ann-cat-filters .ann-cat-chip:first-child .ann-icon { color: var(--ann-muted); }
+.ann-cat-chip:hover { transform: translateY(-1px); box-shadow: var(--ann-shadow); }
+.ann-cat-chip:focus-visible { outline: 3px solid var(--ann-gold); outline-offset: 2px; }
+/* Each chip is tinted with its own category's badge colours (.ann-cat-general etc., above) all the
+   time, like a small preview of what's inside; the active one additionally gets a lift and a shadow. */
+.ann-cat-chip.is-active { border-color: transparent; box-shadow: var(--ann-shadow); }
+.ann-cat-chip.is-active .ann-icon { color: inherit !important; }
+.ann-cat-filters .ann-cat-chip:first-child.is-active { background: var(--ann-navy); color: #fff; border-color: var(--ann-navy); }   /* "All" */
 
 /* Filter bar: the category only, centred above the cards */
 .ann-filters {
@@ -302,7 +385,7 @@
 .ann-dialog-body .ann-card-media { margin: 0 0 16px; border-radius: 12px; }
 
 /* One announcement on its own page (?id=, the no-JavaScript "Read more") */
-.ann-single { max-width: 820px; margin: 0 auto; }
+.ann-single { max-width: 820px; margin: 0 auto; padding-top: 36px; }   /* the feed has a hero above it; this page does not */
 .ann-single .ann-card-body { gap: 12px; }
 .ann-single .ann-card-title { font-size: clamp(1.4rem, 2.6vw, 1.9rem); }
 .ann-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--ann-navy); font-weight: 700; }

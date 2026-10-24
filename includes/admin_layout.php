@@ -33,19 +33,74 @@ if (($GLOBALS['pdo'] ?? null) instanceof PDO) {
 const ADMIN_LAYOUT_REQUIRE_LOGIN = true;
 
 if (ADMIN_LAYOUT_REQUIRE_LOGIN && !in_array($_SESSION['user']['role'] ?? '', ui_area() === 'staff' ? ['staff', 'aid_staff', 'admin'] : ['admin'], true)) {
-    header('Location: ' . ui_login_url());
-    exit();
+    ui_leave_to_login();
 }
 // A removed account is signed out on its next page, not when its session ends
 if (ADMIN_LAYOUT_REQUIRE_LOGIN && decision_user() === null) {
-    header('Location: ' . ui_login_url());
-    exit();
+    ui_leave_to_login();
 }
 
 /** The sign-in page for this side (staff pages open it on the Staff tab). */
 function ui_login_url(): string
 {
     return '../login/login?role=' . ui_area();
+}
+
+/**
+ * Send the visitor to the sign-in page. A page shown inside a window over another page (?embed=1, see below) moves the
+ * whole tab there, not just the small window, so the sign-in form never appears squeezed inside it.
+ */
+function ui_leave_to_login(): void
+{
+    $url = ui_login_url();
+    if (ui_embed_requested()) {
+        header('Content-Type: text/html; charset=UTF-8');
+        echo '<!DOCTYPE html><meta charset="utf-8"><title>Signed out</title>'
+            . '<script>window.top.location.replace(' . json_encode($url) . ');</script>'
+            . '<p>Your sign-in ended. <a target="_top" href="' . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '">Sign in again</a>.</p>';
+        exit();
+    }
+    header('Location: ' . $url);
+    exit();
+}
+
+/* ============================================================
+   PAGES IN A WINDOW
+   Admin settings and the staff "My account" open as a window over the page you are on (like the walk-in form) instead of
+   replacing it. The window is a <dialog> holding an <iframe> that loads the same page with ?embed=1; with that, the page
+   draws only its own content (no menu, no top bar) and tells the window how tall it is (js/admin_embed.js), so the window
+   is exactly as big as what is inside it. js/admin_pagemodal.js opens and closes it. The pages still work on their own
+   (a bookmark, a new tab, no JavaScript): the links keep their normal address and only a plain click opens the window.
+   ============================================================ */
+
+/** Was this page asked to show only its content, for the window? (A page must also opt in: 'embed_ok' in admin_layout_start().) */
+function ui_embed_requested(): bool
+{
+    return ($_GET['embed'] ?? '') === '1';
+}
+
+/** Is the page being drawn right now the content-only version? (set by admin_layout_start()) */
+function ui_embedded(): bool
+{
+    return !empty($GLOBALS['ui_embedded']);
+}
+
+/** The pages that can open in a window: key => address (the window adds ?embed=1), the title above the window, its width. */
+function ui_modal_pages(): array
+{
+    return [
+        'settings' => ['url' => '../Main_dashboard/admin_settings', 'title' => 'Admin settings', 'size' => 'wide'],
+        'addstaff' => ['url' => '../Main_dashboard/admin_settings?tab=addstaff', 'title' => 'Admin settings', 'size' => 'wide'],
+        'account'  => ['url' => '../staff/my_account', 'title' => 'My account', 'size' => 'narrow'],
+    ];
+}
+
+/** The attributes that make a link open one of those pages in the window (the link's own href stays as the fallback). */
+function ui_modal_attrs(string $key): string
+{
+    $m = ui_modal_pages()[$key] ?? null;
+    if ($m === null) return '';
+    return ' data-page-modal="' . ui_e($m['url']) . '" data-modal-title="' . ui_e($m['title']) . '" data-modal-size="' . ui_e($m['size']) . '"';
 }
 
 /**
@@ -76,7 +131,7 @@ function admin_nav(): array
         'reports'   => ['href' => '../reports/reports', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['admin']],
         'announcements' => ['href' => '../Main_dashboard/announcements', 'label' => 'Announcements', 'icon' => 'megaphone', 'roles' => ['admin']],
         'activity'  => ['href' => '../Main_dashboard/activity_log', 'label' => 'Activity Log', 'icon' => 'clock', 'roles' => ['admin']],
-        'settings'  => ['href' => '../Main_dashboard/admin_settings', 'label' => 'Admin Settings', 'icon' => 'settings', 'roles' => ['admin']],
+        'settings'  => ['href' => '../Main_dashboard/admin_settings', 'label' => 'Admin Settings', 'icon' => 'settings', 'roles' => ['admin'], 'modal' => 'settings'],
     ];
 }
 
@@ -95,7 +150,7 @@ function staff_nav(): array
         'medical'     => ['href' => ui_type_url(1, 'all'), 'label' => 'Medical Assistance', 'icon' => 'medical', 'roles' => ['aid_staff', 'admin'], 'type' => 1],
         'burial'      => ['href' => ui_type_url(2, 'all'), 'label' => 'Burial Assistance', 'icon' => 'burial', 'roles' => ['aid_staff', 'admin'], 'type' => 2],
         'aid_reports' => ['href' => '../staff/aid_staff_report', 'label' => 'Reports', 'icon' => 'chart', 'roles' => ['aid_staff', 'admin']],
-        'account'     => ['href' => '../staff/my_account', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff', 'aid_staff']],
+        'account'     => ['href' => '../staff/my_account', 'label' => 'My account', 'icon' => 'user', 'roles' => ['staff', 'aid_staff'], 'modal' => 'account'],
     ];
 }
 
@@ -114,7 +169,9 @@ function admin_commands(): array
     $cmds = [];
     foreach ($staffSide ? staff_nav() : admin_nav() as $item) {
         if ($role !== '' && !in_array($role, $item['roles'], true)) continue;
-        $cmds[] = ['label' => $item['label'], 'href' => $item['href'], 'icon' => $item['icon'], 'group' => 'Go to', 'words' => ''];
+        $cmd = ['label' => $item['label'], 'href' => $item['href'], 'icon' => $item['icon'], 'group' => 'Go to', 'words' => ''];
+        if (isset($item['modal'])) $cmd['modal'] = ui_modal_pages()[$item['modal']];   // opens as a window over this page (js/admin_pagemodal.js)
+        $cmds[] = $cmd;
     }
     $pages = ['all' => ['All applications', 'all list'], 'pending' => ['Waiting for review', 'pending to review queue'],
               'approved' => ['Approved', 'approved done'], 'disapproved' => ['Declined', 'declined disapproved rejected not approved'],
@@ -129,7 +186,8 @@ function admin_commands(): array
     }
     if (!$staffSide && $role === 'admin') {
         $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../Main_dashboard/dashboard#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant'];
-        $cmds[] = ['label' => 'Add staff account', 'href' => '../login/register', 'icon' => 'user-plus', 'group' => 'Actions', 'words' => 'new staff admin user account register'];
+        $cmds[] = ['label' => 'Add staff account', 'href' => ui_modal_pages()['addstaff']['url'], 'icon' => 'user-plus', 'group' => 'Actions', 'words' => 'new staff admin user account register',
+                   'modal' => ui_modal_pages()['addstaff']];
     }
     if ($staffSide && $role === 'aid_staff') {
         $cmds[] = ['label' => 'Add walk-in applicant', 'href' => '../staff/aid_staff_dashboard#add', 'icon' => 'plus', 'group' => 'Actions', 'words' => 'new application walk in add applicant medical burial'];
@@ -202,8 +260,8 @@ function admin_pending_counts(): array
     return $counts;
 }
 
-/** Messages left by the action pages (approve, disapprove, update), shown once. */
-function admin_flash_messages(): string
+/** Messages left by the action pages (approve, disapprove, update), shown once. $toast = false keeps a success message on the page (inside a window a toast would be cramped). */
+function admin_flash_messages(bool $toast = true): string
 {
     $alerts = [];
     if (!empty($_SESSION['success_message'])) {
@@ -228,7 +286,7 @@ function admin_flash_messages(): string
     $html = '';
     foreach ($alerts as [$kind, $text]) {
         // data-toast: admin_ui.js shows a success message as a toast (SweetAlert2); errors stay on the page
-        $html .= '<div class="alert alert-' . $kind . '" role="' . ($kind === 'success' ? 'status' : 'alert') . '"' . ($kind === 'success' ? ' data-toast' : '') . '>'
+        $html .= '<div class="alert alert-' . $kind . '" role="' . ($kind === 'success' ? 'status' : 'alert') . '"' . ($kind === 'success' && $toast ? ' data-toast' : '') . '>'
             . ui_icon($kind === 'success' ? 'check-circle' : 'alert', 'alert-icon')
             . '<div class="alert-body">' . ui_e($text) . '</div></div>';
     }
@@ -237,12 +295,17 @@ function admin_flash_messages(): string
 
 /**
  * Opens the page.
- * $page: title (top bar + browser tab), section (active menu item), topbar_extra (HTML before the user chip)
+ * $page: title (top bar + browser tab), section (active menu item), topbar_extra (HTML before the user chip),
+ * embed_ok (true on a page that may be shown inside the window of "Pages in a window", above: with ?embed=1 it then draws
+ * only its own content, and admin_layout_end() closes it the same way)
  */
 function admin_layout_start(array $page): void
 {
     $title = $page['title'] ?? 'Admin';
     $section = $page['section'] ?? '';
+    $embed = !empty($page['embed_ok']) && ui_embed_requested();
+    $GLOBALS['ui_embedded'] = $embed;
+    if ($embed && !headers_sent()) header('X-Frame-Options: SAMEORIGIN');   // only this site may put it in a window
     $user = $_SESSION['user'] ?? null;
     $role = $user['role'] ?? '';
     $roleLabel = ['admin' => 'Administrator', 'staff' => 'Staff', 'aid_staff' => 'Medical & Burial staff'][$role] ?? '';
@@ -254,7 +317,8 @@ function admin_layout_start(array $page): void
     $myId = (int)($user['id'] ?? 0);   // for the profile picture
     // The person's own page: the admin's settings, or the staff member's account page
     $myPage = $role === 'admin' ? '../Main_dashboard/admin_settings' : '../staff/my_account';
-    $waiting = admin_pending_counts();
+    $myModal = $role === 'admin' ? 'settings' : 'account';
+    $waiting = $embed ? [] : admin_pending_counts();
     $nav = ui_area() === 'staff' ? staff_nav() : admin_nav();
     ?>
 <!DOCTYPE html>
@@ -271,9 +335,9 @@ function admin_layout_start(array $page): void
     <!-- Same for the light/dark choice made with the top bar's moon button (js/admin_theme.js); nothing chosen = the computer's setting -->
     <script>try { const t = localStorage.getItem('lgu.theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
 </head>
-<body>
+<body<?= $embed ? ' class="is-embedded"' : '' ?>>
 
-<a class="skip-link" href="#main">Skip to main content</a>
+<?php if (!$embed): ?><a class="skip-link" href="#main">Skip to main content</a><?php endif; ?>
 
 <!-- Icons, drawn inline so they work without internet (no icon font from a CDN) -->
 <svg class="sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -315,6 +379,13 @@ function admin_layout_start(array $page): void
     <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
 </svg>
 
+<?php if ($embed) {
+    /* Inside the window: no menu and no top bar, just the page's own content (admin_layout_end() closes this the same way).
+       Success messages stay on the page: a toast would be cramped in a small window. */ ?>
+<div class="embed" id="embedRoot">
+<?= admin_flash_messages(false) ?>
+<?php return; } ?>
+
 <div class="app">
 
     <aside class="sidebar" id="sidebar" aria-label="Main menu">
@@ -332,7 +403,7 @@ function admin_layout_start(array $page): void
                     <?php if ($role !== '' && !in_array($role, $item['roles'], true)) continue; ?>
                     <?php $n = isset($item['type']) ? ($waiting[$item['type']] ?? 0) : 0; ?>
                     <li>
-                        <a class="nav-link" href="<?= ui_e($item['href']) ?>"<?= $key === $section ? ' aria-current="page"' : '' ?>>
+                        <a class="nav-link" href="<?= ui_e($item['href']) ?>"<?= $key === $section ? ' aria-current="page"' : '' ?><?= isset($item['modal']) ? ui_modal_attrs($item['modal']) : '' ?>>
                             <?= ui_icon($item['icon']) ?>
                             <span class="nav-text"><?= ui_e($item['label']) ?></span>
                             <?php if (isset($item['type'])): /* always printed (hidden at 0) so admin_live.js can show it when the first one arrives */ ?>
@@ -379,7 +450,7 @@ function admin_layout_start(array $page): void
                 <?= ui_icon('moon', 'theme-moon') ?><?= ui_icon('sun', 'theme-sun') ?><span class="visually-hidden" data-theme-label>Switch to dark theme</span>
             </button>
             <?php if ($user): ?>
-                <a class="user-chip" href="<?= ui_e($myPage) ?>" title="<?= ui_e($role === 'admin' ? 'Your profile and picture' : 'Your account and picture') ?>">
+                <a class="user-chip" href="<?= ui_e($myPage) ?>" title="<?= ui_e($role === 'admin' ? 'Your profile and picture' : 'Your account and picture') ?>"<?= ui_modal_attrs($myModal) ?>>
                     <?= ui_avatar($myId, (string)$userName) ?>
                     <span class="user-chip-text"><strong><?= ui_e($userName) ?></strong><span class="role-badge"><?= ui_e($roleLabel) ?></span></span>
                 </a>
@@ -430,6 +501,31 @@ function admin_layout_start(array $page): void
  */
 function admin_layout_end(array $opts = []): void
 {
+    // The content-only version inside the window (see "Pages in a window", above): close the content and load only what it needs.
+    // 'embedded' tells admin_ui.js to ask the confirmations in the window's parent page, where there is room for them.
+    if (ui_embedded()) {
+        $config = array_merge([
+            'userId'          => (int)($_SESSION['user']['id'] ?? 0),
+            'serverNow'       => time(),
+            'sessionLifetime' => (int)ini_get('session.gc_maxlifetime'),
+            'loginUrl'        => ui_login_url(),
+            'vendor'          => ui_vendor_libs(),
+            'embedded'        => true,
+        ], $opts['config'] ?? []);
+        ?>
+</div>
+<script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+<script src="../js/admin_ui.js"></script>
+<script src="../js/admin_avatar.js"></script>
+<script src="../js/admin_embed.js"></script>
+<?php foreach ($opts['scripts'] ?? [] as $src): ?>
+<script src="<?= ui_e($src) ?>"></script>
+<?php endforeach; ?>
+</body>
+</html>
+<?php
+        return;
+    }
     // A program page showed the "Add walk-in" button (ui_type_tabs): bring the walk-in window with it, posting to the dashboard's saver
     if (!empty($GLOBALS['ui_walkin_on_page']) && strpos((string)($opts['after'] ?? ''), 'id="addApplicantModal"') === false) {
         require_once __DIR__ . '/walkin_form.php';
@@ -440,6 +536,7 @@ function admin_layout_end(array $opts = []): void
         $typeInfo = [];
         foreach (ui_types() as $id => $t) {
             if ($walkInRole === 'aid_staff' && !in_array($id, [1, 2], true)) continue;
+            if ($walkInRole === 'staff' && $id !== 3) continue;   // OPD staff: OPD only
             $typeInfo[$id] = $t;
         }
         $opts['after'] = ($opts['after'] ?? '') . walkin_form_html($typeInfo, '../Main_dashboard/submit_admin_applicant');
@@ -506,6 +603,18 @@ function admin_layout_end(array $opts = []): void
         <p class="visually-hidden" id="cmdkStatus" role="status" aria-live="polite"></p>
     </div>
 </dialog>
+
+<!-- A page in a window (Admin settings, My account): the same page with ?embed=1 in a frame whose height follows its content.
+     js/admin_pagemodal.js opens it; the frame is emptied when the window closes. -->
+<dialog id="pageModal" class="modal modal-page" aria-labelledby="pageModalTitle">
+    <div class="modal-header">
+        <h2 id="pageModalTitle" data-pm-title>Admin settings</h2>
+        <button type="button" class="icon-btn" data-pm-close><?= ui_icon('x') ?><span class="visually-hidden">Close</span></button>
+    </div>
+    <div class="page-modal-body">
+        <iframe class="page-modal-frame" data-pm-frame title="Admin settings" src="about:blank"></iframe>
+    </div>
+</dialog>
 <?php endif; ?>
 
 <?php if ($widgets !== ''): ?>
@@ -518,6 +627,7 @@ function admin_layout_end(array $opts = []): void
 <script src="../js/admin_theme.js"></script>
 <script src="../js/admin_avatar.js"></script>
 <script src="../js/admin_live.js"></script>
+<script src="../js/admin_pagemodal.js"></script>
 <script src="../js/admin_command.js"></script>
 <?php foreach ($opts['scripts'] ?? [] as $src): ?>
 <script src="<?= ui_e($src) ?>"></script>

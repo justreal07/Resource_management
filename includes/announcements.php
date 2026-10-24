@@ -192,6 +192,8 @@ function ann_icon(string $name, string $class = ''): string
         'trash'    => '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',
         'x'        => '<path d="M18 6 6 18M6 6l12 12"/>',
         'arrow'    => '<path d="M5 12h14M13 6l6 6-6 6"/>',
+        // The hero banner's icon (user/announcements.php): a megaphone, for "announcements" at a glance
+        'bullhorn' => '<path d="M3 11v2a2 2 0 0 0 2 2h1l2 5h2l-1.5-5H10l9 4V6l-9 4H5a2 2 0 0 0-2 1Z"/><path d="M15 8.5v7"/>',
     ];
     return '<svg class="ann-icon' . ($class !== '' ? ' ' . $class : '') . '" viewBox="0 0 24 24" aria-hidden="true" focusable="false">'
         . ($paths[$name] ?? $paths['info']) . '</svg>';

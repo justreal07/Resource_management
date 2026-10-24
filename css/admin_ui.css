@@ -563,9 +563,9 @@ a:hover { color: var(--c-primary-hover); }
 .tabs { overflow-x: auto; border-bottom: 1px solid var(--c-border); }
 /* The program tabs with Export CSV / Print beside them */
 /* "Find an applicant by name" above the tabs of every program page */
-.name-search { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 640px; margin-bottom: 12px; }
+.name-search { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; max-width: 640px; margin-bottom: 0; }
 .name-search .input-icon { flex: 1 1 280px; }
-.name-search-result { margin: -4px 0 12px; color: var(--c-text-muted); font-size: var(--fs-sm); }
+.name-search-result { margin: 0; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .name-search-result strong { color: var(--c-text); }
 .tabs-bar { display: flex; flex-wrap: wrap; align-items: stretch; }
 /* wide enough for all six tabs (Overview ... Withdrawn): the tools drop below them when the page is narrower */
@@ -677,6 +677,8 @@ a:hover { color: var(--c-primary-hover); }
 .state-title { font-weight: 600; }
 .state-text { max-width: 44ch; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .state .btn { margin-top: 8px; }
+/* An empty state that is the only thing in a panel needs no second box inside the panel */
+.panel > .state:only-child, .panel > .panel-head + .state { padding: 20px 16px; background: none; border: 0; }
 .state-error { background: var(--c-danger-bg); border: 1px solid var(--c-danger-border); }
 .state-error .state-icon, .state-error .state-title { color: var(--c-danger-text); }
 .state-error .state-text { color: var(--c-text); }
@@ -733,7 +735,8 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
     color: var(--c-primary);
     border-radius: 50%;
 }
-.queue-main { display: grid; flex: 1; gap: 2px; min-width: 0; }
+.queue-main { display: flex; flex-direction: column; align-self: stretch; flex: 1; gap: 2px; min-width: 0; }
+.queue-main .spark { margin-top: auto; padding-top: 8px; }   /* the trend lines of side-by-side cards sit on one line */
 .queue-type { font-weight: 600; }
 .queue-count { font-size: var(--fs-base); }
 .queue-count strong { font-size: var(--fs-2xl); line-height: 1.1; margin-right: 2px; }
@@ -891,7 +894,7 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
 .field > label, .label, legend { font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); }
 .req { color: var(--c-accent); font-weight: 700; }
 
-input[type="text"], input[type="search"], input[type="tel"], input[type="number"],
+input[type="text"], input[type="search"], input[type="tel"], input[type="number"], input[type="email"],
 input[type="date"], input[type="time"], input[type="password"], select, textarea {
     width: 100%;
     min-height: 44px;
@@ -1011,6 +1014,7 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-
     border-bottom: 1px solid var(--c-border);
 }
 .data-table thead th {
+    vertical-align: middle;   /* plain and sortable headers share one baseline */
     background: var(--c-surface-2);
     color: var(--c-heading);
     font-size: var(--fs-sm);
@@ -1383,6 +1387,44 @@ td .field-error { margin-top: 4px; }
 .modal-footer-space { flex: 1; }
 .modal-step { display: grid; gap: 16px; }
 
+/* ---------- A page in a window (js/admin_pagemodal.js; includes/admin_layout.php "Pages in a window") ----------
+   The window is a <dialog> with a title bar and a frame. The frame loads the page with ?embed=1 and is made exactly as tall
+   as that page says it is, so there is no empty space in it; as tall as the screen at most, then the page scrolls inside. */
+.modal-page { width: min(940px, calc(100vw - 24px)); overflow: hidden; }
+.modal-page-narrow { width: min(660px, calc(100vw - 24px)); }
+.modal-page .modal-header { align-items: center; padding: 4px 6px 4px 20px; }
+.modal-page .modal-header h2 { font-size: var(--fs-md); }
+.page-modal-body { position: relative; min-height: 0; }
+.page-modal-frame { display: block; width: 100%; height: 260px; background: var(--c-surface); border: 0; transition: height 0.15s ease; }
+.modal-page.is-loading .page-modal-frame { visibility: hidden; }
+.modal-page.is-loading .page-modal-body::after { content: "Loading…"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--c-text-muted); }
+@media (prefers-reduced-motion: reduce) { .page-modal-frame { transition: none; } }
+
+/* The walk-in window (and any window that asks for it with .modal-compact): the same tight spacing as the settings window,
+   so it holds only what is needed and nothing is empty */
+.modal-compact .modal-header { align-items: center; padding: 8px 8px 8px 20px; }
+.modal-compact .modal-header h2 { font-size: var(--fs-md); line-height: 1.25; }
+.modal-compact .modal-body { gap: 12px; padding: 14px 20px 16px; }
+.modal-compact .modal-step { gap: 12px; }
+.modal-compact .modal-footer { padding: 10px 16px; }
+.modal-compact .step-summary { padding: 8px 12px; }
+.modal-compact .form-section { gap: 10px; }
+.modal-compact .form-section + .form-section { padding-top: 12px; }
+.modal-compact .form-grid { gap: 10px 14px; }
+.modal-compact .modal-form-fields { gap: 12px; }
+.modal-compact .doc-checklist { padding: 10px 14px; }
+.modal-compact .doc-checklist li { min-height: 32px; padding-top: 4px; }
+
+/* The page inside the frame: its own content only (no menu, no top bar), on the window's own surface */
+body.is-embedded { background: var(--c-surface); }
+.embed { min-width: 0; }
+.embed > .alert { margin: 12px 20px 0; }
+.embed-pane { display: grid; gap: 14px; padding: 18px 20px 20px; }
+/* A picture or a form on the left, the details on the right (Admin settings > Profile, My account) */
+.split { display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr); gap: 18px 28px; align-items: start; }
+.split-side .avatar-box { margin: 0; padding: 0; border: 0; }
+.split-main { display: grid; gap: 14px; min-width: 0; }
+@media (max-width: 600px) { .split { grid-template-columns: minmax(0, 1fr); } }
 .type-picker { padding: 0; border: 0; display: grid; gap: 8px; }
 .type-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
 .type-option { position: relative; cursor: pointer; }
