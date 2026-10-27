@@ -49,6 +49,23 @@ if (!isset($_SESSION[$form_data_key])) {
     exit;
 }
 $form_data = $_SESSION[$form_data_key];
+$form_data = application_claimant_values($form_type, $form_data);
+$claimantErrors = application_claimant_errors($form_type, $form_data);
+if ($claimantErrors) {
+    $_SESSION[$form_data_key] = $form_data;
+    $_SESSION[$form_type . '_claimant_errors'] = $claimantErrors;
+    header('Location: ' . $form_page);
+    exit;
+}
+// A form can be left open overnight. Check it again before accepting uploads or saving a request.
+if ($form_type === 'opd') {
+    $fresh = validate_application($form_data, ['checkup_date']);
+    if (isset($fresh['checkup_date'])) {
+        $_SESSION['opd_stale_error'] = $fresh['checkup_date'];
+        header('Location: ' . $form_page);
+        exit;
+    }
+}
 // The person rules (deceased, earlier Medical application, one Burial per person)
 // are checked again while saving, in STEP 2.
 
@@ -111,6 +128,8 @@ $save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $typ
             $columns[] = 'beneficiary_birthdate';
             $values[] = $f['beneficiary_birthdate'];
         }
+        array_push($columns, 'claimant_birthdate', 'claimant_age');
+        array_push($values, $f['claimant_birthdate'] !== '' ? $f['claimant_birthdate'] : null, $f['claimant_age'] !== '' ? $f['claimant_age'] : null);
         $stmt = $pdo->prepare('INSERT INTO applicant (' . implode(', ', $columns) . ') VALUES ('
             . implode(', ', array_fill(0, count($columns), '?')) . ')');
         $stmt->execute($values);
@@ -127,6 +146,8 @@ $save = function (?int $beneficiary_id) use ($pdo, $form_type, $account_id, $typ
             array_push($values, $beneficiary_id, ($f['beneficiary_birthdate'] ?? '') !== '' ? $f['beneficiary_birthdate'] : null,
                        ($f['date_of_death'] ?? '') !== '' ? $f['date_of_death'] : null);
         }
+        $columns[] = 'claimant_birthdate';
+        $values[] = $f['claimant_birthdate'];
         $stmt = $pdo->prepare('INSERT INTO applicant (' . implode(', ', $columns) . ') VALUES ('
             . implode(', ', array_fill(0, count($columns), '?')) . ')');
         $stmt->execute($values);

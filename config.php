@@ -68,6 +68,22 @@ try {
         . '(System administrator: check that MySQL is running in the XAMPP Control Panel and that the database "' . $dbname . '" exists.)');
 }
 
+// A password reset/change ends every earlier applicant sign-in, including direct document and submit endpoints.
+if (isset($_SESSION['applicant']['id'])) {
+    try {
+        $stmt = $pdo->prepare('SELECT password FROM applicant_accounts WHERE id = ?');
+        $stmt->execute([(int)$_SESSION['applicant']['id']]);
+        $currentHash = $stmt->fetchColumn();
+        if ($currentHash === false || !isset($_SESSION['applicant']['pwv'])
+            || !hash_equals(hash('sha256', (string)$currentHash), (string)$_SESSION['applicant']['pwv'])) {
+            unset($_SESSION['applicant']);
+        }
+    } catch (Throwable $e) {
+        error_log('Applicant session validation failed: ' . $e->getMessage());
+        unset($_SESSION['applicant']);
+    }
+}
+
 // An older database still has OPD's reason for the check-up under its old column name: rename it once (see includes/schema.php)
 require_once __DIR__ . '/includes/schema.php';
 schema_checkup_reason_ready($pdo);
@@ -75,6 +91,11 @@ schema_checkup_reason_ready($pdo);
 schema_application_changes_ready($pdo);
 // Medical & Burial staff (role `aid_staff`) and applicant.encoded_by (once; see includes/schema.php)
 schema_aid_staff_ready($pdo);
+// Additive only: historic ages and permissions are preserved for office review.
+if (empty($_SESSION['claimant_reapply_schema_v1'])) {
+    schema_claimant_reapply_ready($pdo);
+    $_SESSION['claimant_reapply_schema_v1'] = true;
+}
 
 define('ASSISTANCE_DB_NAME', $dbname);
 define('ASSISTANCE_DB_HOST', $host);

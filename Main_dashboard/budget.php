@@ -38,6 +38,14 @@ $types = ui_types();
 $statuses = budget_statuses($pdo, $year);
 $history = budget_history($pdo, $year);
 $overrides = budget_overrides($pdo, $year);
+$corrections = [];
+if (budget_corrections_ensure($pdo)) {
+    $stmt = $pdo->prepare('SELECT c.*, COALESCE(u.full_name, u.username) AS changed_by_name
+                           FROM budget_amount_corrections c LEFT JOIN users u ON u.id = c.changed_by
+                           WHERE c.budget_year = ? ORDER BY c.id DESC');
+    $stmt->execute([$year]);
+    $corrections = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 // Which program already has a budget in the years that can be changed: the form only offers what makes sense (js/admin_budget.js)
 $has = [];
@@ -129,5 +137,16 @@ foreach ($overrides as $o) {
 echo ui_report_panel('Approvals over the budget · ' . $year, 'Approvals that went past the budget, with the reason the admin gave.',
     $rows ? ui_report_table('Approvals over the budget ' . $year, ['Date', 'Application', 'Program', 'Amount approved', 'Over the budget by', 'Reason', 'Approved by'], $rows, [3, 4])
           : ui_state('check-circle', 'No approval went over the budget in ' . $year));
+
+$correctionRows = [];
+foreach ($corrections as $c) {
+    $correctionRows[] = [ui_date($c['created_at'], 'M j, Y g:i A'), 'Ref #' . (int)$c['application_id'],
+        $types[(int)$c['assistance_type_id']]['name'] ?? 'Assistance', ui_peso($c['old_amount']), ui_peso($c['new_amount']),
+        ui_peso($c['over_by']), $c['reason'] ?: 'No exception', $c['changed_by_name'] ?: 'Not recorded'];
+}
+echo ui_report_panel('Approved amount corrections · ' . $year, 'Every correction to an approved amount is recorded separately from its original approval.',
+    $correctionRows ? ui_report_table('Approved amount corrections ' . $year,
+        ['Date', 'Application', 'Program', 'Before', 'After', 'Over budget by', 'Reason', 'By'], $correctionRows, [3, 4, 5])
+        : ui_state('check-circle', 'No approved amount corrections in ' . $year));
 
 admin_layout_end(['scripts' => ['../js/admin_budget.js']]);

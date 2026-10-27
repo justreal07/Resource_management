@@ -95,7 +95,7 @@ array_push($columns,
     ['Province',       function ($a) { return $a['province'] ?? ''; }],
     ['Contact number', function ($a) { return $a['contact_number'] ?? ''; }],
     ['Filed by',       function ($a) { return array_key_exists('account_id', $a) ? ($a['account_id'] === null ? 'Walk-in (office)' : 'Online') : ''; }],
-    ['Amount released', function ($a) { return isset($a['amount']) && $a['amount'] !== '' && (float)$a['amount'] > 0 ? number_format((float)$a['amount'], 2, '.', '') : ''; }],
+    ['Approved amount', function ($a) { return isset($a['amount']) && $a['amount'] !== '' && (float)$a['amount'] > 0 ? number_format((float)$a['amount'], 2, '.', '') : ''; }],
     ['Approved on',    function ($a) { return ui_date($a['approved_at'] ?? '', 'Y-m-d H:i'); }],
     ['Approved by',    function ($a) { return !empty($a['approved_by']) ? ui_user_name((int)$a['approved_by']) : ''; }],
     ['Declined on', function ($a) { return ui_date($a['disapproved_at'] ?? '', 'Y-m-d H:i'); }],
@@ -108,7 +108,7 @@ array_push($columns,
 );
 // Medical & Burial staff never see money: no amount column in their CSV
 if ($user['role'] === 'aid_staff') {
-    $columns = array_values(array_filter($columns, function ($c) { return $c[0] !== 'Amount released'; }));
+    $columns = array_values(array_filter($columns, function ($c) { return $c[0] !== 'Approved amount'; }));
 }
 
 try {

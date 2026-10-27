@@ -182,6 +182,7 @@ function application_edit_columns(string $formKey, array $app): array
     } else {
         $columns = array_merge($shared, ['beneficiary_birthdate', 'petitioner_name', 'claimant_age', 'relationship', 'purpose']);
     }
+    $columns = array_unique(array_merge($columns, ['claimant_birthdate', 'claimant_age']));
     return array_values(array_filter($columns, function ($c) use ($app) { return array_key_exists($c, $app); }));
 }
 
@@ -244,6 +245,12 @@ function application_edit_save(PDO $pdo, array $app, string $formKey, array $val
     $id = (int)$app['id'];
     $accountId = (int)$app['account_id'];
     $version = (string)($opts['version'] ?? '');
+    $values = application_claimant_values($formKey, $values, (string)$app['created_at']);
+    $claimantErrors = application_claimant_errors($formKey, $values, (string)$app['created_at']);
+    if ($claimantErrors) {
+        $field = array_key_first($claimantErrors);
+        return $result(false, 'claimant', $claimantErrors[$field], ['field' => $field]);
+    }
 
     if (($problem = application_change_problem($app, 'changed')) !== null) {
         return $result(false, 'already', $problem);

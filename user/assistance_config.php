@@ -51,8 +51,8 @@ $ASSISTANCE_PROGRAMS = [
         'icon'      => 'fa-briefcase-medical',
         'tone'      => 'red',
         // How often: shown on the forms, My Account and to the chat assistant. Follows person_rules.php.
-        'frequency' => 'Once per patient; again with office approval',
-        'cooldown_days' => 0,      // no account-level wait: applying again for the same patient needs an admin's permission (person_rules.php)
+        'frequency' => 'Three months after the same patient\'s last approval; an admin may allow an earlier application',
+        'cooldown_days' => 0,      // Patient-level waiting period and early exceptions are checked in person_rules.php.
         // Document name => short hint shown under it. Names are in UPPER CASE on purpose, matching the office's
         // official requirements board; keep them that way if this list changes again.
         'documents' => [
@@ -217,12 +217,9 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     // Services are for GMA residents: these two are fixed, whatever an old application or the profile says
     $values = force_service_area($values);
 
-    // The age of the person filling in the form, from their birthdate
-    if ($own['age'] !== '') {
-        if ($key === 'burial' || $key === 'medical') {
-            // Burial: section 1 is the claimant. Medical: the claimant section, used when filing for another person.
-            $values['claimant_age'] = $own['age'];
-        }
+    // Reuse a known birthdate only for the named account holder; never infer one from a typed age.
+    if ($own['birthdate'] !== '' && $key === 'burial' && same_person_name($values, $own)) {
+        $values['claimant_birthdate'] = $own['birthdate'];
     }
     if ($key === 'opd' && $own['birthdate'] !== '' && same_person_name($values, $own)) {
         $values['beneficiary_birthdate'] = $own['birthdate'];   // only when the patient on the form is the account holder
@@ -230,6 +227,7 @@ function get_form_prefill(PDO $pdo, int $account_id, string $key): array {
     // Medical "for another person": the one filling in the form is the claimant
     if ($key === 'medical' && trim((string)($values['petitioner_name'] ?? '')) === '') {
         $values['petitioner_name'] = trim($own['first_name'] . ' ' . $own['last_name']);
+        $values['claimant_birthdate'] = $own['birthdate'];
     }
 
     return ['values' => $values, 'source' => $source, 'date' => $date, 'own' => $own];
@@ -422,7 +420,54 @@ function ini_size_bytes(string $size): int {
 }
 
 // Medical form: the claimant section is only filled in when the assistance is for another person
-const CLAIMANT_FIELDS = ['petitioner_name', 'claimant_age', 'relationship'];
+const CLAIMANT_FIELDS = ['petitioner_name', 'claimant_age', 'claimant_birthdate', 'relationship'];
+
+/** Claimant age is always derived from a birthdate, on the original filing day for corrections. */
+function application_claimant_values(string $program, array $data, string $on = ''): array
+{
+    $self = $program === 'medical' && (($data['applying_for'] ?? '') === 'self'
+        || (!isset($data['applying_for']) && strcasecmp(trim((string)($data['relationship'] ?? '')), 'Self') === 0));
+    if ($self) {
+        $data = array_merge($data, medical_self_claimant($data, $on));
+        $data['claimant_birthdate'] = (string)($data['beneficiary_birthdate'] ?? '');
+    } else {
+        $data['claimant_birthdate'] = trim((string)($data['claimant_birthdate'] ?? ''));
+        $data['claimant_age'] = age_on($data['claimant_birthdate'], $on);
+    }
+    return $data;
+}
+
+function application_claimant_errors(string $program, array $data, string $on = ''): array
+{
+    $on = $on !== '' ? substr($on, 0, 10) : date('Y-m-d');
+    $data = application_claimant_values($program, $data, $on);
+    $patientAge = age_on((string)($data['beneficiary_birthdate'] ?? ''), $on);
+    $self = $program === 'medical' && strcasecmp((string)($data['relationship'] ?? ''), 'Self') === 0;
+    if ($program !== 'burial' && $patientAge === '') {
+        return ['beneficiary_birthdate' => 'Enter a patient birthdate on or before the application date.'];
+    }
+    if ($program === 'medical' && ($data['applying_for'] ?? '') === 'other' && $self) {
+        return ['relationship' => 'For another person requires a separate adult claimant. Choose For myself only when the adult patient is applying.'];
+    }
+    if ($self && ($patientAge === '' || (int)$patientAge < 18)) {
+        return ['beneficiary_birthdate' => 'A patient under 18 needs an adult representative. Choose For another person and enter the adult claimant details.'];
+    }
+    $hasCompanion = trim((string)($data['petitioner_name'] ?? '')) !== ''
+        || trim((string)($data['relationship'] ?? '')) !== '' || $data['claimant_birthdate'] !== '';
+    if ($program === 'opd' && !$hasCompanion && $patientAge !== '' && (int)$patientAge >= 18) return [];
+    $errors = [];
+    if ($program === 'opd') {
+        if (trim((string)($data['petitioner_name'] ?? '')) === '') $errors['petitioner_name'] = 'A patient under 18 needs an adult guardian or representative. Enter their full name.';
+        if (trim((string)($data['relationship'] ?? '')) === '') $errors['relationship'] = 'Enter the guardian or companion relationship to the patient.';
+    }
+    $birth = $data['claimant_birthdate'];
+    if (!is_ymd($birth) || $birth < OLDEST_DATE || $birth > $on) {
+        $errors['claimant_birthdate'] = 'Enter the claimant or companion birthdate as shown on their ID, on or before the filing date.';
+    } elseif ((int)$data['claimant_age'] < 18) {
+        $errors['claimant_birthdate'] = 'The claimant or companion must be at least 18 years old on the application date.';
+    }
+    return $errors;
+}
 
 /**
  * "For myself": the patient is also the claimant, so the claimant details are taken
@@ -439,6 +484,7 @@ function medical_self_claimant(array $values, string $on = ''): array {
     return [
         'petitioner_name' => mb_substr($name, 0, FIELD_MAX_LENGTH['petitioner_name']),
         'claimant_age'    => $age,
+        'claimant_birthdate' => (string)($values['beneficiary_birthdate'] ?? ''),
         'relationship'    => 'Self',
     ];
 }

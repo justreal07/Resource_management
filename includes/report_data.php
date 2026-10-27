@@ -12,7 +12,7 @@
  * A builder returns only the parts it fills in (cards, charts, tables, empty); report_build() adds the title and notes.
  *
  * Which date a number is counted by: an approved application and its amount belong to the day it was APPROVED
- * (applicant.approved_at; older records without one fall back to the filing date). That is when the money was released.
+ * (applicant.approved_at; older records without one fall back to the filing date). Actual payments use released_on.
  * There is no other choice (a "count by date filed" option was removed).
  * Pending applications have no other date, so they always count by the day they were filed. Disapproved ones are not in
  * any report but "Disapproved" (by the day they were disapproved), as everywhere else in the system.
@@ -24,6 +24,7 @@ require_once __DIR__ . '/admin_components.php';
 require_once __DIR__ . '/application_decision.php';
 require_once __DIR__ . '/../user/assistance_config.php';   // BARANGAYS
 require_once __DIR__ . '/barangay_map.php';                // barangay_official(): typed names matched to the official list
+require_once __DIR__ . '/assistance_release.php';
 
 const REPORT_MAX_DAYS = 1830;        // "Choose dates" stops at about five years
 const REPORT_LIST_MAX_DAYS = 93;     // the Overview lists every person for a quarter or less; use a program tab for a year
@@ -180,7 +181,7 @@ function report_notes(array $f): array
 {
     $notes = [];
     if (in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true)) {
-        $notes[] = 'Approved applications and the amount released are counted by the date they were approved, when the assistance was released.';
+        $notes[] = 'Approved amounts are counted by approval date. Payments are counted separately by the actual payment date recorded by an administrator.';
         $notes[] = 'Pending applications are the ones filed in this period that are still waiting for a decision. Declined applications are on the Declined tab.';
     }
     return $notes;
@@ -270,12 +271,12 @@ function report_time_charts(array $f, array $b, array $counts, array $amounts, s
         'None in this period.');
     if ($withAmount) {
         $pesoFmt = function ($v) { return ui_peso($v); };
-        $cards[] = ui_chart_card('Amount released per ' . $unit, report_sub($f),
+        $cards[] = ui_chart_card('Approved amount per ' . $unit, report_sub($f),
             array_sum($amounts)
                 ? ui_column_chart($amounts, $b['labels'], $b['names'], $pesoFmt, 'ui_peso_short')
-                    . ui_table_view([ucfirst($unit), 'Amount released'], array_map(function ($n, $v) { return [$n, ui_peso($v)]; }, $b['names'], $amounts))
+                    . ui_table_view([ucfirst($unit), 'Approved amount'], array_map(function ($n, $v) { return [$n, ui_peso($v)]; }, $b['names'], $amounts))
                 : '',
-            'No amounts were released in this period.');
+            'No amounts were approved in this period.');
     }
     return $cards;
 }
@@ -292,7 +293,7 @@ function report_series_table(array $f, array $b, array $counts, array $amounts, 
     $head = [ucfirst($b['unit']), $what];
     $total = ['Total', number_format(array_sum($counts))];
     if ($withAmount) {
-        $head[] = 'Amount released';
+        $head[] = 'Approved amount';
         $total[] = ui_peso(array_sum($amounts));
     }
     return report_table('Per ' . $b['unit'], $what . ' per ' . $b['unit'], $f['label'], $head, $rows, $withAmount ? [1, 2] : [1], $total, 'None in this period.', false, '', false);
@@ -342,7 +343,7 @@ function report_load(PDO $pdo, array $f, ?int $typeId = null): array
    WHAT A ROW SAYS ABOUT THE PEOPLE
    ============================================================ */
 
-/** The amount released on an application, 0 when none was recorded (OPD has none; older records may not). */
+/** The approved amount on an application, 0 when none was recorded (OPD has none; older records may not). */
 function report_amount(array $a): float
 {
     return isset($a['amount']) && $a['amount'] !== '' ? max(0.0, (float)$a['amount']) : 0.0;
@@ -353,6 +354,34 @@ function report_sum(array $rows): float
     $sum = 0.0;
     foreach ($rows as $a) $sum += report_amount($a);
     return $sum;
+}
+
+/** Actual recorded payments in the selected period, counted by payment date. */
+function report_payments(PDO $pdo, array $f, ?int $typeId = null): array
+{
+    if (!assistance_release_ensure($pdo)) return [];
+    $stmt = $pdo->prepare('SELECT application_id, assistance_type_id, amount, released_on, receipt_ref
+                           FROM assistance_releases WHERE released_on >= ? AND released_on < ?'
+                           . ($typeId !== null ? ' AND assistance_type_id = ?' : '')
+                           . ' ORDER BY released_on DESC, id DESC');
+    $params = [$f['start'], $f['end_excl']];
+    if ($typeId !== null) $params[] = $typeId;
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+function report_payments_table(array $payments, string $label): array
+{
+    $rows = [];
+    foreach ($payments as $p) {
+        $rows[] = [ui_date($p['released_on']), 'Ref #' . (int)$p['application_id'],
+            ui_types()[(int)$p['assistance_type_id']]['name'] ?? 'Assistance', ui_peso($p['amount']), $p['receipt_ref']];
+    }
+    return report_table('Payments', $label . ' (' . count($rows) . ')',
+        'Recorded by actual payment date. Approved applications without a payment record are excluded.',
+        ['Payment date', 'Application', 'Program', 'Paid', 'Receipt reference'], $rows, [3],
+        ['Total', '', '', ui_peso(array_sum(array_map(function ($p) { return (float)$p['amount']; }, $payments))), ''],
+        'No payments were recorded in this period.');
 }
 
 /** How many of these have an amount (the average counts only those). */
@@ -584,8 +613,8 @@ function report_processing_table(PDO $pdo, array $f, ?int $typeId): array
 }
 
 /**
- * Budget against money released, per program that gives money (Medical, Burial), for the year of the period.
- * The budget itself (set, added to, reduced, with its history) lives on the Budget page (includes/budget.php), and "released"
+ * Budget against approved amount, per program that gives money (Medical, Burial), for the year of the period.
+ * The budget itself (set, added to, reduced, with its history) lives on the Budget page (includes/budget.php), and "approved"
  * is the same figure it uses: approved amounts of that year by the day approved. A budget is for a whole year, so the period
  * filter above does not change this table. Returns null when the budget tables can't be read (the rest of the report still works).
  */
@@ -617,8 +646,8 @@ function report_budget_table(PDO $pdo, array $f): ?array
     $link = '<p class="panel-note no-print"><a href="../Main_dashboard/budget?year=' . $year . '">' . ui_icon('wallet') . 'Open the Budget page</a> to set the ' . $year
         . ' budget, add to it or reduce it, and see its history.</p>';
     return report_table('Budget use', 'Budget use · ' . $year,
-        'Money released in ' . $year . ' (by date approved) against the budget the office set. The period above does not change this table.',
-        ['Program', 'Budget', 'Released', 'Remaining', 'Used'], $rows, [1, 2, 3, 4], $total, '', true, $link);
+        'Approved amount in ' . $year . ' (by date approved) against the budget the office set. The period above does not change this table.',
+        ['Program', 'Budget', 'Committed', 'Remaining', 'Used'], $rows, [1, 2, 3, 4], $total, '', true, $link);
 }
 
 /* ============================================================

@@ -193,8 +193,7 @@ $wiList = function (string $id, array $options): string {
         <div class="form-grid">
             <div class="field field-wide"><label for="petitioner_name">Claimant's full name <?= $req ?></label>
                 <input type="text" id="petitioner_name" name="petitioner_name" maxlength="150" required placeholder="First name, middle name, last name"></div>
-            <div class="field"><label for="claimant_age">Claimant's age <?= $req ?></label>
-                <input type="number" id="claimant_age" name="claimant_age" min="0" max="120" inputmode="numeric" required placeholder="Age"></div>
+            <?= $wiDate('claimant_birthdate', "Claimant's birthdate", OLDEST_DATE, $today, 'Must be at least 18 on the application date.') ?>
             <div class="field"><label for="relationship">Relationship to the patient <?= $req ?></label>
                 <input type="text" id="relationship" name="relationship" maxlength="100" required list="relationshipList" placeholder="e.g. Mother, Son, Spouse">
                 <?= $wiList('relationshipList', RELATIONSHIP_SUGGESTIONS['medical']) ?></div>
@@ -215,8 +214,7 @@ $wiList = function (string $id, array $options): string {
         <p class="field-help">As written on the claimant's valid ID.</p>
         <div class="form-grid">
             <?= $wiNames() ?>
-            <div class="field"><label for="claimant_age">Age <?= $req ?></label>
-                <input type="number" id="claimant_age" name="claimant_age" min="0" max="120" inputmode="numeric" required placeholder="Age"></div>
+            <?= $wiDate('claimant_birthdate', "Claimant's birthdate", OLDEST_DATE, $today, 'Must be at least 18 on the application date.') ?>
             <?= $wiSex() ?>
             <?= $wiContact() ?>
         </div>
@@ -262,9 +260,11 @@ $wiList = function (string $id, array $options): string {
         </div>
     </fieldset>
     <fieldset class="form-section">
-        <legend>Companion <span class="muted">(optional)</span></legend>
-        <p class="field-help">The person who will go with the patient on the check-up day. Leave both empty if the patient goes alone.</p>
+        <legend>Adult guardian or companion</legend>
+        <p class="field-help">Required for a patient under 18. Adults may leave all companion fields empty. A named companion must be at least 18.</p>
         <div class="form-grid">
+            <div class="field"><label for="claimant_birthdate">Guardian or companion birthdate</label>
+                <input type="date" id="claimant_birthdate" name="claimant_birthdate" min="<?= OLDEST_DATE ?>" max="<?= $today ?>"></div>
             <div class="field"><label for="petitioner_name">Accompanied by</label>
                 <input type="text" id="petitioner_name" name="petitioner_name" maxlength="150" placeholder="Full name of the companion"></div>
             <div class="field"><label for="relationship">Relationship to the patient</label>

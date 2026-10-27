@@ -164,6 +164,16 @@ function schema_aid_staff_ready(PDO $pdo): void
  * @param string[] $columns column name => definition, e.g. 'phone' => 'VARCHAR(20) NULL'
  * @throws PDOException     when a column has to be added and the database refuses
  */
+function schema_claimant_reapply_ready(PDO $pdo): void
+{
+    schema_add_columns($pdo, 'applicant', ['claimant_birthdate' => 'DATE NULL']);
+    schema_add_columns($pdo, 'medical_reapply_decisions', [
+        'eligible_from' => 'DATE NULL',
+        'default_eligible_from' => 'DATE NULL',
+        'previous_eligible_from' => 'DATE NULL',
+    ]);
+}
+
 function schema_add_columns(PDO $pdo, string $table, array $columns): void
 {
     if (!preg_match('/^\w+$/', $table)) {

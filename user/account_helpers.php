@@ -45,6 +45,11 @@ function get_current_user_row(PDO $pdo): ?array {
  * $extra adds session keys such as the Google picture and auth_type.
  */
 function start_applicant_session(array $account, array $extra = []): void {
+    global $pdo;
+    $stmt = $pdo->prepare('SELECT password FROM applicant_accounts WHERE id = ?');
+    $stmt->execute([(int)$account['id']]);
+    $passwordHash = $stmt->fetchColumn();
+    if ($passwordHash === false) throw new RuntimeException('Applicant account was not found at sign-in.');
     session_regenerate_id(true);
     $_SESSION['applicant'] = array_merge([
         'id'        => (int)$account['id'],
@@ -52,6 +57,7 @@ function start_applicant_session(array $account, array $extra = []): void {
         'firstname' => $account['firstname'],
         'lastname'  => $account['lastname'],
         'email'     => $account['email'] ?? null,
+        'pwv'       => hash('sha256', (string)$passwordHash),
     ], $extra);
 }
 

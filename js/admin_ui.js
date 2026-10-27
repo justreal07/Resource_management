@@ -84,7 +84,7 @@
     }
 
     function peso(n) {
-        return '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return '₱' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 0 });
     }
 
     /* ---------- Dialogs (native <dialog>, with a fallback for old browsers) ---------- */
@@ -343,6 +343,30 @@
        All: the hard copies to bring and a note. The server checks the same rules again
        (decision_claim_parse() in application_decision.php). */
 
+    // The amount arrows and keyboard Up/Down change any typed whole-peso value by exactly ₱100.
+    // Keep the browser's native 1-peso spinner hidden so there is only one increment rule.
+    function changeClaimAmount(input, delta) {
+        // An older record may still contain cents; only an explicit amount change converts it to whole pesos.
+        const parsed = Number(input.value);
+        const current = Number.isFinite(parsed) ? Math.trunc(parsed) : 0;
+        input.value = String(Math.max(0, Math.min(99999999, current + delta)));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+    }
+    document.querySelectorAll('[data-claim="amount"]').forEach((input) => {
+        input.closest('.amount-box').querySelectorAll('[data-amount-step]').forEach((button) => {
+            button.addEventListener('click', () => changeClaimAmount(input, Number(button.dataset.amountStep)));
+        });
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                e.preventDefault();
+                changeClaimAmount(input, e.key === 'ArrowUp' ? 100 : -100);
+            } else if (['.', ',', 'e', 'E', '+', '-'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+    });
+
     // The last place and claim time used for Medical / Burial, offered for the next approval (this browser only)
     const claimKey = (scope, what) => 'lgu.claim' + what + '.' + (scope.dataset.claimType || '');
     function fillRememberedClaim(scope) {
@@ -375,6 +399,20 @@
         const label = box.dataset.budgetYear + ' ' + box.dataset.budgetName + ' budget';
         const typed = amountEl ? Number(amountEl.value) : 0;
         const amount = typed > 0 ? typed : 0;
+        const paperDate = scope.querySelector('input[name="backdated_approved_at"]');
+        const claimDate = scope.querySelector('[data-claim="date"]');
+        const historical = !!(paperDate && paperDate.value);
+        if (claimDate) {
+            if (!claimDate.dataset.normalMin) claimDate.dataset.normalMin = claimDate.min;
+            claimDate.min = historical ? paperDate.value : claimDate.dataset.normalMin;
+             claimDate.max = historical ? paperDate.max : '';
+        }
+        if (historical) {
+            text.textContent = 'The ' + paperDate.value.slice(0, 4) + ' budget will be checked when this paper approval is saved. Enter the actual claim date and explain the historical budget decision.';
+            if (reasonBox) reasonBox.hidden = false;
+            if (reason) reason.disabled = false;
+            return;
+        }
         let state = 'none';
         let over = false;
         if (total !== null) {
@@ -401,6 +439,15 @@
         if (e.target.matches && e.target.matches('[data-claim="amount"]')) {
             const form = e.target.closest('form');
             if (form) updateBudgetNote(form);
+        } else if (e.target.matches && e.target.matches('input[name="backdated_approved_at"]')) {
+            const form = e.target.closest('form');
+            if (form) updateBudgetNote(form);
+        }
+    });
+    document.addEventListener('change', (e) => {
+        if (e.target.matches && e.target.matches('input[name="backdated_approved_at"]')) {
+            const form = e.target.closest('form');
+            if (form) updateBudgetNote(form);
         }
     });
     document.querySelectorAll('[data-budget]').forEach((box) => { const form = box.closest('form'); if (form) updateBudgetNote(form); });
@@ -411,13 +458,14 @@
         const required = (v, el) => (v ? '' : el.dataset.claimMsg || 'Fill this in.');
         const checks = [
             ['amount', (v) => {
-                if (!/^\d+(\.\d{1,2})?$/.test(v) || Number(v) <= 0) return 'Enter the amount to release (more than ₱0, up to 2 decimal places).';
-                if (Number(v) > 99999999.99) return 'The amount is too large.';
+                if (!/^\d+$/.test(v) || Number(v) <= 0) return 'Enter a whole-peso amount greater than ₱0.';
+                if (Number(v) > 99999999) return 'The amount is too large.';
                 return '';
             }],
             ['budget_reason', (v, el) => (el.disabled || v ? '' : el.dataset.claimMsg)],   // only when the amount passes the budget
             ['place', required],
-            ['date', (v, el) => required(v, el) || (el.min && v < el.min ? 'The claim date has already passed. Choose today or a later date.' : '')],
+            ['date', (v, el) => required(v, el) || (el.min && v < el.min ? 'The claim date is before the allowed date.' : '')
+                || (el.max && v > el.max ? 'For a past paper approval, use the actual past claim date.' : '')],
             ['time', required],
             ['requirements', required]
         ];
@@ -458,6 +506,7 @@
                 approveForm.querySelectorAll('[data-claim]').forEach(clearFieldError);
                 approveForm.action = btn.dataset.action;
                 approveForm.querySelector('[data-approve-id]').value = btn.dataset.approveOpen;
+                approveForm.querySelector('[data-approve-version]').value = btn.dataset.version || '';
                 approveDialog.querySelectorAll('[data-approve-name]').forEach((el) => { el.textContent = btn.dataset.name; });
                 approveDialog.querySelector('[data-approve-ref]').textContent = btn.dataset.ref;
 
@@ -520,13 +569,41 @@
        again). Posts to Main_dashboard/disapprove_applicant.php through the dialog's form, which carries the form token.
        Always the built-in dialog (not SweetAlert2): it has to hold tick boxes. */
 
-    // Some reason must be ticked or written; otherwise the message appears under the choices. Returns whether one is.
+    // Other reason reveals a required explanation. Unchecking it leaves the draft out of the submission.
+    function syncDisapproveOther(scope, written) {
+        const other = scope.querySelector('[data-reason-other]');
+        if (!other || !written) return;
+        const count = scope.querySelector('[data-reason-count]');
+        if (count) {
+            const selectedCount = scope.querySelectorAll('[data-reason]:checked').length;
+            count.textContent = selectedCount + ' selected';
+            count.hidden = selectedCount === 0;
+        }
+        const section = scope.querySelector('[data-reason-section]');
+        const declining = !section || !section.hidden;
+        const selected = declining && !other.disabled && other.checked;
+        written.closest('.field').hidden = declining && !selected;
+        written.disabled = declining && !selected;
+        written.required = selected;
+        other.setAttribute('aria-expanded', selected ? 'true' : 'false');
+    }
+
+    // A preset needs no explanation; Other reason always does, even alongside a preset.
     function checkDisapproveReason(scope, written) {
         const err = scope.querySelector('[data-reason-error]');
-        const ok = !!scope.querySelector('[data-reason]:checked') || !!(written && written.value.trim());
-        err.textContent = ok ? '' : 'Choose at least one reason, or write the reason, so the applicant knows what to fix.';
+        const other = scope.querySelector('[data-reason-other]:checked');
+        const text = written && !written.disabled ? written.value.trim() : '';
+        const ok = !!scope.querySelector('[data-reason]:checked') && (!other || !!text);
+        err.textContent = ok ? '' : (other ? 'Please explain the other reason so the applicant knows what to fix.'
+            : 'Choose at least one reason. Choose Other reason to write your own explanation.');
         err.hidden = ok;
         return ok;
+    }
+    function focusDisapproveReason(scope, written) {
+        const details = scope.querySelector('[data-reason-details]');
+        if (details) details.open = true;
+        if (scope.querySelector('[data-reason-other]:checked') && written && !written.disabled) written.focus();
+        else scope.querySelector('[data-reason]').focus();
     }
     function hideDisapproveError(scope) {
         const err = scope.querySelector('[data-reason-error]');
@@ -537,6 +614,8 @@
     function watchDisapproveReason(scope, written) {
         const clear = () => checkDisapproveReason(scope, written);
         scope.querySelectorAll('[data-reason]').forEach((box) => box.addEventListener('change', () => {
+            syncDisapproveOther(scope, written);
+            if (box.hasAttribute('data-reason-other') && box.checked && written) written.focus();
             if (!scope.querySelector('[data-reason-error]').hidden) clear();
         }));
         if (written) written.addEventListener('input', () => {
@@ -560,8 +639,11 @@
                 if (disapproveForm.dataset.sending === '1') return;
                 disapproveOpener = btn;
                 disapproveForm.reset();
+                disapproveForm.querySelector('[data-reason-details]').open = false;
+                syncDisapproveOther(disapproveForm, written);
                 hideDisapproveError(disapproveForm);
                 disapproveForm.querySelector('[data-disapprove-id]').value = btn.dataset.disapprove;
+                disapproveForm.querySelector('[data-disapprove-version]').value = btn.dataset.version || '';
                 disapproveDialog.querySelectorAll('[data-disapprove-name]').forEach((el) => { el.textContent = btn.dataset.name; });
                 disapproveDialog.querySelector('[data-disapprove-ref]').textContent = btn.dataset.ref;
 
@@ -579,7 +661,7 @@
                     : disapproveHelpText;
 
                 openDialog(disapproveDialog);
-                disapproveForm.querySelector('[data-reason]').focus();
+                disapproveForm.querySelector('[data-reason-toggle]').focus();
             });
         });
         disapproveDialog.addEventListener('close', () => {
@@ -590,7 +672,7 @@
             e.preventDefault();
             if (disapproveForm.dataset.sending === '1') return;   // a double-click sends it once
             if (!checkDisapproveReason(disapproveForm, written)) {
-                disapproveForm.querySelector('[data-reason]').focus();
+                focusDisapproveReason(disapproveForm, written);
                 return;
             }
             disapproveForm.dataset.sending = '1';
@@ -613,13 +695,14 @@
         const syncRemarks = () => {
             const chosen = form.querySelector('input[name="status"]:checked');
             const disapprove = !!chosen && chosen.value === 'Disapproved';
-            if (label) label.innerHTML = disapprove ? 'Other reason <span class="muted">(write it here)</span>' : labelText;
-            if (help) help.textContent = disapprove ? 'Choose the reasons above, or write the reason here. The applicant is told all of them (by email, when their account has one), so they know what to fix before applying again.' : helpText;
+            if (label) label.innerHTML = disapprove ? 'Explain the other reason <span class="req" aria-hidden="true">*</span>' : labelText;
+            if (help) help.textContent = disapprove ? 'Explain why this application is being declined. The applicant sees this explanation along with the reasons you choose above.' : helpText;
             if (reasonSection) {
                 reasonSection.hidden = !disapprove;
                 reasonSection.querySelectorAll('[data-reason]').forEach((box) => { box.disabled = !disapprove; });
                 if (!disapprove) hideDisapproveError(form);
             }
+            syncDisapproveOther(form, form.elements.remarks);
             if (claimSection) {
                 const approve = !!chosen && chosen.value === 'Approved';
                 claimSection.hidden = !approve;
@@ -646,7 +729,7 @@
             const disapprove = chosen.value === 'Disapproved';
             // Disapproving needs a reason: a ticked one or the written one in the remarks box
             if (disapprove && reasonSection && !checkDisapproveReason(form, form.elements.remarks)) {
-                form.querySelector('[data-reason]').focus();
+                focusDisapproveReason(form, form.elements.remarks);
                 return;
             }
             // Approving needs the approval details (Medical/Burial: amount and claim details; OPD: the trip)
@@ -714,11 +797,21 @@
             }
             clearFieldError(remarks);
             const until = form.elements.valid_until;
+            const from = form.elements.eligible_from;
+            if (allow && (!from || !from.value || !from.checkValidity())) {
+                if (from) { showFieldError(from, 'Choose the date when a new application may start.'); from.focus(); }
+                return;
+            }
+            if (allow && until && until.value && (until.value < from.value || !until.checkValidity())) {
+                showFieldError(until, 'The expiry must be on or after the start date and no earlier than today.');
+                until.focus();
+                return;
+            }
             confirmAction({
                 title: allow ? 'Allow a new Medical application?' : 'Don\'t allow a new Medical application?',
                 message: allow
-                    ? 'The patient may file one new Medical application' + (until && until.value ? ' until ' + formatDate(until.value) : '') + '. This is kept in a permanent log.'
-                    : 'The patient can\'t file a new Medical application unless an admin allows it later. This is kept in a permanent log.',
+                    ? 'The patient may file one new Medical application starting ' + formatDate(from.value) + (until && until.value ? ' until ' + formatDate(until.value) : '') + '. This is kept in a permanent log.'
+                    : 'Early permission will be withdrawn. The patient may still apply after the normal three-month waiting period. This decision is kept in a permanent log.',
                 name: form.dataset.name,
                 ref: form.dataset.ref,
                 okLabel: allow ? 'Allow' : 'Don\'t allow',

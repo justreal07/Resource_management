@@ -69,8 +69,23 @@ function mail_ready(): bool
 function mail_load_phpmailer(): bool
 {
     if (class_exists(PHPMailer::class)) return true;
+    // PHPMailer's three files first: vendor/autoload.php loads every library (Google's alone is ~35,000 files), and one
+    // missing file there (a partial upload to a host) would be a fatal error that also blocks email.
+    $src = __DIR__ . '/../vendor/phpmailer/phpmailer/src/';
+    if (is_file($src . 'PHPMailer.php') && is_file($src . 'SMTP.php') && is_file($src . 'Exception.php')) {
+        require_once $src . 'Exception.php';
+        require_once $src . 'PHPMailer.php';
+        require_once $src . 'SMTP.php';
+        return class_exists(PHPMailer::class);
+    }
     $autoload = __DIR__ . '/../vendor/autoload.php';
-    if (is_file($autoload)) require_once $autoload;
+    if (is_file($autoload)) {
+        try {
+            require_once $autoload;
+        } catch (Throwable $e) {
+            error_log('mail_load_phpmailer: ' . $e->getMessage());   // an incomplete vendor/ folder: email is off, the page still works
+        }
+    }
     return class_exists(PHPMailer::class);
 }
 

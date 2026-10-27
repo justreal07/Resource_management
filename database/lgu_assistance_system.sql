@@ -29,6 +29,36 @@
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `assistance_releases` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `application_id` int NOT NULL,
+  `assistance_type_id` int NOT NULL,
+  `amount` decimal(12,2) NOT NULL,
+  `released_on` date NOT NULL,
+  `receipt_ref` varchar(100) NOT NULL,
+  `recorded_by` int NOT NULL,
+  `recorded_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_release_application` (`application_id`),
+  KEY `idx_release_date_type` (`released_on`,`assistance_type_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE `budget_amount_corrections` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `application_id` int NOT NULL,
+  `budget_year` smallint unsigned NOT NULL,
+  `assistance_type_id` int NOT NULL,
+  `old_amount` decimal(12,2) NOT NULL,
+  `new_amount` decimal(12,2) NOT NULL,
+  `over_by` decimal(12,2) NOT NULL DEFAULT 0,
+  `reason` varchar(500) DEFAULT NULL,
+  `changed_by` int NOT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_correction_app` (`application_id`),
+  KEY `idx_correction_year` (`budget_year`,`assistance_type_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 CREATE TABLE `activity_log` (
   `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
   `created_at` datetime NOT NULL,
@@ -127,6 +157,7 @@ CREATE TABLE `applicant` (
   `date_released` date DEFAULT NULL,
   `sex` enum('Male','Female') DEFAULT NULL,
   `claimant_age` int(11) DEFAULT NULL,
+  `claimant_birthdate` date DEFAULT NULL,
   `contact_number` varchar(20) DEFAULT NULL,
   `wheelchair` enum('Yes','No') NOT NULL DEFAULT 'No',
   `stretcher` enum('Yes','No') NOT NULL DEFAULT 'No',
@@ -419,6 +450,9 @@ CREATE TABLE `medical_reapply_decisions` (
   `decided_by` int(11) NOT NULL COMMENT 'users.id, must be an admin (trigger below)',
   `decided_at` datetime NOT NULL DEFAULT current_timestamp(),
   `remarks` varchar(500) NOT NULL COMMENT 'Why',
+  `eligible_from` date DEFAULT NULL,
+  `default_eligible_from` date DEFAULT NULL,
+  `previous_eligible_from` date DEFAULT NULL,
   `valid_until` date DEFAULT NULL COMMENT 'Last day a grant can be used; NULL = no end date',
   `consumed_at` datetime DEFAULT NULL COMMENT 'When the grant was used',
   `consumed_by_application_id` int(11) DEFAULT NULL COMMENT 'The new Medical application that used it',
@@ -481,7 +515,10 @@ BEGIN
           AND NEW.`decided_by` <=> OLD.`decided_by`
           AND NEW.`decided_at` <=> OLD.`decided_at`
           AND NEW.`remarks` <=> OLD.`remarks`
-          AND NEW.`valid_until` <=> OLD.`valid_until`)
+          AND NEW.`valid_until` <=> OLD.`valid_until`
+          AND NEW.`eligible_from` <=> OLD.`eligible_from`
+          AND NEW.`default_eligible_from` <=> OLD.`default_eligible_from`
+          AND NEW.`previous_eligible_from` <=> OLD.`previous_eligible_from`)
      OR OLD.`reapply_allowed` = 0
      OR OLD.`consumed_at` IS NOT NULL
      OR NEW.`consumed_at` IS NULL

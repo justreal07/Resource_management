@@ -1,5 +1,7 @@
 # 📅 WEEKLY REPORT FEATURE - USER GUIDE
 
+> **Current terminology:** Older screenshots and examples below say “Amount Released” for approved application amounts. Current reports label those **Approved amount**. Actual payments are recorded separately by an administrator and appear under **Payments recorded**, grouped by payment date. Do not treat an approval as proof of payment.
+
 ## Overview
 The Weekly Report feature allows administrators to view detailed weekly statistics across all assistance programs, with daily breakdown of data and interactive charts.
 

@@ -26,13 +26,16 @@ function report_build_overview(PDO $pdo, array $f): array
     }
     $approvedN = count($d['approved']);
     $sum = report_sum($d['approved']);
+    $payments = report_payments($pdo, $f);
+    $paidTotal = array_sum(array_map(function ($p) { return (float)$p['amount']; }, $payments));
     $basisText = 'Approved in this period';
 
     $cards = [
         ['label' => 'Applications filed', 'value' => number_format($d['filed_total']), 'icon' => 'inbox', 'note' => 'Filed in this period'],
         ['label' => 'Approved', 'value' => number_format($approvedN), 'status' => 'Approved', 'note' => $basisText],
         ['label' => 'Pending', 'value' => number_format(count($d['pending'])), 'status' => 'Pending', 'note' => 'Filed in this period, still waiting'],
-        ['label' => 'Amount released', 'value' => ui_peso($sum, 0), 'icon' => 'check-circle', 'note' => $basisText],
+        ['label' => 'Approved amount', 'value' => ui_peso($sum, 0), 'icon' => 'check-circle', 'note' => $basisText],
+        ['label' => 'Payments recorded', 'value' => ui_peso($paidTotal, 0), 'icon' => 'wallet', 'note' => 'Paid in this period'],
     ];
 
     // Charts
@@ -46,8 +49,8 @@ function report_build_overview(PDO $pdo, array $f): array
     $charts = report_time_charts($f, $b, $counts, $amounts, 'Approved applications');
     $charts[] = ui_chart_card('Approved applications by program', report_sub($f),
         $approvedN ? ui_bar_list($countItems, $countFmt) : '', 'No approved applications in this period.');
-    $charts[] = ui_chart_card('Amount released by program', report_sub($f),
-        $amountItems ? ui_bar_list($amountItems, $pesoFmt) : '', 'No amounts were released in this period.');
+    $charts[] = ui_chart_card('Approved amount by program', report_sub($f),
+        $amountItems ? ui_bar_list($amountItems, $pesoFmt) : '', 'No amounts were approved in this period.');
     $who = report_who_parts($d['approved'], 'patients (Medical, OPD) and claimants (Burial)', $f);
     $charts = array_merge($charts, $who['charts']);
 
@@ -60,9 +63,10 @@ function report_build_overview(PDO $pdo, array $f): array
         $rows[] = [$t['name'], number_format($x['n']), $x['sum'] > 0 ? ui_peso($x['sum']) : '—', $x['with'] > 0 ? ui_peso($x['sum'] / $x['with']) : '—'];
     }
     $tables = [report_table('By program', 'Approved applications by program', report_sub($f, 'by date approved'),
-        ['Program', 'Approved', 'Total amount released', 'Average per application'], $rows, [1, 2, 3],
+        ['Program', 'Approved', 'Total approved amount', 'Average per application'], $rows, [1, 2, 3],
         ['Total', number_format($approvedN), $sum > 0 ? ui_peso($sum) : '—', $withAmount > 0 ? ui_peso($sum / $withAmount) : '—'],
         'No approved applications in this period.')];
+    $tables[] = report_payments_table($payments, 'Recorded payments in this period');
 
     $budget = report_budget_table($pdo, $f);
     if ($budget !== null) $tables[] = $budget;

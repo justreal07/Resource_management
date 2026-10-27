@@ -5,6 +5,7 @@ $editRole = $_SESSION['user']['role'] ?? '';
 if ($editRole === 'aid_staff') define('UI_AREA', 'staff');
 require_once '../includes/admin_layout.php';
 require_once '../user/person_rules.php';   // validate_application() and the choice lists of the online forms, and the person registry fix
+require_once '../includes/assistance_release.php';
 
 // Editing a record is for administrators, and for Medical & Burial staff fixing their own mistake while it is
 // still Pending (checked again below, once the record is loaded: their two programs, status Pending only).
@@ -79,7 +80,8 @@ $defs = [
     'date_of_death'  => ['Date of death', 'date', true],
     // OPD: the companion is optional (the patient may go alone); opd_companion_errors() checks the pair
     'petitioner_name'=> [['medical' => "Claimant's full name", 'burial' => 'Full name of the deceased', 'opd' => 'Accompanied by'][$formKey], 'text', $formKey !== 'opd', 150],
-    'claimant_age'   => ["Claimant's age", 'age', true],
+    'claimant_age'   => ["Claimant's age (calculated from birthdate)", 'age', false],
+    'claimant_birthdate' => [$formKey === 'opd' ? 'Guardian or companion birthdate' : "Claimant's birthdate", 'date', $formKey !== 'opd'],
     'age'            => ['Age', 'age', true],
     'relationship'   => [['medical' => 'Relationship to the patient', 'burial' => 'Relationship to the deceased', 'opd' => 'Relationship'][$formKey], 'text', $formKey !== 'opd', 100],
     'purpose'        => ['Purpose of assistance', 'textarea', false, 2000],
@@ -98,12 +100,12 @@ $sections = [
     'medical' => [
         ['Patient', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'beneficiary_birthdate'], 'Who the assistance is for, as written on the valid ID.' . $aboutPerson],
         ['Address and contact', 'pin', $address, $aboutAddress],
-        ['Claimant', 'user-plus', ['applying_for', 'petitioner_name', 'claimant_age', 'relationship'],
+        ['Claimant', 'user-plus', ['applying_for', 'petitioner_name', 'claimant_birthdate', 'claimant_age', 'relationship'],
          'Whoever filled in the form is the claimant: the patient themself, or another person filing for them. Claimant details are kept only for another person.'],
         ['Request', 'medical', ['purpose'], 'What the assistance is for.'],
     ],
     'burial' => [
-        ['Claimant', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'claimant_age', 'relationship'], 'The person who filed the application.'],
+        ['Claimant', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'claimant_birthdate', 'claimant_age', 'relationship'], 'The adult who filed the application. Birthdate must be verified from the original ID.'],
         ['The deceased', 'burial', ['petitioner_name', 'beneficiary_birthdate', 'date_of_death'],
          'Who the burial assistance is for. A change here also corrects the person record (one Burial application per deceased person).'],
         ['Address and contact', 'pin', $address, $aboutAddress],
@@ -112,7 +114,7 @@ $sections = [
         ['Patient', 'user', ['first_name', 'middle_name', 'last_name', 'sex', 'beneficiary_birthdate', 'age'],
          'Who the check-up is for, as written on the valid ID. When a birthdate is saved, the age is worked out from it (as of the day the request was filed). A patient can have one request for each check-up date.'],
         ['Address and contact', 'pin', $address, $aboutAddress],
-        ['Check-up and transport', 'van', ['hospital', 'checkup_date', 'checkup_reason', 'petitioner_name', 'relationship', 'wheelchair', 'stretcher'],
+        ['Check-up and transport', 'van', ['hospital', 'checkup_date', 'checkup_reason', 'petitioner_name', 'relationship', 'claimant_birthdate', 'claimant_age', 'wheelchair', 'stretcher'],
          'Where and when the check-up is, and what the patient needs for the trip.'],
     ],
 ][$formKey];
@@ -122,11 +124,11 @@ foreach ($sections as $i => $s) {
 }
 $fields = array_merge(...array_column($sections, 2));
 
-// The amount released: on approved Medical and Burial applications, which must have one (as when approving). OPD gives no money,
+// The approved amount: on approved Medical and Burial applications, which must have one (as when approving). OPD gives no money,
 // so its edit page has no amount box.
 $showAmount = $status === 'Approved' && $typeId !== 3 && array_key_exists('amount', $applicant);
 $amountRequired = $showAmount && decision_needs_amount($typeId);
-$amountText = function ($v): string { return $v === null || $v === '' ? '' : number_format((float)$v, 2, '.', ''); };
+$amountText = function ($v): string { return $v === null || $v === '' ? '' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); };
 
 /**
  * The online forms' clean-up (posted_fields(), which reads $_POST) applied to stored values, so a stored value
@@ -193,6 +195,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($computedAge !== '') $values['age'] = $computedAge;
     }
     // The check-up date may be in the past here (an old request is being corrected), so it is checked below instead
+    $values['claimant_age'] = $original['claimant_age'] ?? '';
+    if (!empty($values['claimant_birthdate']) || $applyingFor === 'self') {
+        $values = application_claimant_values($formKey, $values, (string)$applicant['created_at']);
+    }
     $check = $values;
     unset($check['checkup_date']);
     $errors = validate_application($check, array_diff($required, ['checkup_date']));
@@ -221,12 +227,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($showAmount) {
-        // "₱5,000.50" and "5000.5" are both fine
+        // Corrections use whole pesos. An untouched older amount keeps its exact value.
         $values['amount'] = trim(str_replace([',', '₱', ' '], '', is_string($_POST['amount'] ?? null) ? $_POST['amount'] : ''));
         if ($values['amount'] === '') {
-            if ($amountRequired) $errors['amount'] = 'Enter the amount released (more than ₱0). Approved Medical and Burial applications always have one.';
-        } elseif (!is_numeric($values['amount']) || (float)$values['amount'] <= 0 || (float)$values['amount'] > 99999999.99) {
-            $errors['amount'] = 'Enter an amount more than ₱0, e.g. 5000 or 5000.50.';
+            if ($amountRequired) $errors['amount'] = 'Enter the approved amount (more than ₱0). Approved Medical and Burial applications always have one.';
+        } elseif (!preg_match('/^[0-9]+$/D', $values['amount']) || (float)$values['amount'] <= 0 || (float)$values['amount'] > 99999999) {
+            $errors['amount'] = 'Enter a whole-peso amount greater than ₱0, e.g. 5000.';
         } else {
             $values['amount'] = $amountText($values['amount']);
         }
@@ -243,6 +249,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!decision_csrf_ok()) {
         $errors['form'] = 'This page was open for too long, or you signed in again since it opened. Nothing was changed. Check the details, then press Save again.';
+    }
+    $claimantFields = ['claimant_birthdate', 'petitioner_name', 'relationship', 'applying_for', 'beneficiary_birthdate'];
+    if ($formKey === 'burial') $claimantFields = array_merge($claimantFields, ['first_name', 'middle_name', 'last_name']);
+    $claimantChanged = (bool)array_filter($claimantFields, function ($field) use ($values, $original, $same) {
+        return !$same($values[$field] ?? '', $original[$field] ?? '');
+    });
+    if ($status === 'Pending' || $claimantChanged) {
+        $errors += application_claimant_errors($formKey, $values, (string)$applicant['created_at']);
+    }
+    $postedVersion = is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : '';
+    if ($postedVersion === '' || $postedVersion !== (string)$applicant['updated_at']) {
+        $errors['form'] = 'This record changed since you opened the form. Reload it and review the latest details before saving.';
     }
 
     // What changed
@@ -264,7 +282,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$errors) {
         $locks = [];
+        $budgetLock = false;
+        $budgetCorrection = null;
         try {
+            if (in_array('amount', $changed, true)) {
+                if (assistance_release_for($pdo, $id) !== null) {
+                    $errors['amount'] = 'Payment is already recorded. The approved amount can no longer be changed.';
+                }
+                if (!budget_corrections_ensure($pdo) || !budget_ensure($pdo)) throw new RuntimeException('budget_setup');
+                if (!budget_get_lock($pdo, $typeId)) throw new RuntimeException('busy');
+                $budgetLock = true;
+                $budgetYear = (int)substr((string)($applicant['approved_at'] ?? $applicant['created_at']), 0, 4);
+                $budgetBefore = budget_status($pdo, $budgetYear, $typeId, true);
+                $oldAmount = (float)$applicant['amount'];
+                $newAmount = (float)$values['amount'];
+                $usedAfter = round($budgetBefore['used'] - $oldAmount + $newAmount, 2);
+                $overBy = $budgetBefore['budget'] !== null ? max(0.0, round($usedAfter - $budgetBefore['budget'], 2)) : 0.0;
+                $budgetReason = trim(preg_replace('/\s+/u', ' ', (string)($_POST['budget_reason'] ?? '')) ?? '');
+                if (mb_strlen($budgetReason) > BUDGET_REASON_MAX) {
+                    $errors['budget_reason'] = 'Keep the reason under ' . BUDGET_REASON_MAX . ' characters.';
+                } elseif ($newAmount > $oldAmount && $overBy > 0 && $budgetReason === '') {
+                    $errors['budget_reason'] = 'This correction exceeds the ' . $budgetYear . ' budget. Explain why it is needed.';
+                }
+                $budgetCorrection = [$id, $budgetYear, $typeId, $oldAmount, $newAmount, $overBy,
+                    $budgetReason === '' ? null : $budgetReason, (int)decision_user()['id']];
+            }
             if ($identityChanged && !empty($applicant['beneficiary_id']) && person_rules_installed($pdo)) {
                 foreach (person_correction_locks($formKey, $original, $values) as $lock) {
                     if (!person_lock($pdo, $lock)) {
@@ -282,7 +324,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $dup = opd_duplicate_result($pdo, $values, null, $id);
                 if (!$dup['ok']) $errors['checkup_date'] = $dup['message'];
             }
-            if (!$errors) $pdo->beginTransaction();
+            if (!$errors) {
+                $pdo->beginTransaction();
+                $locked = $pdo->prepare('SELECT status, updated_at FROM applicant WHERE id = ? FOR UPDATE');
+                $locked->execute([$id]);
+                $latest = $locked->fetch(PDO::FETCH_ASSOC);
+                if (!$latest || $latest['status'] !== $status || $latest['updated_at'] !== $postedVersion
+                    || ($editRole === 'aid_staff' && $latest['status'] !== 'Pending')) {
+                    $pdo->rollBack();
+                    $errors['form'] = 'This record changed since you opened the form. Reload it and review the latest details before saving.';
+                } elseif ($budgetCorrection !== null) {
+                    $paid = $pdo->prepare('SELECT id FROM assistance_releases WHERE application_id = ?');
+                    $paid->execute([$id]);
+                    if ($paid->fetchColumn() !== false) {
+                        $pdo->rollBack();
+                        $errors['amount'] = 'Payment was already recorded. The approved amount can no longer be changed.';
+                    }
+                }
+            }
             if ($identityChanged && !$errors) {
                 $problem = person_correct_identity($pdo, $formKey, $applicant, $values);
                 if ($problem !== null) {
@@ -308,10 +367,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $params[] = $id;
                 $pdo->prepare('UPDATE applicant SET ' . implode(', ', $set) . ' WHERE id = ?')->execute($params);
+                if ($budgetCorrection !== null) {
+                    $pdo->prepare('INSERT INTO budget_amount_corrections (application_id, budget_year, assistance_type_id, old_amount, new_amount, over_by, reason, changed_by)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)')->execute($budgetCorrection);
+                }
                 $pdo->commit();
 
                 // Activity log: which fields (not their contents), and the amount since it is money
-                $labels = array_map(function ($f) use ($defs) { return $f === 'amount' ? 'Amount released' : $defs[$f][0]; }, $changed);
+                $labels = array_map(function ($f) use ($defs) { return $f === 'amount' ? 'Approved amount' : $defs[$f][0]; }, $changed);
                 $detail = 'Ref #' . $id . ' (' . $typeName . '): changed ' . implode(', ', $labels) . '.';
                 if (in_array('amount', $changed, true)) {
                     $peso = function ($v) { return $v === '' ? 'none' : '₱' . number_format((float)$v, 2); };
@@ -328,12 +391,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($pdo->inTransaction()) $pdo->rollBack();
             if ($e->getMessage() === 'busy') {
                 $errors['form'] = 'Another change for this person is being saved right now. Please try again in a moment.';
+            } elseif ($e->getMessage() === 'budget_setup') {
+                $errors['form'] = 'Budget auditing is unavailable. The amount was not changed; ask the system administrator to check the database.';
             } else {
                 error_log('edit_applicant.php #' . $id . ': ' . $e->getMessage());
                 $errors['form'] = 'The changes could not be saved because of a problem on the server. Please try again; if it keeps happening, tell the system administrator.';
             }
         } finally {
             foreach ($locks as $lock) person_unlock($pdo, $lock);
+            if ($budgetLock) budget_release_lock($pdo, $typeId);
         }
     }
 }
@@ -403,7 +469,7 @@ function edit_field(string $f, array $def, string $value, ?string $error, string
             break;
         case 'age':
             $inRange = $stored === '' || (ctype_digit($stored) && (int)$stored <= 120);
-            $control = '<input type="number" ' . $common . ' value="' . ui_e($value) . '"' . ($inRange ? ' min="0" max="120"' : '') . ' step="1" inputmode="numeric">';
+            $control = '<input type="number" ' . $common . ' value="' . ui_e($value) . '"' . ($inRange ? ' min="0" max="120"' : '') . ' step="1" inputmode="numeric"' . ($f === 'claimant_age' ? ' readonly' : '') . '>';
             break;
         case 'textarea':
             $control = '<textarea ' . $common . ' rows="' . ($f === 'checkup_reason' ? 2 : 3) . '"' . ($max ? ' maxlength="' . $max . '"' : '') . '>' . ui_e($value) . '</textarea>';
@@ -424,6 +490,7 @@ admin_layout_start(['title' => 'Edit applicant', 'section' => $section]);
 ?>
 <form class="panel edit-box" method="post" novalidate data-busy="Saving…" aria-labelledby="editTitle">
     <?= decision_csrf_field() ?>
+    <input type="hidden" name="expected_version" value="<?= ui_e((string)$applicant['updated_at']) ?>">
 
     <!-- Who is being edited -->
     <header class="edit-head">
@@ -471,18 +538,28 @@ admin_layout_start(['title' => 'Edit applicant', 'section' => $section]);
     <?php if ($showAmount): ?>
         <section class="edit-section" role="group" aria-labelledby="secAmount">
             <div class="edit-section-about">
-                <h3 id="secAmount"><?= ui_icon('check-circle') ?>Amount released</h3>
+                <h3 id="secAmount"><?= ui_icon('check-circle') ?>Approved amount</h3>
                 <p><?= $amountRequired
-                    ? 'The amount given when it was approved. Correct it if it was typed wrong; every change is recorded in the Activity log.'
-                    : 'OPD approvals don\'t need an amount. Fill it in only if the office released money for this request.' ?></p>
+                    ? 'The amount approved for this application. Correct it if it was typed wrong; every change is recorded in the Activity log.'
+                    : 'OPD approvals do not need an amount.' ?></p>
             </div>
             <div class="edit-grid">
                 <div class="field span-2">
                     <label for="amount">Amount (₱)<?= $amountRequired ? ' <span class="req" aria-hidden="true">*</span>' : ' <span class="muted">(optional)</span>' ?></label>
-                    <input type="text" id="amount" name="amount" value="<?= ui_e($values['amount'] ?? '') ?>" inputmode="decimal" maxlength="15"
-                           placeholder="e.g. 5000.00"<?= $amountRequired ? ' required' : '' ?> data-message="Enter the amount released (more than ₱0)."
-                           <?= isset($errors['amount']) ? 'aria-invalid="true" aria-describedby="amountError"' : '' ?>>
+                    <div class="amount-box"><span aria-hidden="true">₱</span>
+                        <input type="text" id="amount" name="amount" class="amount-input" value="<?= ui_e($values['amount'] ?? '') ?>" inputmode="numeric" maxlength="15"
+                               placeholder="e.g. 5000"<?= $amountRequired ? ' required' : '' ?> data-claim="amount" data-message="Enter a whole-peso amount greater than ₱0."
+                               aria-describedby="amountHelp<?= isset($errors['amount']) ? ' amountError' : '' ?>"<?= isset($errors['amount']) ? ' aria-invalid="true"' : '' ?>>
+                        <span class="amount-steps"><button type="button" data-amount-step="100" aria-label="Increase approved amount by 100 pesos">▲</button>
+                        <button type="button" data-amount-step="-100" aria-label="Decrease approved amount by 100 pesos">▼</button></span>
+                    </div>
+                    <p class="field-help" id="amountHelp">Whole pesos only. Use the arrows to change the amount by ₱100.</p>
                     <?php if (isset($errors['amount'])): ?><p class="field-error" id="amountError"><?= ui_e($errors['amount']) ?></p><?php endif; ?>
+                </div>
+                <div class="field span-4">
+                    <label for="budgetReason">Reason for amount correction <span class="muted">(required when an increase exceeds the budget)</span></label>
+                    <textarea id="budgetReason" name="budget_reason" rows="2" maxlength="<?= BUDGET_REASON_MAX ?>"><?= ui_e((string)($_POST['budget_reason'] ?? '')) ?></textarea>
+                    <?php if (isset($errors['budget_reason'])): ?><p class="field-error"><?= ui_e($errors['budget_reason']) ?></p><?php endif; ?>
                 </div>
             </div>
         </section>

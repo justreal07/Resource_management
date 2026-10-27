@@ -4,7 +4,7 @@
  * not the account that files it.
  *
  *   Medical  The patient (section 1 name + birthdate). A patient who already has an
- *            APPROVED Medical application needs an admin's permission to apply again;
+ *            APPROVED Medical application starts a three-month patient wait; an admin may allow an earlier application;
  *            the permission is used up by that one new application.
  *   Burial   The deceased (full name + birthdate + date of death). One Burial
  *            application per deceased person: the same name WITH the same birthdate OR the same date of
@@ -34,6 +34,7 @@
  * database update is needed. Before, every Medical and Burial application failed at step 1.
  */
 require_once __DIR__ . '/assistance_config.php';
+require_once __DIR__ . '/../includes/medical_reapply.php';
 
 // Seconds a save waits for another save of the same person to finish
 const PERSON_LOCK_TIMEOUT = 10;
@@ -167,6 +168,11 @@ function person_names_equal(array $a, array $b): bool
 function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accountId): array
 {
     $office = $accountId === null;
+    $ageErrors = application_claimant_errors($formKey, $data, $office ? (string)($data['_application_date'] ?? '') : '');
+    if ($ageErrors) {
+        $field = array_key_first($ageErrors);
+        return person_result($field, $ageErrors[$field]);
+    }
     if ($formKey === 'opd') {
         return opd_duplicate_result($pdo, $data, $accountId);   // OPD: no person registry, only "one request per patient per check-up date"
     }
@@ -175,7 +181,7 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
         return person_result();
     }
     if (!person_rules_installed($pdo)) {
-        return person_result();   // the database update isn't installed yet: accepted without the person checks
+        return person_result('person', 'The person registry is unavailable. Please contact the office before submitting.');
     }
 
     // The person must be properly identified before comparing (the forms check this too)
@@ -204,6 +210,14 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
     }
 
     try {
+        // Old records without a birthdate or registry link cannot be compared safely. Hold a
+        // possible same-name request for office verification until that record is reconciled.
+        $legacy = person_unlinked_match($pdo, $person);
+        if ($legacy !== null) {
+            return person_result('person', $office
+                ? 'An active older application may be for this person (Ref #' . (int)$legacy['id'] . '). Verify and link that record in Data records before accepting this request.'
+                : 'An older application may be for this person. Please contact the MSWD office to verify the records before applying.');
+        }
         $matches = person_find($pdo, $person);
         $ids = array_map('intval', array_column($matches, 'id'));
         $deceased = in_array(1, array_map('intval', array_column($matches, 'is_deceased')), true);
@@ -213,36 +227,10 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
             if ($deceased) {
                 return person_result('person', 'This person is recorded as deceased and cannot apply for Medical Assistance.');
             }
-            $previous = person_last_application($pdo, $ids, 1);
-            if ($previous) {
-                $ref = person_ref($previous, $accountId);
-                if ($previous['status'] === 'Pending') {
-                    return person_result('person', $office
-                        ? "This patient already has a Medical application waiting for review$ref. Approve or decline that one first."
-                        : "This person already has a Medical application waiting for review$ref. Please wait for the decision before applying again.");
-                }
-                // The admin gives the permission on the patient's approved Medical record (medical/reapply_decision.php)
-                $section = '"Applying again for Medical Assistance"';
-                $decision = person_last_decision($pdo, $ids);
-                if (!$decision || $decision['consumed_at'] !== null) {
-                    return person_result('person', $office
-                        ? "This patient already has an approved Medical application$ref. To accept a new one, first allow it on that record, under $section."
-                        : "This person already has an approved Medical application$ref. Admin approval is required to apply again: "
-                          . 'please contact the MSWD office, and apply again once they allow it.');
-                }
-                if ((int)$decision['reapply_allowed'] !== 1) {
-                    return person_result('person', $office
-                        ? "A new Medical application for this patient was not allowed. You can change that on their approved Medical record$ref, under $section."
-                        : "An admin reviewed this person's Medical record and has not allowed a new application. Please contact the MSWD office.");
-                }
-                if ($decision['valid_until'] !== null && $decision['valid_until'] < date('Y-m-d')) {
-                    $ended = date('M d, Y', strtotime($decision['valid_until']));
-                    return person_result('person', $office
-                        ? "The permission for this patient to apply again ended on $ended. Allow it again on their approved Medical record$ref, under $section."
-                        : "The admin's permission for this person to apply again ended on $ended. Please contact the MSWD office.");
-                }
-                $grantId = (int)$decision['id'];   // used up when the application is saved
-            }
+            $filingDate = $office && !empty($data['_application_date']) ? substr((string)$data['_application_date'], 0, 10) : null;
+            $eligibility = medical_reapply_status($pdo, $ids, $filingDate);
+            if (!$eligibility['eligible']) return person_result('person', $eligibility['message']);
+            $grantId = $eligibility['grant_id'];
         } else {
             // Burial: the same name with the same birthdate or the same date of death is the same deceased person
             $sameName = person_find_burial_matches($pdo, $person);
@@ -265,6 +253,22 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
     return person_result(null, null, $person, $ids, $grantId);
 }
 
+/** A conservative hold for pre-registry records: names prompt verification, never an automatic merge. */
+function person_unlinked_match(PDO $pdo, array $person): ?array
+{
+    $rows = $pdo->query("SELECT id, assistance_type_id, first_name, middle_name, last_name, petitioner_name
+                         FROM applicant WHERE assistance_type_id IN (1, 2) AND status IN ('Pending', 'Approved')
+                           AND beneficiary_id IS NULL ORDER BY id")->fetchAll(PDO::FETCH_ASSOC);
+    foreach ($rows as $row) {
+        $name = (int)$row['assistance_type_id'] === 2
+            ? (string)$row['petitioner_name']
+            : implode(' ', [$row['first_name'], $row['middle_name'], $row['last_name']]);
+        $parts = person_name_parts($name);
+        if (person_names_equal($parts, $person['parts']) || person_names_match($parts, $person['parts'])) return $row;
+    }
+    return null;
+}
+
 /* ============================================================
    SAVING (step 2)
    ============================================================ */
@@ -284,9 +288,14 @@ function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accou
 function submit_with_person_rules(PDO $pdo, string $formKey, array $data, ?int $accountId, callable $insert): array
 {
     // The OPD one-per-day rule needs no registry tables, so its lock is taken even before the person-rules update is installed
-    $lock = ($formKey === 'opd' || person_rules_installed($pdo)) ? person_lock_name($formKey, $data) : null;
-    if ($lock !== null && !person_lock($pdo, $lock)) {
-        return ['ok' => false, 'message' => 'Another application for this person is being saved right now. Please try again in a moment.'];
+    $lockNames = ($formKey === 'opd' || person_rules_installed($pdo)) ? person_lock_names($formKey, $data) : [];
+    $heldLocks = [];
+    foreach ($lockNames as $lock) {
+        if (!person_lock($pdo, $lock)) {
+            foreach (array_reverse($heldLocks) as $held) person_unlock($pdo, $held);
+            return ['ok' => false, 'message' => 'Another application for this person is being saved right now. Please try again in a moment.'];
+        }
+        $heldLocks[] = $lock;
     }
     try {
         $pdo->beginTransaction();
@@ -307,7 +316,7 @@ function submit_with_person_rules(PDO $pdo, string $formKey, array $data, ?int $
         if ($pdo->inTransaction()) $pdo->rollBack();
         throw $e;
     } finally {
-        if ($lock !== null) person_unlock($pdo, $lock);
+        foreach (array_reverse($heldLocks) as $held) person_unlock($pdo, $held);
     }
 }
 
@@ -362,6 +371,17 @@ function person_lock_name(string $formKey, array $data): ?string
     return in_array($formKey, ['medical', 'burial'], true) && is_ymd($birthdate) ? 'lgu_person_' . $birthdate : null;
 }
 
+/** Burial also takes the birthdate lock used by Medical, so the two programs cannot create separate people at once. */
+function person_lock_names(string $formKey, array $data): array
+{
+    $birthdate = person_text($data, 'beneficiary_birthdate');
+    if ($formKey === 'burial' && is_ymd($birthdate)) {
+        return ['lgu_burial_same_name', 'lgu_person_' . $birthdate];
+    }
+    $one = person_lock_name($formKey, $data);
+    return $one === null ? [] : [$one];
+}
+
 function person_lock(PDO $pdo, string $lock): bool
 {
     $stmt = $pdo->prepare('SELECT GET_LOCK(?, ?)');
@@ -394,9 +414,9 @@ function person_unlock(PDO $pdo, string $lock): void
  * @throws DomainException with a message that can be shown to the admin
  * @throws PDOException    on database errors
  */
-function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicationId, bool $allow, string $remarks, ?string $validUntil = null): int
+function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicationId, bool $allow, string $remarks, ?string $validUntil = null, ?string $eligibleFrom = null, ?int $expectedDecisionId = null): int
 {
-    $stmt = $pdo->prepare('SELECT role FROM users WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT role FROM users WHERE id = ? AND is_active = 1');
     $stmt->execute([$adminUserId]);
     if ($stmt->fetchColumn() !== 'admin') {
         throw new DomainException('Only an admin can allow or deny a Medical re-application.');
@@ -413,6 +433,13 @@ function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicatio
     if ($validUntil !== null && (!is_ymd($validUntil) || $validUntil < date('Y-m-d'))) {
         throw new DomainException('"Valid until" must be today or a later date.');
     }
+    $eligibleFrom = $allow ? trim((string)$eligibleFrom) : null;
+    if ($allow && (!is_ymd($eligibleFrom) || $eligibleFrom < OLDEST_DATE)) {
+        throw new DomainException('Enter the date when this patient may start a new application.');
+    }
+    if ($allow && $validUntil !== null && $validUntil < $eligibleFrom) {
+        throw new DomainException('The expiry date cannot be before the eligibility start date.');
+    }
 
     $stmt = $pdo->prepare('SELECT a.beneficiary_id, b.birthdate, b.is_deceased
                            FROM applicant a LEFT JOIN beneficiaries b ON b.id = a.beneficiary_id
@@ -423,7 +450,7 @@ function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicatio
         throw new DomainException('Medical application not found.');
     }
     if ($app['beneficiary_id'] === null) {
-        throw new DomainException('This application was filed before patients were tracked, so no permission is needed.');
+        throw new DomainException('Verify and link this patient in Data records before setting a reapplication date.');
     }
     if ($allow && (int)$app['is_deceased'] === 1) {
         throw new DomainException('This patient is recorded as deceased.');
@@ -435,10 +462,30 @@ function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicatio
         throw new DomainException("This patient's record is busy. Please try again in a moment.");
     }
     try {
-        $pdo->prepare('INSERT INTO medical_reapply_decisions (beneficiary_id, based_on_application_id, reapply_allowed, decided_by, remarks, valid_until)
-                       VALUES (?, ?, ?, ?, ?, ?)')
-            ->execute([$app['beneficiary_id'], $medicalApplicationId, $allow ? 1 : 0, $adminUserId, $remarks, $validUntil]);
-        return (int)$pdo->lastInsertId();
+        $pdo->beginTransaction();
+        $locked = $pdo->prepare('SELECT a.*, b.is_deceased FROM applicant a JOIN beneficiaries b ON b.id = a.beneficiary_id WHERE a.id = ? FOR UPDATE');
+        $locked->execute([$medicalApplicationId]);
+        $current = $locked->fetch(PDO::FETCH_ASSOC);
+        if (!$current || $current['status'] !== 'Approved' || (int)$current['beneficiary_id'] !== (int)$app['beneficiary_id']
+            || ($allow && (int)$current['is_deceased'] === 1)) throw new DomainException('This patient record changed. Reload before making a decision.');
+        $latestApp = person_last_application($pdo, [(int)$app['beneficiary_id']], 1);
+        if (!$latestApp || (int)$latestApp['id'] !== $medicalApplicationId) throw new DomainException('Use the latest Medical application for this patient. Resolve any pending application first.');
+        $last = person_last_decision($pdo, [(int)$app['beneficiary_id']]);
+        if ($expectedDecisionId !== null && $expectedDecisionId !== (int)($last['id'] ?? 0)) throw new DomainException('The reapplication permission changed. Reload before saving.');
+        $default = medical_reapply_default($pdo, $medicalApplicationId);
+        if ($allow && $eligibleFrom < substr((string)($current['approved_at'] ?? $current['created_at']), 0, 10)) {
+            throw new DomainException('The next application date cannot be before the previous approval date.');
+        }
+        $pdo->prepare('INSERT INTO medical_reapply_decisions (beneficiary_id, based_on_application_id, reapply_allowed, decided_by, remarks, valid_until, eligible_from, default_eligible_from, previous_eligible_from)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$app['beneficiary_id'], $medicalApplicationId, $allow ? 1 : 0, $adminUserId, $remarks, $validUntil,
+                $eligibleFrom, $default, $last['eligible_from'] ?? $default]);
+        $id = (int)$pdo->lastInsertId();
+        $pdo->commit();
+        return $id;
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
     } finally {
         person_unlock($pdo, $lock);
     }
@@ -451,13 +498,13 @@ function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicatio
 /** The locks to hold while correcting a person (see person_lock_name): the new birthdate's, and the old one's if it changes. */
 function person_correction_locks(string $formKey, array $old, array $new): array
 {
-    if ($formKey === 'burial') return ['lgu_burial_same_name'];
     $locks = [];
     foreach ([person_text($new, 'beneficiary_birthdate'), person_text($old, 'beneficiary_birthdate')] as $birthdate) {
         if (is_ymd($birthdate)) $locks['lgu_person_' . $birthdate] = true;
     }
     $names = array_keys($locks);
     sort($names);   // always in the same order, so two corrections can't wait on each other
+    if ($formKey === 'burial') array_unshift($names, 'lgu_burial_same_name');
     return $names;
 }
 
@@ -706,7 +753,7 @@ function person_last_application(PDO $pdo, array $beneficiaryIds, int $typeId): 
     $in = implode(',', array_fill(0, count($beneficiaryIds), '?'));
     $stmt = $pdo->prepare("SELECT id, account_id, status FROM applicant
                            WHERE beneficiary_id IN ($in) AND assistance_type_id = ? AND status IN ('Pending', 'Approved')
-                           ORDER BY status = 'Pending' DESC, created_at DESC, id DESC LIMIT 1");
+                           ORDER BY status = 'Pending' DESC, approved_at DESC, created_at DESC, id DESC LIMIT 1");
     $stmt->execute([...$beneficiaryIds, $typeId]);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
@@ -716,7 +763,7 @@ function person_last_decision(PDO $pdo, array $beneficiaryIds): ?array
 {
     if (!$beneficiaryIds) return null;
     $in = implode(',', array_fill(0, count($beneficiaryIds), '?'));
-    $stmt = $pdo->prepare("SELECT id, reapply_allowed, valid_until, consumed_at FROM medical_reapply_decisions
+    $stmt = $pdo->prepare("SELECT id, reapply_allowed, valid_until, consumed_at, eligible_from, default_eligible_from, based_on_application_id FROM medical_reapply_decisions
                            WHERE beneficiary_id IN ($in) ORDER BY decided_at DESC, id DESC LIMIT 1");
     $stmt->execute($beneficiaryIds);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;

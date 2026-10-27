@@ -124,7 +124,7 @@
     if (forRadios.length) {
         const birth = byId('beneficiary_birthdate');
         const claimantName = byId('petitioner_name');
-        const claimantAge = byId('claimant_age');
+        const claimantBirth = byId('claimant_birthdate');
         forRadios.forEach(function (r) {
             r.addEventListener('change', function () {
                 if (!r.checked) return;
@@ -143,8 +143,10 @@
                     if (isOwnName() && untouched(firstName) && untouched(lastName)) { fill(firstName, ''); fill(lastName, ''); }
                     if (birth && own.birthdate && birth.value === own.birthdate && untouched(birth)) fill(birth, '');
                     // ...and the applicant is the claimant
-                    if (claimantName && claimantName.value.trim() === '') fill(claimantName, (own.first + ' ' + own.last).trim());
-                    if (claimantAge && own.age !== '' && untouched(claimantAge)) fill(claimantAge, own.age);
+                    if (claimantName && claimantName.value.trim() === '') {
+                        fill(claimantName, (own.first + ' ' + own.last).trim());
+                        if (claimantBirth && own.birthdate !== '' && untouched(claimantBirth)) fill(claimantBirth, own.birthdate);
+                    }
                 }
                 syncAgeHints();
             });
@@ -169,18 +171,40 @@
         sync();
     });
 
-    // Optional groups that go together (OPD companion: name + relationship): all empty is fine,
-    // but once one box is filled in, every box in the group is needed (the server checks the same)
+    // OPD guardian details are required for minors. Adult patients may leave the entire group empty.
     const pairGroups = Array.from(form.querySelectorAll('[data-all-or-none]'));
     function syncPairs() {
         pairGroups.forEach(function (group) {
-            const boxes = Array.from(group.querySelectorAll('input[type="text"]'));
-            const any = boxes.some(function (el) { return el.value.trim() !== ''; });
+            const boxes = Array.from(group.querySelectorAll('input[type="text"], input[type="date"]'));
+            const patient = parseYmd((byId('beneficiary_birthdate') || {}).value);
+            const filing = parseYmd(form.dataset.filingDate);
+            const minor = patient && filing && yearsBetween(patient, filing) < 18;
+            const any = minor || boxes.some(function (el) { return el.value.trim() !== ''; });
             boxes.forEach(function (el) { el.required = any; });
         });
     }
     form.addEventListener('input', syncPairs);
     syncPairs();
+
+    function checkAdultClaimant() {
+        const filing = parseYmd(form.dataset.filingDate);
+        const claimant = byId('claimant_birthdate');
+        const patient = byId('beneficiary_birthdate');
+        const self = form.querySelector('input[name="applying_for"][value="self"]:checked');
+        if (claimant) {
+            const birth = parseYmd(claimant.value);
+            claimant.setCustomValidity(birth && filing && !claimant.disabled && yearsBetween(birth, filing) < 18
+                ? 'The claimant or companion must be at least 18 on the application date.' : '');
+        }
+        if (patient && forRadios.length) {
+            const birth = parseYmd(patient.value);
+            patient.setCustomValidity(self && birth && filing && yearsBetween(birth, filing) < 18
+                ? 'A patient under 18 needs an adult claimant. Choose For another person.' : '');
+        }
+    }
+    form.addEventListener('input', checkAdultClaimant);
+    form.addEventListener('change', checkAdultClaimant);
+    checkAdultClaimant();
 
     /* ---------- The picked date in words, under each date box ----------
        "Friday, October 16, 2026 · in 6 days", and the age for a birthdate
@@ -222,7 +246,7 @@
         }
         // Birthdate
         const short = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-        if (deathInput) {
+        if (deathInput && input.id === 'beneficiary_birthdate') {
             const death = parseYmd(deathInput.value);
             const age = death ? yearsBetween(d, death) : -1;
             return short + (age >= 0 ? ' · age ' + age + ' at the time of death' : '');
@@ -269,6 +293,7 @@
     function refresh() {
         dateEchoes.forEach(function (render) { render(); });
         syncPairs();
+        checkAdultClaimant();
         updateSections();
     }
     refresh();

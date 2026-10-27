@@ -18,6 +18,8 @@ function report_build_program(PDO $pdo, array $f, int $typeId, bool $hideAmounts
     $b = report_buckets($f);
     [$counts, $amounts] = report_series($b, $approved);
     $sum = report_sum($approved);
+    $payments = $hideAmounts ? [] : report_payments($pdo, $f, $typeId);
+    $paidTotal = array_sum(array_map(function ($p) { return (float)$p['amount']; }, $payments));
     $withAmount = report_with_amount($approved);
     $basisText = 'Approved in this period';
 
@@ -26,7 +28,8 @@ function report_build_program(PDO $pdo, array $f, int $typeId, bool $hideAmounts
         ['label' => 'Approved', 'value' => number_format(count($approved)), 'status' => 'Approved', 'note' => $basisText],
     ];
     if (!$hideAmounts) {
-        $cards[] = ['label' => 'Total amount released', 'value' => ui_peso($sum, 0), 'icon' => 'check-circle', 'note' => $basisText];
+        $cards[] = ['label' => 'Total approved amount', 'value' => ui_peso($sum, 0), 'icon' => 'check-circle', 'note' => $basisText];
+        $cards[] = ['label' => 'Payments recorded', 'value' => ui_peso($paidTotal, 0), 'icon' => 'wallet', 'note' => 'Paid in this period'];
         // The average counts only the approved ones that have an amount, the same rule as the Overview
         $cards[] = ['label' => 'Average per application', 'value' => $withAmount > 0 ? ui_peso($sum / $withAmount, 0) : '—', 'icon' => 'chart', 'note' => 'Of those with an amount'];
     }
@@ -69,16 +72,17 @@ function report_build_program(PDO $pdo, array $f, int $typeId, bool $hideAmounts
         $note = 'The claimant is the person who applied and collects the assistance; the deceased is the person the assistance is for.';
     }
     if (!$hideAmounts) {
-        $head[] = 'Amount released';
+        $head[] = 'Approved amount';
         $numCols[] = count($head) - 1;
     }
 
     $tables = [
         report_table('Approved ' . $name, 'Approved ' . $name . ' applications (' . count($rows) . ')', $note . ' ' . report_sub($f, 'by date approved'),
-            $head, $rows, $numCols, $hideAmounts ? null : ['Total ' . $name . ' assistance released', ui_peso($sum)], 'No approved ' . $name . ' applications in this period.'),
+            $head, $rows, $numCols, $hideAmounts ? null : ['Total ' . $name . ' assistance approved', ui_peso($sum)], 'No approved ' . $name . ' applications in this period.'),
         report_processing_table($pdo, $f, $typeId),
         report_series_table($f, $b, $counts, $amounts, $what, !$hideAmounts),
     ];
+    if (!$hideAmounts) $tables[] = report_payments_table($payments, 'Recorded ' . $name . ' payments');
     $tables = array_merge($tables, $who['tables']);
 
     return ['cards' => $cards, 'charts' => $charts, 'tables' => $tables];

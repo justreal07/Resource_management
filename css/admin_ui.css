@@ -1051,7 +1051,23 @@ a.row-link { font-weight: 600; text-underline-offset: 3px; }
 }
 .amount-box:focus-within { border-color: var(--c-focus); outline: 3px solid var(--c-focus); outline-offset: 2px; }
 .amount-box .amount-input { width: 120px; min-height: 40px; border: 0; padding-left: 2px; }
+.amount-box .amount-input::-webkit-inner-spin-button,
+.amount-box .amount-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.amount-box .amount-input { appearance: textfield; }
 .amount-box .amount-input:focus-visible { outline: none; }
+.amount-steps { display: grid; align-self: stretch; border-left: 1px solid var(--c-border); }
+.amount-steps button {
+    min-width: 30px;
+    padding: 0;
+    border: 0;
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: var(--fs-xs);
+    cursor: pointer;
+}
+.amount-steps button + button { border-top: 1px solid var(--c-border); }
+.amount-steps button:hover { background: var(--c-primary-soft); }
+.amount-steps button:focus-visible { outline: 3px solid var(--c-focus); outline-offset: 2px; }
 .amount-box .amount-input[aria-invalid="true"] { border: 0 !important; box-shadow: none; }   /* the box shows the error, not the inner field */
 .amount-box:has([aria-invalid="true"]) { border-color: var(--c-danger-text); box-shadow: inset 0 0 0 1px var(--c-danger-text); }
 td .field-error { margin-top: 4px; }
@@ -1502,7 +1518,39 @@ body.is-embedded { background: var(--c-surface); }
 .choice-text small { color: var(--c-text-muted); font-size: var(--fs-sm); font-weight: 400; }
 
 /* The reasons to choose from when disapproving: one choice per line, the whole sentence readable */
-.reason-list { display: grid; gap: 8px; margin-top: 4px; }
+.reason-group { display: block; }
+.reason-group:not([open]) > :not(summary) { display: none; }
+.reason-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 9px 14px;
+    border: 1px solid var(--c-border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--c-surface);
+    color: var(--c-text);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+}
+.reason-summary::-webkit-details-marker { display: none; }
+.reason-summary::after {
+    content: '';
+    flex: none;
+    width: 8px;
+    height: 8px;
+    margin: -4px 3px 0 auto;
+    border-right: 2px solid var(--c-text-muted);
+    border-bottom: 2px solid var(--c-text-muted);
+    transform: rotate(45deg);
+}
+.reason-group[open] .reason-summary::after { margin-top: 4px; transform: rotate(225deg); }
+.reason-summary:hover { background: var(--c-surface-2); }
+.reason-summary:focus-visible { outline: 3px solid var(--c-focus); outline-offset: 2px; }
+.reason-count { color: var(--c-primary); white-space: nowrap; }
+.reason-list { display: grid; gap: 8px; margin-top: 8px; }
 .reason-list .choice > span { align-items: flex-start; font-weight: 500; line-height: 1.35; }
 .reason-list .choice > span::before { margin-top: 1px; }
 .reason-group:has([data-reason-error]:not([hidden])) .reason-list .choice > span { border-color: var(--c-danger-text); }

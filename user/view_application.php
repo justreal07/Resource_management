@@ -5,6 +5,8 @@ require_once 'account_layout.php';
 require_once '../includes/feedback.php';
 require_once '../includes/documents.php';
 require_once '../includes/application_changes.php';   // Withdrawn status, edit / withdraw rules
+require_once '../includes/assistance_release.php';
+require_once '../includes/medical_reapply.php';
 
 $ctx = account_context($pdo);
 $account_id = (int)$ctx['user']['id'];
@@ -36,6 +38,7 @@ $program = get_program_by_type($app['assistance_type_id']);
 $pname = $program['name'] ?? ($app['type_name'] ?: 'Assistance');
 $type = (int)$app['assistance_type_id'];
 $status = $app['status'] ?: 'Pending';
+$payment = $status === 'Approved' && in_array($type, [1, 2], true) ? assistance_release_for($pdo, $app_id) : null;
 
 $stmt = $pdo->prepare("SELECT * FROM applicant_documents WHERE applicant_id = ? ORDER BY document_name, id");
 $stmt->execute([$app_id]);
@@ -52,6 +55,9 @@ foreach ($remarks as $r) {
 }
 if ($status === 'Approved') {
     $timeline[] = ['time' => $app['approved_at'] ?: $app['created_at'], 'title' => 'Approved', 'text' => $app['remarks'] ?: 'Your application was approved.', 'icon' => 'fa-check', 'tone' => 'success'];
+    if ($payment) $timeline[] = ['time' => $payment['released_on'] . ' 00:00:00', 'title' => 'Payment recorded',
+        'text' => 'The office recorded payment on ' . date('F j, Y', strtotime($payment['released_on'])) . '.',
+        'icon' => 'fa-hand-holding-heart', 'tone' => 'success'];
 } elseif ($status === 'Disapproved') {
     // CHANGED (Disapprove): was 'Rejected'. The reason is the one typed when the application was disapproved.
     $timeline[] = ['time' => ($app['disapproved_at'] ?? null) ?: $app['created_at'], 'title' => 'Declined',
@@ -87,6 +93,9 @@ $person_label = $type === 2 ? 'Applicant' : 'Patient';
 
 // A declined or withdrawn application doesn't count against the person: they may apply again right away
 $can_reapply = in_array($status, ['Disapproved', APPLICATION_WITHDRAWN], true) && $program && !empty($program['form_page']);
+$medicalEligibility = $type === 1 && !empty($app['beneficiary_id'])
+    ? medical_reapply_status($pdo, [(int)$app['beneficiary_id']]) : null;
+if ($medicalEligibility !== null) $can_reapply = $status !== 'Pending' && $medicalEligibility['eligible'];
 $disapproval_reason = trim((string)($app['disapproval_remarks'] ?? ''));
 $withdrawal_reason = trim((string)($app['withdrawal_reason'] ?? ''));
 
@@ -125,6 +134,9 @@ account_page_start($ctx, "Application #$app_id", 'account', [
             <p>
                 <?php if ($status === 'Approved'): ?>
                     Your application was approved<?= $app['approved_at'] ? ' on ' . e(date('F d, Y', strtotime($app['approved_at']))) : '' ?>.
+                    <?php if (in_array($type, [1, 2], true)): ?>
+                        <?= $payment ? 'The office recorded your payment on ' . e(date('F d, Y', strtotime($payment['released_on']))) . '.' : 'Payment has not been recorded yet.' ?>
+                    <?php endif; ?>
                 <?php elseif ($status === 'Disapproved'): ?>
                     Your application was declined<?= !empty($app['disapproved_at']) ? ' on ' . e(date('F d, Y', strtotime($app['disapproved_at']))) : '' ?>. You may apply again.
                 <?php elseif ($status === APPLICATION_WITHDRAWN): ?>
@@ -176,6 +188,9 @@ account_page_start($ctx, "Application #$app_id", 'account', [
     <?php elseif ($status !== 'Disapproved' && !empty($app['remarks'])): ?>
         <div class="acc-note"><i class="fas fa-comment-dots"></i><div><strong>Note from the office:</strong> <?= e($app['remarks']) ?></div></div>
     <?php endif; ?>
+    <?php if ($medicalEligibility !== null && $medicalEligibility['message'] !== ''): ?>
+        <div class="acc-note"><i class="fas fa-calendar-alt"></i><div><strong>Next Medical application:</strong> <?= e($medicalEligibility['message']) ?></div></div>
+    <?php endif; ?>
     <?php if ($can_reapply): ?>
         <a href="<?= e($form_href) ?>" class="ap-btn ap-btn-primary acc-btn-sm acc-btn-edit no-print"><i class="fas fa-redo"></i> Apply again</a>
     <?php endif; ?>
@@ -226,6 +241,7 @@ account_page_start($ctx, "Application #$app_id", 'account', [
             detail_row('Full name', trim(preg_replace('/\s+/', ' ', $app['first_name'] . ' ' . $app['middle_name'] . ' ' . $app['last_name'])));
             if ($type === 1 && !empty($app['beneficiary_birthdate'])) detail_row('Birthdate', date('F d, Y', strtotime($app['beneficiary_birthdate'])));
             detail_row('Age', $age !== '' && $age !== null ? $age . ' years old' : '');
+            if ($type === 2) detail_row("Claimant's birthdate", $app['claimant_birthdate'] ?? '');
             detail_row('Sex', $app['sex']);
             detail_row('Contact number', $app['contact_number']);
             detail_row('Address', $address);
@@ -246,6 +262,7 @@ account_page_start($ctx, "Application #$app_id", 'account', [
                 } else {
                     detail_row('Claimant', $app['petitioner_name']);
                     detail_row("Claimant's age", $app['claimant_age'] !== null && $app['claimant_age'] !== '' ? $app['claimant_age'] . ' years old' : '');
+                    detail_row("Claimant's birthdate", $app['claimant_birthdate'] ?? '');
                     detail_row('Relationship to patient', $app['relationship']);
                 }
                 detail_row('Purpose', $app['purpose']);
@@ -258,10 +275,11 @@ account_page_start($ctx, "Application #$app_id", 'account', [
                 detail_row('Preferred hospital', $app['hospital']);
                 detail_row('Check-up date', $app['checkup_date'] ? date('l, F d, Y', strtotime($app['checkup_date'])) : '');
                 detail_row('Reason for check-up', $app['checkup_reason']);
-                // The companion is optional: the patient may go to the check-up alone
+                // Adult patients may travel alone; minor patients need an adult guardian.
                 $companion = trim((string)$app['petitioner_name']);
                 detail_row('Accompanied by', $companion !== '' ? $companion : 'No companion');
                 if ($companion !== '') detail_row('Relationship', $app['relationship']);
+                if ($companion !== '') detail_row('Companion birthdate', $app['claimant_birthdate'] ?? '');
                 $needs = array_filter([$app['wheelchair'] === 'Yes' ? 'Wheelchair' : '', $app['stretcher'] === 'Yes' ? 'Stretcher' : '']);
                 detail_row('Special assistance', $needs ? implode(', ', $needs) : 'None');
             }

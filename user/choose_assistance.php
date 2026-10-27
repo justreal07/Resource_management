@@ -125,7 +125,7 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
                     </div>
 
                     <?php if ($open): ?>
-                        <p class="eligibility ok"><i class="fas fa-check-circle" aria-hidden="true"></i> <span>Available</span></p>
+                        <p class="eligibility ok"><i class="fas fa-check-circle" aria-hidden="true"></i> <span>Start a form; eligibility is checked for the patient</span></p>
                         <a href="<?= $h($form_url) ?>" class="btn btn-primary btn-block program-cta ch-cta"
                            aria-label="Start application for <?= $h($p['name']) ?>">Start application <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
                     <?php else: ?>

@@ -26,7 +26,7 @@ $fields = [
     'first_name'      => true,
     'middle_name'     => false,
     'last_name'       => true,
-    'claimant_age'    => true,
+    'claimant_birthdate' => true,
     'sex'             => true,
     'contact_number'  => true,
     'house_no'        => false,
@@ -40,16 +40,17 @@ $fields = [
     'relationship'    => true,
 ];
 
-$errors = [];
+$errors = $_SESSION['burial_claimant_errors'] ?? [];
+unset($_SESSION['burial_claimant_errors']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $values = force_service_area(posted_fields(array_keys($fields)));
     $own = get_form_prefill($pdo, (int)$account_id, $form_key)['own'];   // the applicant's own age/birthdate, for the hints and the script
     $claimantName = trim(implode(' ', [$values['first_name'], $values['middle_name'], $values['last_name']]));
-    if ($edit === null && ($ownAge = claimant_age_from_account($own, $claimantName)) !== null) {
-        $values['claimant_age'] = $ownAge;   // the claimant is the account holder: their age comes from their saved birthdate, not the box
-    }
     $errors = validate_application($values, array_keys(array_filter($fields)));
+    $filedOn = $edit !== null ? substr((string)$edit['created_at'], 0, 10) : '';
+    $values = application_claimant_values($form_key, $values, $filedOn);
+    $errors += application_claimant_errors($form_key, $values, $filedOn);
     $prefill = ['source' => 'post', 'own' => $own];
 
     if ($edit !== null && !csrf_valid()) {
@@ -110,7 +111,7 @@ apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : 
             <?php render_prefill_notice($prefill, $program); ?>
         <?php endif; ?>
 
-        <form method="post" class="ap-card ap-form-card" id="applicationForm"
+        <form method="post" class="ap-card ap-form-card" id="applicationForm" data-filing-date="<?= e($edit !== null ? substr($edit['created_at'], 0, 10) : date('Y-m-d')) ?>"
               data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
             <?php if ($edit !== null) render_edit_fields($edit); ?>
             <div class="ap-form-top">
@@ -142,10 +143,10 @@ apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : 
                         <?= error_for('last_name') ?>
                     </div>
                     <div class="field span-2">
-                        <label for="claimant_age">Age <span class="req">*</span></label>
-                        <input type="number" id="claimant_age" name="claimant_age" value="<?= val('claimant_age') ?>" required min="0" max="120" inputmode="numeric" placeholder="Age"<?= invalid('claimant_age') ?>>
-                        <?= own_age_hint($prefill, 'claimant_age') ?>
-                        <?= error_for('claimant_age') ?>
+                        <label for="claimant_birthdate">Claimant's birthdate <span class="req">*</span></label>
+                        <input type="date" id="claimant_birthdate" name="claimant_birthdate" value="<?= val('claimant_birthdate') ?>" required max="<?= date('Y-m-d') ?>"<?= invalid('claimant_birthdate') ?>>
+                        <p class="field-help">The claimant must be at least 18 on the application date.</p>
+                        <?= error_for('claimant_birthdate') ?>
                     </div>
                     <div class="field span-2">
                         <label>Sex <span class="req">*</span></label>

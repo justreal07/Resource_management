@@ -1,9 +1,9 @@
 <?php
-// Medical re-application: an admin allows (or doesn't allow) a patient who already received Medical
+// Medical re-application: an admin allows (or doesn't allow) a patient already approved for Medical
 // Assistance to file one new Medical application (the rule is in user/person_rules.php).
 // Posted from the patient's approved Medical record (ui_medical_reapply_panel in admin_components.php).
 // Fields: applicant_id (the approved Medical application the admin reviewed), decision (allow | deny),
-// remarks (required), valid_until (optional, allow only), decision_token, return.
+// remarks (required), eligible_from (required for allow), valid_until (optional), expected_decision_id, decision_token, return.
 // Saved by decideMedicalReapply(): one new row in the permanent log (the database trigger repeats the admin check).
 require_once '../config.php';
 require_once '../includes/application_decision.php';
@@ -38,10 +38,12 @@ if (!decision_csrf_ok()) {
         try {
             decideMedicalReapply($pdo, $user['id'], $id, $decision === 'allow',
                 is_string($_POST['remarks'] ?? null) ? $_POST['remarks'] : '',
-                is_string($_POST['valid_until'] ?? null) ? $_POST['valid_until'] : null);
+                is_string($_POST['valid_until'] ?? null) ? $_POST['valid_until'] : null,
+                is_string($_POST['eligible_from'] ?? null) ? $_POST['eligible_from'] : null,
+                isset($_POST['expected_decision_id']) ? (int)$_POST['expected_decision_id'] : -1);
             $_SESSION['success_message'] = $decision === 'allow'
-                ? 'The patient may now file one new Medical application.'
-                : 'Saved. The patient can\'t file a new Medical application unless an admin allows it later.';
+                ? 'Permission saved. The patient may file one new Medical application starting ' . $_POST['eligible_from'] . '.'
+                : 'Saved. Early permission was withdrawn. The normal three-month waiting period still applies.';
             header('Location: ' . $back);
             exit();
         } catch (DomainException $e) {

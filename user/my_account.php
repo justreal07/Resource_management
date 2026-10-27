@@ -159,7 +159,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('error', 'Your new password must be different from your current password.');
         } else {
             // must_change_password: set when the office gave a temporary password (includes/password_reset.php)
-            $pdo->prepare("UPDATE applicant_accounts SET password = ?, must_change_password = 0 WHERE id = ?")->execute([password_hash($new, PASSWORD_DEFAULT), $account_id]);
+            $newHash = password_hash($new, PASSWORD_DEFAULT);
+            $pdo->prepare("UPDATE applicant_accounts SET password = ?, must_change_password = 0 WHERE id = ?")->execute([$newHash, $account_id]);
+            $_SESSION['applicant']['pwv'] = hash('sha256', $newHash);
             session_regenerate_id(true);
             flash('success', 'Your password was changed.');
         }
@@ -282,7 +284,7 @@ account_page_start($ctx, 'My Account', 'account', [
                 <?php elseif ($p['pending']): ?>
                     <p class="acc-state info"><i class="fas fa-hourglass-half"></i> <?= $p['pending'] ?> pending application<?= $p['pending'] > 1 ? 's' : '' ?></p>
                 <?php else: ?>
-                    <p class="acc-state ok"><i class="fas fa-check-circle"></i> You can apply now</p>
+                    <p class="acc-state ok"><i class="fas fa-check-circle"></i> <?= (int)$p['type_id'] === 1 ? 'Open your Medical record for your next date and permission status' : 'You can start a form; eligibility is checked for the patient' ?></p>
                 <?php endif; ?>
             </div>
             <?php if ($ok): ?>

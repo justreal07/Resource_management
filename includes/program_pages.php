@@ -28,7 +28,7 @@ function program_texts(int $typeId): array
             'all_label' => 'Medical applications', 'all_empty' => ['No Medical applications yet', 'Applications filed online or added as walk-ins will be listed here.'],
             'pending_head' => 'Medical applications to review', 'pending_sub' => 'Pending applications, newest first. Open Review to see the photos and details, then approve or decline there.',
             'pending_empty' => ['No Medical applications to review', 'New applications will appear here.'],
-            'approved_head' => 'Approved Medical applications', 'approved_sub' => 'Approved applications and the amount given, newest first.',
+            'approved_head' => 'Approved Medical applications', 'approved_sub' => 'Approved applications and approved amounts, newest first.',
             'approved_empty' => ['No approved Medical applications yet', 'Applications you approve will be listed here.'],
             'declined_head' => 'Declined Medical applications', 'declined_who' => 'Only administrators and Medical & Burial staff can see declined Medical applications.',
             'withdrawn_head' => 'Withdrawn Medical applications',
@@ -42,7 +42,7 @@ function program_texts(int $typeId): array
             'all_label' => 'Burial applications', 'all_empty' => ['No Burial applications yet', 'Applications filed online or added as walk-ins will be listed here.'],
             'pending_head' => 'Burial applications to review', 'pending_sub' => 'Pending applications, newest first. Open Review to see the photos and details, then approve or decline there.',
             'pending_empty' => ['No Burial applications to review', 'New applications will appear here.'],
-            'approved_head' => 'Approved Burial applications', 'approved_sub' => 'Approved applications and the amount given, newest first.',
+            'approved_head' => 'Approved Burial applications', 'approved_sub' => 'Approved applications and approved amounts, newest first.',
             'approved_empty' => ['No approved Burial applications yet', 'Applications you approve will be listed here.'],
             'declined_head' => 'Declined Burial applications', 'declined_who' => 'Only administrators and Medical & Burial staff can see declined Burial applications.',
             'withdrawn_head' => 'Withdrawn Burial applications',
@@ -136,11 +136,11 @@ function program_columns(int $typeId, string $page): array
             $address, $contact,
         ]));
     }
-    // approved: Medical and Burial show what was given; OPD (a vehicle schedule) nothing
+    // approved: Medical and Burial show approved amounts; OPD (a vehicle schedule) nothing
     return array_values(array_filter($typeId === 3
         ? [$person, $filed, $address, $contact]
         : [$person, $typeId === 2 ? $deceased : null,
-           ['label' => 'Amount given', 'type' => 'amount', 'key' => 'amount'],
+           ['label' => 'Approved amount', 'type' => 'amount', 'key' => 'amount', 'trim_zero_decimals' => true],
            ['label' => 'Date approved', 'type' => 'datetime', 'value' => function ($r) { return $r['approved_at'] ?? $r['created_at']; }],
            $address, $contact]));
 }
@@ -162,7 +162,7 @@ function program_rows(int $typeId, string $page): array
         // the check-up date is the OPD trip day; encoded_by is who keyed in a walk-in (NULL for an online application)
         $source = ui_source_query();
         $sourceSql = $source === 'online' ? ' AND a.account_id IS NOT NULL' : ($source === 'walkin' ? ' AND a.account_id IS NULL' : '');
-        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at, a.status, a.edited_at, a.edit_count,
+        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at, a.status, a.updated_at, a.edited_at, a.edit_count,
                                       " . ($typeId === 2 ? 'a.petitioner_name,' : '') . ($typeId === 3 ? 'a.checkup_date,' : '') . "
                                       a.account_id, acc.email AS account_email,
                                       COALESCE(NULLIF(TRIM(u.full_name), ''), u.username) AS encoded_by_name
@@ -279,7 +279,8 @@ function program_list_page(int $typeId, string $page): void
     }
     echo '<section class="panel" aria-label="' . ui_e($label) . '">' . ui_table($rows, program_columns($typeId, $page), $options);
     if ($page === 'approved' && $t['gives_money'] && $rows) {
-        echo '<p class="panel-note"><strong>Total given:</strong> ' . ui_e(ui_peso(array_sum(array_column($rows, 'amount')))) . '</p>';
+        $totalGiven = round(array_sum(array_column($rows, 'amount')), 2);
+        echo '<p class="panel-note"><strong>Total given:</strong> ' . ui_e(ui_peso($totalGiven, $totalGiven === floor($totalGiven) ? 0 : 2)) . '</p>';
     }
     echo '</section>';
     admin_layout_end();
@@ -386,6 +387,9 @@ function program_view_page(int $typeId): void
     // that may actually decide this program (OPD staff; never Medical & Burial staff, who only encode and view).
     if ($staff && !in_array($applicant['status'], ['Disapproved', 'Withdrawn'], true) && decision_can(decision_user(), $typeId)) {
         echo '<div class="page-actions">' . ui_staff_update_link($typeId, $applicant) . '</div>';
+    }
+    if (!$staff && in_array($typeId, [1, 2], true) && $applicant['status'] === 'Approved') {
+        echo '<div class="page-actions"><a class="btn btn-primary" href="../Main_dashboard/release_assistance?id=' . $id . '">Record or view payment</a></div>';
     }
     echo ui_applicant_record($applicant, $documents, $backHref, $backLabel);
     admin_layout_end();

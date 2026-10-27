@@ -11,7 +11,7 @@
  *
  *   "Used" = the amounts of Approved applications of that year, counted by the day they were approved (approved_at; an older
  *   record without one counts by its filing date). It is the amount typed in the Approve dialog, so it is what the office
- *   promised, the same figure the Reports page calls "released".
+ *   promised, the same figure the Reports page calls "approved".
  *
  *   Approving is checked on the SERVER, inside decide_application() (application_decision.php), under a lock per program so two
  *   admins approving at the same moment cannot both fit in the last pesos:
@@ -19,7 +19,7 @@
  *     - the approval fits: it goes through; at BUDGET_WARN_PERCENT or more the admin is told how much is left;
  *     - it would go over the budget: it needs a written reason, which is saved in budget_overrides with the approval.
  *       It is a warning with a paper trail, not a wall: medical and burial aid is often urgent and the office may still decide to pay.
- *   If the budget tables cannot be read, approving still works (the problem is logged): a budget fault must not stop urgent aid.
+ *   If the budget tables cannot be read, an approval or amount correction is held until the office can check the budget.
  *
  * Tables are created by budget_ensure() the first time a page needs them (database/migrations/migration_budget.sql is the same).
  * This file only has functions; the Budget page is Main_dashboard/budget.php.
@@ -144,7 +144,7 @@ function budget_replay(array $rows): array
  *
  * @return array<int, array{type: int, year: int, budget: ?float, used: float, remaining: ?float, percent: float, state: string}>
  */
-function budget_statuses(PDO $pdo, int $year): array
+function budget_statuses(PDO $pdo, int $year, bool $strict = false): array
 {
     $out = [];
     foreach (budget_types() as $id) {
@@ -163,6 +163,7 @@ function budget_statuses(PDO $pdo, int $year): array
         $used = $used->fetchAll(PDO::FETCH_KEY_PAIR);
     } catch (Throwable $e) {
         error_log('budget_statuses: ' . $e->getMessage());
+        if ($strict) throw $e;
         return $out;
     }
     foreach (budget_types() as $id) {
@@ -178,9 +179,9 @@ function budget_statuses(PDO $pdo, int $year): array
     return $out;
 }
 
-function budget_status(PDO $pdo, int $year, int $typeId): array
+function budget_status(PDO $pdo, int $year, int $typeId, bool $strict = false): array
 {
-    return budget_statuses($pdo, $year)[$typeId] ?? ['type' => $typeId, 'year' => $year, 'budget' => null, 'used' => 0.0, 'remaining' => null, 'percent' => 0.0, 'state' => 'none'];
+    return budget_statuses($pdo, $year, $strict)[$typeId] ?? ['type' => $typeId, 'year' => $year, 'budget' => null, 'used' => 0.0, 'remaining' => null, 'percent' => 0.0, 'state' => 'none'];
 }
 
 /**
@@ -189,7 +190,7 @@ function budget_status(PDO $pdo, int $year, int $typeId): array
  */
 function budget_check_approval(PDO $pdo, int $year, int $typeId, float $amount): array
 {
-    $before = budget_status($pdo, $year, $typeId);
+    $before = budget_status($pdo, $year, $typeId, true);
     $after = round($before['used'] + $amount, 2);
     $over = $before['budget'] !== null && $after > $before['budget'] + 0.004;
     return ['over' => $over, 'over_by' => $over ? round($after - $before['budget'], 2) : 0.0, 'before' => $before, 'used_after' => $after];
@@ -214,6 +215,31 @@ function budget_release_lock(PDO $pdo, int $typeId): void
         $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([budget_lock_name($typeId)]);
     } catch (Throwable $e) {
         error_log('budget_release_lock: ' . $e->getMessage());
+    }
+}
+
+/** Audit approved amount corrections separately from the original approval. Call before opening a transaction. */
+function budget_corrections_ensure(PDO $pdo): bool
+{
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS budget_amount_corrections (
+            id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            application_id INT NOT NULL,
+            budget_year SMALLINT UNSIGNED NOT NULL,
+            assistance_type_id INT NOT NULL,
+            old_amount DECIMAL(12,2) NOT NULL,
+            new_amount DECIMAL(12,2) NOT NULL,
+            over_by DECIMAL(12,2) NOT NULL DEFAULT 0,
+            reason VARCHAR(500) NULL,
+            changed_by INT NOT NULL,
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            KEY idx_correction_app (application_id),
+            KEY idx_correction_year (budget_year, assistance_type_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+        return true;
+    } catch (Throwable $e) {
+        error_log('budget_corrections_ensure: ' . $e->getMessage());
+        return false;
     }
 }
 

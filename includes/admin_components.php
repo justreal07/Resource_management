@@ -512,7 +512,8 @@ function ui_table(array $rows, array $columns, array $opts = []): string
                     $sortKey = $value ? date('Y-m-d H:i:s', strtotime($value)) : '';
                     break;
                 case 'amount':
-                    $content = $value !== null && (float)$value > 0 ? ui_e(ui_peso($value))
+                    $decimals = !empty($c['trim_zero_decimals']) && (float)$value === floor((float)$value) ? 0 : 2;
+                    $content = $value !== null && (float)$value > 0 ? ui_e(ui_peso($value, $decimals))
                         : '<span class="muted" aria-hidden="true">—</span><span class="visually-hidden">No amount</span>';
                     $sortKey = (string)(float)$value;
                     break;
@@ -637,7 +638,7 @@ function ui_approve_button(array $row, string $action, int $typeId, array $opts 
     }
     return '<button type="button" class="' . ui_e($opts['class'] ?? 'btn btn-primary btn-sm') . '" data-approve-open="' . $id . '" data-action="' . ui_e($action) . '"'
         . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . $id . '"'
-        . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '"' . ($walkIn ? ' data-walkin' : '') . $schedule . '>'
+        . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '" data-version="' . ui_e((string)($row['updated_at'] ?? '')) . '"' . ($walkIn ? ' data-walkin' : '') . $schedule . '>'
         . ui_icon('check-circle') . 'Approve' . (isset($opts['hint']) ? ' <kbd>' . ui_e($opts['hint']) . '</kbd>' : '') . '</button>';
 }
 
@@ -673,8 +674,10 @@ function ui_claim_fields(int $typeId, string $idPrefix, bool $required = true, a
         $html = '<div class="form-grid">'
             . '<div class="field"><label for="' . $f('amount') . '">Approved amount ' . $req . '</label>'
             . '<div class="amount-box"><span aria-hidden="true">₱</span><input type="number" id="' . $f('amount') . '" name="amount" class="amount-input"'
-            . ' min="0.01" max="99999999.99" step="0.01" inputmode="decimal" placeholder="0.00"' . $r . ' aria-describedby="' . $f('amountHelp') . '" data-claim="amount"></div>'
-            . '<p class="field-help" id="' . $f('amountHelp') . '">Saved with the application. It is not put in the email.</p></div>'
+            . ' min="1" max="99999999" step="1" inputmode="numeric" placeholder="0"' . $r . ' aria-describedby="' . $f('amountHelp') . '" data-claim="amount">'
+            . '<span class="amount-steps"><button type="button" data-amount-step="100" aria-label="Increase approved amount by 100 pesos">▲</button>'
+            . '<button type="button" data-amount-step="-100" aria-label="Decrease approved amount by 100 pesos">▼</button></span></div>'
+            . '<p class="field-help" id="' . $f('amountHelp') . '">Whole pesos only. Use the arrows to change the amount by ₱100. It is not put in the email.</p></div>'
             . $place('Where to claim', 'Office and building', 'Enter where the applicant will claim the assistance.')
             . '<div class="field"><label for="' . $f('date') . '">Date ' . $req . '</label>'
             . '<input type="date" id="' . $f('date') . '" name="claim_date" min="' . date('Y-m-d') . '"' . $r
@@ -730,6 +733,7 @@ function ui_approve_dialog(int $typeId, string $return = ''): string
         . '<form method="POST" novalidate data-approve-dialog-form data-claim-type="' . $typeId . '">'
         . decision_csrf_field() . '<input type="hidden" name="return" value="' . ui_e($return !== '' ? $return : ui_current_page()) . '">'
         . '<input type="hidden" name="applicant_id" data-approve-id>'
+        . '<input type="hidden" name="expected_version" data-approve-version>'
         . '<div class="modal-header"><h2 id="approveTitle">Approve the ' . ($typeId === 3 ? 'OPD request' : 'application') . ' of <span data-approve-name></span></h2>'
         . '<button type="button" class="icon-btn" data-dialog-close>' . ui_icon('x') . '<span class="visually-hidden">Close</span></button></div>'
         . '<div class="modal-body">'
@@ -760,26 +764,30 @@ function ui_disapprove_button(array $row, int $typeId, array $opts = []): string
     $walkIn = array_key_exists('account_id', $row) && $row['account_id'] === null;
     return '<button type="button" class="' . ui_e($opts['class'] ?? 'btn btn-danger btn-sm') . '" data-disapprove="' . (int)$row['id'] . '"'
         . ' data-name="' . ui_e(ui_person_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '"'
-        . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '"' . ($walkIn ? ' data-walkin' : '') . '>'
+        . ' data-email="' . ui_e(trim((string)($row['account_email'] ?? ''))) . '" data-version="' . ui_e((string)($row['updated_at'] ?? '')) . '"' . ($walkIn ? ' data-walkin' : '') . '>'
         . ui_icon('x-circle') . 'Decline'
         . (isset($opts['hint']) ? ' <kbd>' . ui_e($opts['hint']) . '</kbd>' : '') . '</button>';
 }
 
 /**
- * The reasons to choose from when disapproving (DISAPPROVAL_REASONS): tick boxes, as many as apply. The dialog adds a box
- * for a written reason, the Update page uses its Remarks box for it. At least one of the two is needed (checked in
+ * The reasons to choose from when disapproving (DISAPPROVAL_REASONS): tick boxes, as many as apply. Choosing Other reason
+ * reveals a required explanation (the Update page uses its Remarks box). At least one reason is needed (checked in
  * admin_ui.js and again by decide_application()). $attrs: extra attributes on the group (the Update page hides it
  * until Disapprove is chosen).
  */
 function ui_disapprove_reasons(string $idPrefix, string $attrs = ''): string
 {
-    $html = '<div class="field reason-group" role="group" aria-labelledby="' . $idPrefix . 'ReasonLabel" ' . $attrs . '>'
-        . '<span class="label" id="' . $idPrefix . 'ReasonLabel">Reason <span class="req" aria-hidden="true">*</span> <span class="muted">(choose all that apply)</span></span>'
+    $html = '<details class="field reason-group" data-reason-details ' . $attrs . '>'
+        . '<summary class="reason-summary" id="' . $idPrefix . 'ReasonLabel" data-reason-toggle>'
+        . '<span>Reason <span class="req" aria-hidden="true">*</span> <span class="muted">(choose all that apply)</span></span>'
+        . '<span class="reason-count" data-reason-count hidden></span></summary>'
         . '<div class="reason-list">';
     foreach (DISAPPROVAL_REASONS as $key => $sentence) {
         $html .= '<label class="choice"><input type="checkbox" name="disapproval_reasons[]" value="' . ui_e($key) . '" data-reason><span>' . ui_e($sentence) . '</span></label>';
     }
-    return $html . '</div><p class="field-error" tabindex="-1" data-reason-error hidden></p></div>';
+    $html .= '<label class="choice"><input type="checkbox" name="disapproval_reasons[]" value="other" data-reason data-reason-other'
+        . ' aria-controls="' . $idPrefix . 'OtherReason" aria-expanded="false"><span>Other reason</span></label>';
+    return $html . '</div><p class="field-error" tabindex="-1" data-reason-error hidden></p></details>';
 }
 
 /**
@@ -798,10 +806,11 @@ function ui_disapprove_dialog(string $return = ''): string
         . '<dl class="confirm-subject"><div><dt>Name</dt><dd data-disapprove-name></dd></div><div><dt>Reference</dt><dd data-disapprove-ref></dd></div>'
         . '<div><dt>Email to</dt><dd data-disapprove-email></dd></div></dl>'
         . '<input type="hidden" name="applicant_id" data-disapprove-id>'
+        . '<input type="hidden" name="expected_version" data-disapprove-version>'
         . ui_disapprove_reasons('disapprove')
-        . '<div class="field"><label for="disapprovalRemarks">Other reason <span class="muted">(write it here)</span></label>'
-        . '<textarea id="disapprovalRemarks" name="disapproval_remarks" rows="3" maxlength="' . DISAPPROVAL_REMARKS_MAX . '" aria-describedby="disapprovalRemarksHelp"></textarea>'
-        . '<p class="field-help" id="disapprovalRemarksHelp" data-disapprove-help>The applicant is emailed the reasons you choose and anything you write here, so they know what to fix before applying again.</p></div>'
+        . '<div class="field" id="disapproveOtherReason" hidden><label for="disapprovalRemarks">Explain the other reason <span class="req" aria-hidden="true">*</span></label>'
+        . '<textarea id="disapprovalRemarks" name="disapproval_remarks" rows="3" maxlength="' . DISAPPROVAL_REMARKS_MAX . '" aria-describedby="disapprovalRemarksHelp" placeholder="Write your explanation for the applicant" disabled></textarea></div>'
+        . '<p class="field-help" id="disapprovalRemarksHelp" data-disapprove-help>The applicant is emailed the reasons you choose and any explanation you provide, so they know what to fix before applying again.</p>'
         . '</div>'
         . '<div class="modal-footer"><span class="modal-footer-space"></span>'
         . '<button type="button" class="btn btn-secondary" data-dialog-close>Cancel</button>'
@@ -1284,7 +1293,14 @@ function ui_record_cards(array $a): array
     if ($a['status'] === 'Approved') {
         if ($has('approved_at')) $app[] = ui_detail('Date approved', ui_date($a['approved_at'], 'F j, Y, g:i A'));
         if ($has('approved_by')) $app[] = ui_detail_user('Approved by', (int)$a['approved_by']);
-        if ($has('amount') && (float)$a['amount'] > 0) $app[] = ui_detail('Amount released', ui_peso($a['amount']));
+        if ($has('amount') && (float)$a['amount'] > 0) $app[] = ui_detail('Approved amount', ui_peso($a['amount']));
+        if (in_array($type, [1, 2], true)) {
+            require_once __DIR__ . '/assistance_release.php';
+            $payment = assistance_release_for($GLOBALS['pdo'], (int)$a['id']);
+            $app[] = ui_detail('Payment', $payment
+                ? 'Recorded ' . ui_date($payment['released_on']) . ' · ' . ui_peso($payment['amount']) . ' · Ref ' . $payment['receipt_ref']
+                : 'No payment recorded');
+        }
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date
         // Approval details typed when approving, the same ones the approval email gave
         // (OPD: the trip is on the patient's check-up date; no pick-up point or departure time is kept any more)
@@ -1332,6 +1348,7 @@ function ui_record_cards(array $a): array
             ui_detail('Full name', ui_full_name($a)),
             ui_detail('Sex', $a['sex'] ?? ''),
             ui_detail('Age', $a['claimant_age'] ?? ''),
+            ui_detail('Claimant birthdate', ui_date($a['claimant_birthdate'] ?? '', 'F j, Y')),
             ui_detail('Relationship to the deceased', $a['relationship'] ?? ''),
         ]);
         $deceased = [ui_detail('Full name of the deceased', $a['petitioner_name'] ?? '')];
@@ -1353,6 +1370,7 @@ function ui_record_cards(array $a): array
             ui_detail('Check-up date', ui_date($a['checkup_date'] ?? '', 'F j, Y')),
             ui_detail('Reason for check-up', $a['checkup_reason'] ?? '', true),
             ui_detail('Accompanied by', ui_opd_companion($a)),   // optional: "No companion" when the patient goes alone
+            ui_detail('Guardian or companion birthdate', ui_date($a['claimant_birthdate'] ?? '', 'F j, Y')),
             ui_detail('Wheelchair', $a['wheelchair'] ?? 'No'),
             ui_detail('Stretcher', $a['stretcher'] ?? 'No'),
         ]);
@@ -1375,6 +1393,7 @@ function ui_record_cards(array $a): array
             $who[] = ui_detail_card('Claimant (person applying)', 'user-plus', [
                 ui_detail('Full name', $a['petitioner_name'] ?? ''),
                 ui_detail('Age', $a['claimant_age'] ?? ''),
+                ui_detail('Claimant birthdate', ui_date($a['claimant_birthdate'] ?? '', 'F j, Y')),
                 ui_detail('Relationship to the patient', $a['relationship'] ?? ''),
             ]);
         }
@@ -1461,14 +1480,14 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
 function ui_medical_reapply_panel(array $a): string
 {
     global $pdo;
+    require_once __DIR__ . '/medical_reapply.php';
     if ((int)$a['assistance_type_id'] !== 1 || empty($a['beneficiary_id']) || (decision_user()['role'] ?? '') !== 'admin'
         || !decision_person_rules_installed($pdo)) {
         return '';   // OPD/Burial, an application filed before patients were tracked, or not an admin
     }
 
     $head = '<section class="panel" aria-labelledby="reapplyTitle"><div class="panel-head"><h3 id="reapplyTitle">Applying again for Medical Assistance</h3>'
-        . '<p class="panel-sub">A patient who already received Medical Assistance needs your permission to file a new Medical application. '
-        . 'A permission is good for one new application.</p></div>';
+        . '<p class="panel-sub">The patient may apply again three calendar months after the last approval. You may allow one earlier application with a dated exception and a reason. New applications still require review and approval.</p></div>';
     try {
         $stmt = $pdo->prepare("SELECT d.*, COALESCE(NULLIF(TRIM(u.full_name), ''), u.username) AS decided_by_name
                                FROM medical_reapply_decisions d LEFT JOIN users u ON u.id = d.decided_by
@@ -1478,32 +1497,22 @@ function ui_medical_reapply_panel(array $a): string
         $stmt = $pdo->prepare('SELECT is_deceased FROM beneficiaries WHERE id = ?');
         $stmt->execute([(int)$a['beneficiary_id']]);
         $deceased = (int)$stmt->fetchColumn() === 1;
+        $eligibility = medical_reapply_status($pdo, [(int)$a['beneficiary_id']]);
+        $defaultDate = medical_reapply_default($pdo, (int)$a['id']);
     } catch (PDOException $e) {
         error_log('ui_medical_reapply_panel #' . (int)$a['id'] . ': ' . $e->getMessage());
         return $head . ui_state('alert', 'Could not load the permissions for this patient.', 'Reload the page in a moment.', '', 'state-error') . '</section>';
     }
 
-    // Where things stand: the latest decision counts (same rule as checkPersonConflict())
+    // Shared patient eligibility includes the normal wait and any early exception.
     $today = date('Y-m-d');
     $last = $log[0] ?? null;
-    $active = $last && (int)$last['reapply_allowed'] === 1 && $last['consumed_at'] === null
+    $active = $last && !empty($last['eligible_from']) && (int)$last['reapply_allowed'] === 1 && $last['consumed_at'] === null
         && ($last['valid_until'] === null || $last['valid_until'] >= $today);
-    if ($deceased) {
-        $state = 'This patient is recorded as deceased, so no new Medical application can be filed.';
-    } elseif (!$last) {
-        $state = 'No decision yet. The patient can\'t file a new Medical application until you allow it.';
-    } elseif ($active) {
-        $state = 'Allowed on ' . ui_date($last['decided_at']) . ' by ' . ($last['decided_by_name'] ?: 'an admin')
-            . ($last['valid_until'] !== null ? ', until ' . ui_date($last['valid_until']) : '') . '. Not used yet: the patient may file one new Medical application.';
-    } elseif ((int)$last['reapply_allowed'] === 1 && $last['consumed_at'] !== null) {
-        $state = 'The last permission was used by Medical application Ref #' . (int)$last['consumed_by_application_id']
-            . ' on ' . ui_date($last['consumed_at']) . '. Another new application needs a new permission.';
-    } elseif ((int)$last['reapply_allowed'] === 1) {
-        $state = 'The last permission ended on ' . ui_date($last['valid_until']) . ' without being used.';
-    } else {
-        $state = 'Not allowed on ' . ui_date($last['decided_at']) . ' by ' . ($last['decided_by_name'] ?: 'an admin') . '.';
-    }
+    $state = $deceased ? 'This patient is recorded as deceased, so no new Medical application can be filed.' : $eligibility['message'];
     $html = $head . '<p class="alert alert-info" role="note">' . ui_icon('info', 'alert-icon') . '<span class="alert-body">' . ui_e($state) . '</span></p>';
+    $html .= '<p>' . ($defaultDate !== null ? 'Default date from approval: ' . ui_e(ui_date($defaultDate))
+        : 'No verified approval date is recorded. Verify the original approval date or explain a dated exception.') . '</p>';
 
     // The decision is made from an approved application (that is what the rule is about)
     if ($a['status'] === 'Approved' && !$deceased) {
@@ -1513,30 +1522,33 @@ function ui_medical_reapply_panel(array $a): string
             . decision_csrf_field()
             . '<input type="hidden" name="return" value="' . ui_e($return) . '">'
             . '<input type="hidden" name="applicant_id" value="' . (int)$a['id'] . '">'
+            . '<input type="hidden" name="expected_decision_id" value="' . (int)($last['id'] ?? 0) . '">'
             . '<div class="form-grid-2">'
+            . '<div class="field"><label for="reapplyFrom">Can apply again starting on</label>'
+            . '<input type="date" id="reapplyFrom" name="eligible_from" value="' . ui_e((string)($active ? $last['eligible_from'] : ($defaultDate ?? ''))) . '">'
+            . '<p class="field-help">Choose the start date for an early exception and explain the reason below. Normal eligibility resumes three months after approval.</p></div>'
             . '<div class="field"><label for="reapplyRemarks">Reason <span class="req" aria-hidden="true">*</span></label>'
             . '<textarea id="reapplyRemarks" name="remarks" rows="2" maxlength="500" required aria-describedby="reapplyRemarksHelp"></textarea>'
             . '<p class="field-help" id="reapplyRemarksHelp">Kept in a permanent log with your name. It can\'t be edited later.</p></div>'
-            . ($active ? '' : '<div class="field"><label for="reapplyUntil">Allowed until <span class="muted">(optional)</span></label>'
-                . '<input type="date" id="reapplyUntil" name="valid_until" min="' . $today . '" aria-describedby="reapplyUntilHelp">'
-                . '<p class="field-help" id="reapplyUntilHelp">Leave empty for no end date. Only used when you allow it.</p></div>')
+            . '<div class="field"><label for="reapplyUntil">Permission expires on <span class="muted">(optional)</span></label>'
+                . '<input type="date" id="reapplyUntil" name="valid_until" min="' . $today . '" value="' . ui_e((string)($active ? $last['valid_until'] : '')) . '" aria-describedby="reapplyUntilHelp">'
+                . '<p class="field-help" id="reapplyUntilHelp">Leave empty for no expiry. This must be on or after the start date.</p></div>'
             . '</div><div class="form-actions">'
-            . ($active
-                ? '<button type="submit" name="decision" value="deny" class="btn btn-secondary">' . ui_icon('x-circle') . 'Withdraw the permission</button>'
-                : '<button type="submit" name="decision" value="deny" class="btn btn-secondary">' . ui_icon('x-circle') . 'Don\'t allow</button>'
-                  . '<button type="submit" name="decision" value="allow" class="btn btn-primary">' . ui_icon('check-circle') . 'Allow a new application</button>')
+            . '<button type="submit" name="decision" value="deny" class="btn btn-secondary">' . ui_icon('x-circle') . 'Deny / withdraw early permission</button>'
+            . '<button type="submit" name="decision" value="allow" class="btn btn-primary">' . ui_icon('check-circle') . ($active ? 'Save adjusted dates' : 'Allow from this date') . '</button>'
             . '</div></form>';
     }
 
     if ($log) {
         $html .= '<div class="table-wrap"><table class="data-table"><caption class="visually-hidden">Earlier decisions for this patient</caption><thead><tr>'
-            . '<th scope="col">Decided</th><th scope="col">Decision</th><th scope="col">By</th><th scope="col">Reason</th><th scope="col">Until</th><th scope="col">Used by</th></tr></thead><tbody>';
+            . '<th scope="col">Decided</th><th scope="col">Decision</th><th scope="col">By</th><th scope="col">Reason</th><th scope="col">Start / previous / default</th><th scope="col">Expiry</th><th scope="col">Used by</th></tr></thead><tbody>';
         foreach ($log as $d) {
             $used = $d['consumed_by_application_id'] !== null ? 'Ref #' . (int)$d['consumed_by_application_id'] : ((int)$d['reapply_allowed'] === 1 ? 'Not used' : '');
             $html .= '<tr><td data-label="Decided">' . ui_e(ui_date($d['decided_at'], 'M j, Y, g:i A')) . '</td>'
                 . '<td data-label="Decision">' . ((int)$d['reapply_allowed'] === 1 ? 'Allowed' : 'Not allowed') . '</td>'
                 . '<td data-label="By">' . ui_e($d['decided_by_name'] ?: 'User #' . (int)$d['decided_by']) . '</td>'
                 . '<td data-label="Reason">' . ui_e($d['remarks']) . '</td>'
+                . '<td data-label="Start / previous / default">' . ui_e(($d['eligible_from'] ?? 'Not set') . ' / ' . ($d['previous_eligible_from'] ?? 'Not set') . ' / ' . ($d['default_eligible_from'] ?? 'No approval date')) . '</td>'
                 . '<td data-label="Until">' . ((int)$d['reapply_allowed'] !== 1 ? ''
                     : ($d['valid_until'] !== null ? ui_e(ui_date($d['valid_until'])) : '<span class="muted">No end date</span>')) . '</td>'
                 . '<td data-label="Used by">' . ui_e($used) . '</td></tr>';
@@ -1571,7 +1583,8 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
     $html .= '<form class="panel form-card" method="POST" data-status-form data-current="' . ui_e($row['status']) . '"'
         . ' data-name="' . ui_e(ui_full_name($row)) . '" data-ref="Ref #' . (int)$row['id'] . '">'
         . decision_csrf_field()
-        . '<input type="hidden" name="expected_status" value="' . ui_e($row['status']) . '">';
+        . '<input type="hidden" name="expected_status" value="' . ui_e($row['status']) . '">'
+        . '<input type="hidden" name="expected_version" value="' . ui_e((string)($row['updated_at'] ?? '')) . '">';
 
     if ($pending) {
         $choices = ['Pending' => 'Keep pending', 'Approved' => 'Approve', 'Disapproved' => 'Decline'];
@@ -1599,7 +1612,7 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
             . ($row['status'] === 'Approved' ? 'approved' : 'processed') . '. Only the remarks can be changed.</span></p>';
     }
 
-    $html .= '<div class="field"><label for="remarks" data-remarks-label>Remarks <span class="muted">(optional)</span></label>'
+    $html .= '<div class="field" id="updateOtherReason"><label for="remarks" data-remarks-label>Remarks <span class="muted">(optional)</span></label>'
         . '<textarea name="remarks" id="remarks" rows="4" maxlength="5000" aria-describedby="remarksHelp" placeholder="Notes about this application">'
         . ui_e($row['remarks'] ?? '') . '</textarea>'
         // The applicant sees these remarks on their application and in the "approved" notification (user/view_application.php)

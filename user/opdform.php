@@ -39,9 +39,15 @@ $fields = [
     'checkup_date'    => true,
     'petitioner_name' => false,   // the companion: optional, the patient may go alone (opd_companion_errors())
     'relationship'    => false,
+    'claimant_birthdate' => false,
 ];
 
-$errors = [];
+$errors = $_SESSION['opd_claimant_errors'] ?? [];
+unset($_SESSION['opd_claimant_errors']);
+if (!empty($_SESSION['opd_stale_error'])) {
+    $errors['checkup_date'] = (string)$_SESSION['opd_stale_error'];
+    unset($_SESSION['opd_stale_error']);
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $reason_error = resolve_choice_post('checkup_reason', OPD_REASONS, $fields['checkup_reason']);
@@ -51,6 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $can_apply) {
     $values['stretcher']  = isset($_POST['stretcher']) ? 'Yes' : 'No';
     $errors = validate_application($values, array_keys(array_filter($fields)));
     $errors += opd_companion_errors($values);
+    $filedOn = $edit !== null ? substr((string)$edit['created_at'], 0, 10) : '';
+    $values = application_claimant_values($form_key, $values, $filedOn);
+    $errors += application_claimant_errors($form_key, $values, $filedOn);
     if ($reason_error) $errors['checkup_reason'] = $reason_error;
     $prefill = ['source' => 'post', 'own' => get_form_prefill($pdo, (int)$account_id, $form_key)['own']];   // the applicant's own age/birthdate, for the hints and the script
 
@@ -116,7 +125,7 @@ apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : 
             <?php render_prefill_notice($prefill, $program); ?>
         <?php endif; ?>
 
-        <form method="post" class="ap-card ap-form-card" id="applicationForm"
+        <form method="post" class="ap-card ap-form-card" id="applicationForm" data-filing-date="<?= e($edit !== null ? substr($edit['created_at'], 0, 10) : date('Y-m-d')) ?>"
               data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
             <?php if ($edit !== null) render_edit_fields($edit); ?>
             <div class="ap-form-top">
@@ -227,9 +236,14 @@ apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : 
 
             <!-- 4. Companion (optional: both empty = the patient goes alone; js/apply-form.js asks for both once one is filled in) -->
             <fieldset class="ap-section" data-all-or-none>
-                <legend><span class="ap-section-num">4</span> Companion <span class="optional">(optional)</span></legend>
-                <p class="ap-section-hint">Is someone going with the patient on the check-up day? Fill in their name and relationship. If the patient is going alone, leave this empty.</p>
+                <legend><span class="ap-section-num">4</span> Adult guardian or companion</legend>
+                <p class="ap-section-hint">Required for patients under 18. Adult patients may leave all companion fields empty. A named companion must be at least 18.</p>
                 <div class="ap-grid">
+                    <div class="field span-2">
+                        <label for="claimant_birthdate">Guardian or companion birthdate</label>
+                        <input type="date" id="claimant_birthdate" name="claimant_birthdate" value="<?= val('claimant_birthdate') ?>" max="<?= date('Y-m-d') ?>"<?= invalid('claimant_birthdate') ?>>
+                        <?= error_for('claimant_birthdate') ?>
+                    </div>
                     <div class="field span-4">
                         <label for="petitioner_name">Accompanied by</label>
                         <input type="text" id="petitioner_name" name="petitioner_name" value="<?= val('petitioner_name') ?>" placeholder="Full name of companion"<?= invalid('petitioner_name') ?>>

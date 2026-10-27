@@ -36,6 +36,7 @@ $userRole = $_SESSION['user']['role'];
 
 $quickActions = [
     ['href' => '../reports/reports', 'label' => 'Generate report', 'icon' => 'chart', 'roles' => ['admin']],
+    ['href' => 'data_integrity', 'label' => 'Check data records', 'icon' => 'alert', 'roles' => ['admin']],
     ['href' => '../login/register', 'label' => 'Add staff account', 'icon' => 'user-plus', 'roles' => ['admin'], 'modal' => 'addstaff'],   // opens Admin settings > Add staff as a window
 ];
 
@@ -74,7 +75,7 @@ try {
 
 
     /* ======================
-       MONTHLY AMOUNT RELEASED (Cashflow)
+       MONTHLY APPROVED AMOUNT
     ====================== */
 
     $stmt = $pdo->prepare("
@@ -108,7 +109,7 @@ try {
     $burial = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 2 AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
     $opd = $pdo->query("SELECT COUNT(*) FROM applicant WHERE assistance_type_id = 3 AND status NOT IN ('Disapproved', 'Withdrawn')")->fetchColumn();
 
-    // Total Amount Released (Approved applications)
+    // Total approved amount across approved applications
     $totalAmount = $pdo->query("SELECT COALESCE(SUM(amount), 0) FROM applicant WHERE status='Approved' AND amount IS NOT NULL")->fetchColumn();
 
     // Today's applications

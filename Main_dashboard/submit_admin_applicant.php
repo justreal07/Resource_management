@@ -42,8 +42,9 @@ function walkin_respond(bool $is_ajax, int $status, array $data): void
 }
 
 // Security Check - an admin adds a walk-in for any program; Medical & Burial staff for Medical/Burial only; OPD staff for OPD only
-$walkin_role = $_SESSION['user']['role'] ?? '';
-if (!isset($_SESSION['user']) || !in_array($walkin_role, ['admin', 'aid_staff', 'staff'], true)) {
+$walkin_user = decision_user();
+$walkin_role = $walkin_user['role'] ?? '';
+if ($walkin_user === null) {
     walkin_respond($is_ajax, 403, ['success' => false, 'message' => 'Unauthorized']);
 }
 
@@ -93,11 +94,11 @@ $person  = ['first_name' => true, 'middle_name' => false, 'last_name' => true, '
 $address = ['house_no' => false, 'street' => false, 'barangay' => true, 'municipality' => true, 'province' => true];
 $fields = [
     'medical' => $person + ['beneficiary_birthdate' => true] + $address
-               + ['petitioner_name' => true, 'claimant_age' => true, 'relationship' => true, 'purpose' => false],
-    'burial'  => $person + ['claimant_age' => true] + $address
+               + ['petitioner_name' => true, 'claimant_birthdate' => true, 'relationship' => true, 'purpose' => false],
+    'burial'  => $person + ['claimant_birthdate' => true] + $address
                + ['petitioner_name' => true, 'relationship' => true, 'beneficiary_birthdate' => true, 'date_of_death' => true],
     'opd'     => $person + ['beneficiary_birthdate' => true] + $address   // the age is worked out from the birthdate (opd_with_age())
-               + ['hospital' => true, 'checkup_date' => true, 'checkup_reason' => true, 'petitioner_name' => false, 'relationship' => false],   // companion optional
+               + ['hospital' => true, 'checkup_date' => true, 'checkup_reason' => true, 'petitioner_name' => false, 'relationship' => false, 'claimant_birthdate' => false],
 ][$form_type];
 
 // A list with "Others" sends the picked choice or the typed answer (resolve_choice_post), as online
@@ -126,6 +127,8 @@ if ($form_type === 'opd') {
 }
 
 $errors = validate_application($values, $required);
+$values = application_claimant_values($form_type, $values, $application_date);
+$errors += application_claimant_errors($form_type, $values, $application_date);
 if ($form_type === 'medical') {
     if ($applying_for === 'self') {
         foreach (CLAIMANT_FIELDS as $f) unset($errors[$f]);   // not on the form, so nothing to highlight
@@ -156,6 +159,7 @@ if ($form_type === 'opd') {
 
 // The same person checks as online (null = the office, which sees every Ref #): Medical and Burial by person,
 // OPD one request per patient per check-up date
+$values['_application_date'] = $application_date;
 $check = checkPersonConflict($pdo, $form_type, $values, null);
 if (!$check['ok']) {
     walkin_respond($is_ajax, 409, ['success' => false, 'safe' => true, 'errors' => [$check['field'] => $check['message']],
@@ -170,7 +174,7 @@ $v = $values;
 // Account ID is NULL for walk-ins (they don't belong to an applicant account). encoded_by is who keyed it in
 // (the admin too), so the Pending list can show "Walk-in, added by <name>".
 // date_released stays empty: it is the day the assistance is handed over (it used to get the filing date).
-$encoded_by = (int)($_SESSION['user']['id'] ?? 0);
+$encoded_by = (int)$walkin_user['id'];
 $insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $created_at, $with_person_columns, $encoded_by): int {
     $row = [
         'account_id' => null, 'encoded_by' => $encoded_by ?: null, 'assistance_type_id' => $type_id, 'status' => 'Pending', 'created_at' => $created_at,
@@ -179,6 +183,8 @@ $insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $
         'house_no' => $v['house_no'], 'street' => $v['street'], 'barangay' => $v['barangay'],
         'municipality' => $v['municipality'], 'province' => $v['province'],
         'petitioner_name' => $v['petitioner_name'], 'relationship' => $v['relationship'],
+        'claimant_birthdate' => $v['claimant_birthdate'] !== '' ? $v['claimant_birthdate'] : null,
+        'claimant_age' => $v['claimant_age'] !== '' ? $v['claimant_age'] : null,
     ];
     if ($form_type === 'opd') {
         $row += ['age' => $v['age'] !== '' ? $v['age'] : null, 'hospital' => $v['hospital'], 'checkup_date' => $v['checkup_date'],

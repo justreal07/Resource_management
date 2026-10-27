@@ -37,6 +37,8 @@
  * Needs database/migrations/migration_disapprove.sql (Approve works without it; Disapprove asks for it).
  */
 require_once __DIR__ . '/budget.php';
+require_once __DIR__ . '/../user/assistance_config.php';
+require_once __DIR__ . '/medical_reapply.php';
 require_once __DIR__ . '/admin_security.php';   // account_password_mark(): a changed password ends the account's other sign-ins
 
 const DECISION_PENDING = 'Pending';
@@ -82,7 +84,7 @@ function staff_can_view(?array $user, int $typeId): bool
 /**
  * Is the signed-in account still in the database with the same role, and not turned off? An admin can
  * remove or turn off a staff account (Admin settings), and someone already signed in must lose access
- * at once, not when their session ends. If the check itself fails (database error) the sign-in is kept.
+ * at once, not when their session ends. A failed status check denies access until it can be retried.
  */
 function decision_account_active(int $id, string $role): bool
 {
@@ -112,7 +114,7 @@ function decision_account_active(int $id, string $role): bool
             $checked[$key] = $active;
         } catch (Throwable $e) {
             error_log('decision_account_active: ' . $e->getMessage());
-            return true;
+            return false;
         }
     }
     if (!$checked[$key]) {
@@ -261,7 +263,7 @@ function decision_claim_from_post(): array
  * so only the hard copies to bring (and the optional note) are asked.
  * @return array{ok: bool, message: string, values: array}
  */
-function decision_claim_parse(array $raw, int $typeId = 1): array
+function decision_claim_parse(array $raw, int $typeId = 1, bool $historical = false): array
 {
     $opd = $typeId === 3;
     $line = function ($v) { return trim(preg_replace('/\s+/u', ' ', (string)$v) ?? ''); };
@@ -281,7 +283,8 @@ function decision_claim_parse(array $raw, int $typeId = 1): array
 
         $d = DateTime::createFromFormat('!Y-m-d', $date);
         if ($date === '' || !$d || $d->format('Y-m-d') !== $date) return $fail('Choose the date the applicant will claim the assistance.');
-        if ($date < date('Y-m-d')) return $fail('The claim date has already passed. Choose today or a later date.');
+        if (!$historical && $date < date('Y-m-d')) return $fail('The claim date has already passed. Choose today or a later date.');
+        if ($historical && $date > date('Y-m-d')) return $fail('For a past paper approval, enter the actual past claim date.');
 
         $t = DateTime::createFromFormat('!H:i', substr($time, 0, 5));
         if ($time === '' || !$t || $t->format('H:i') !== substr($time, 0, 5)) {
@@ -343,16 +346,17 @@ function decision_not_pending_text(string $status): string
  * paper record Medical & Burial staff encoded as Pending, which an admin now approves with its real approval
  * date, so Reports count it in the period it actually happened. No approval email is sent for one of these
  * (decide_application() skips it whenever this is set). Returns a DATETIME string (that date, now's time of day)
- * or null when none was given, or it wasn't a real date, or it was in the future.
+ * or null when none was given. A nonempty invalid date is refused instead of becoming today's approval.
  */
 function decision_backdated_approved_at(?string $raw): ?string
 {
     $raw = trim((string)$raw);
-    if ($raw === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) return null;
-    $d = DateTime::createFromFormat('Y-m-d', $raw);
-    if (!$d || $d->format('Y-m-d') !== $raw) return null;
-    // A day of slack, in case the office PC's clock is ahead of the server's (same rule as the walk-in form)
-    if ($raw > date('Y-m-d', strtotime('+1 day'))) return null;
+    if ($raw === '') return null;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) throw new DomainException('Enter a valid date for the paper approval.');
+    $d = DateTime::createFromFormat('!Y-m-d', $raw);
+    if (!$d || $d->format('Y-m-d') !== $raw || $raw > date('Y-m-d')) {
+        throw new DomainException('The paper approval date must be a real date no later than today.');
+    }
     return $raw . ' ' . date('H:i:s');
 }
 
@@ -375,10 +379,10 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
     if ($decision === 'approve') {
         $raw = $opts['amount'] ?? null;
         if ($raw !== null && $raw !== '') {
-            if (!is_numeric($raw) || (float)$raw <= 0 || (float)$raw > 99999999.99) {
-                return decision_result(false, 'amount', 'Enter the amount to release (more than ₱0) before approving.');
+            if (!is_scalar($raw) || !preg_match('/^[0-9]+$/D', (string)$raw) || (float)$raw <= 0 || (float)$raw > 99999999) {
+                return decision_result(false, 'amount', 'Enter a whole-peso amount (more than ₱0) before approving.');
             }
-            $amount = round((float)$raw, 2);
+            $amount = (int)$raw;
         } elseif (!empty($opts['require_amount'])) {
             return decision_result(false, 'amount', 'Enter the amount to release (more than ₱0) before approving.');
         }
@@ -393,7 +397,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         $remarks = $composed['text'];
     }
 
-    $lock = null;
+    $locks = [];
     $budgetLock = null;     // type id of the program whose budget lock is held (released below, whatever happens)
     $budgetCheck = null;    // the budget before and after this approval, when the program has a budget to check
     $override = null;       // set when this approval passes the budget (and its reason was given)
@@ -414,7 +418,16 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         $app = ['id' => (int)$peek['id'], 'type' => $typeId, 'name' => decision_person_name($peek)];
         // A past paper record already approved: Medical/Burial only (that is the only place staff encode old paper
         // records). Saved with its real approval date; no approval email for one of these.
-        $backdatedAt = $decision === 'approve' && in_array($typeId, [1, 2], true) ? ($opts['backdated_approved_at'] ?? null) : null;
+        $backdatedAt = null;
+        if ($decision === 'approve' && !empty($opts['backdated_approved_at'])) {
+            if (!in_array($typeId, [1, 2], true) || $peek['account_id'] !== null) {
+                return decision_result(false, 'claim', 'Only a Medical or Burial walk-in can use a paper approval date.', $app);
+            }
+            $backdatedAt = decision_backdated_approved_at((string)$opts['backdated_approved_at']);
+            if (substr($backdatedAt, 0, 10) < substr((string)$peek['created_at'], 0, 10)) {
+                return decision_result(false, 'claim', 'The paper approval date cannot be before the original filing date.', $app);
+            }
+        }
 
         if (isset($opts['expect_type']) && (int)$opts['expect_type'] !== $typeId) {
             return decision_result(false, 'invalid', 'That application belongs to another program. Open it from its own list.', $app);
@@ -427,9 +440,20 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         if ($peek['status'] !== DECISION_PENDING) {
             return decision_result(false, 'already', decision_not_pending_text($peek['status']), $app);
         }
+        if (empty($opts['expected_version']) || (string)$opts['expected_version'] !== (string)$peek['updated_at']) {
+            return decision_result(false, 'changed', 'This application changed since you opened it. Reload and review the latest details before deciding.', $app);
+        }
         // The applicant is told where, when and what to bring: Medical / Burial when to claim (with the
         // amount, which stays out of the email), OPD the trip on the patient's check-up date
         if ($decision === 'approve') {
+            $formKey = [1 => 'medical', 2 => 'burial', 3 => 'opd'][$typeId] ?? '';
+            $claimantErrors = application_claimant_errors($formKey, $peek, (string)$peek['created_at']);
+            if ($claimantErrors) {
+                return decision_result(false, 'claim', 'Verify the claimant details before approval: ' . reset($claimantErrors), $app);
+            }
+            if (($waitProblem = medical_approval_wait_problem($pdo, $peek, $backdatedAt ?? date('Y-m-d'))) !== null) {
+                return decision_result(false, 'claim', $waitProblem, $app);
+            }
             if (decision_needs_amount($typeId) && $amount === null) {
                 return decision_result(false, 'amount', 'Enter the amount to release (more than ₱0) before approving.', $app);
             }
@@ -441,9 +465,12 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
                     ? 'List the hard copies the patient must bring before approving.'
                     : 'Fill in where and when to claim, and the hard copies to bring, before approving.', $app);
             }
-            $parsed = decision_claim_parse($opts['claim'], $typeId);
+            $parsed = decision_claim_parse($opts['claim'], $typeId, $backdatedAt !== null);
             if (!$parsed['ok']) return decision_result(false, 'claim', $parsed['message'], $app);
             $claim = $parsed['values'];
+            if ($backdatedAt !== null && $claim['claim_date'] < substr($backdatedAt, 0, 10)) {
+                return decision_result(false, 'claim', 'The actual claim date cannot be before the paper approval date.', $app);
+            }
             if (!decision_claim_ensure($pdo)) {
                 return decision_result(false, 'setup', 'Applications can\'t be approved until the database update is installed. '
                     . 'Ask the system administrator to run database/migrations/migration_approval_claim.sql.', $app);
@@ -451,13 +478,16 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
 
             // The yearly budget (Medical / Burial). One lock per program, held until the approval is saved, so two admins
             // approving at the same moment each see what the other already used. No budget set = no limit; a budget
-            // table that can't be made or read never stops an approval (budget_statuses() then says "no budget").
-            if ($amount !== null && decision_needs_amount($typeId) && budget_ensure($pdo)) {
+            // A budget query failure must not be mistaken for an unset budget.
+            if ($amount !== null && decision_needs_amount($typeId)) {
+                if (!budget_ensure($pdo)) {
+                    return decision_result(false, 'setup', 'The budget register is unavailable. The approval was not saved; ask the system administrator to check the database.', $app);
+                }
                 if (!budget_get_lock($pdo, $typeId)) {
                     return decision_result(false, 'error', 'The ' . ui_types()[$typeId]['name'] . ' budget is busy right now. Please try again in a moment.', $app);
                 }
                 $budgetLock = $typeId;
-                $budgetCheck = budget_check_approval($pdo, (int)date('Y'), $typeId, $amount);
+                $budgetCheck = budget_check_approval($pdo, (int)substr($backdatedAt ?? date('Y-m-d'), 0, 4), $typeId, $amount);
                 if ($budgetCheck['over']) {
                     $before = $budgetCheck['before'];
                     $reason = trim(preg_replace('/\s+/u', ' ', (string)($opts['budget_reason'] ?? '')) ?? '');
@@ -479,30 +509,46 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         // Burial saves all share one lock, because the deceased is looked for among all Burial applications (name with birthdate or date of death).
         // OPD has no person to free: a declined request simply stops counting for its check-up day.
         if ($decision === 'disapprove' && !empty($peek['beneficiary_birthdate']) && decision_person_rules_installed($pdo)) {
-            $lock = $typeId === 2 ? 'lgu_burial_same_name' : 'lgu_person_' . $peek['beneficiary_birthdate'];
+            $names = $typeId === 2 ? ['lgu_burial_same_name', 'lgu_person_' . $peek['beneficiary_birthdate']]
+                : ['lgu_person_' . $peek['beneficiary_birthdate']];
+            foreach ($names as $lock) {
             $stmt = $pdo->prepare('SELECT GET_LOCK(?, 10)');
             $stmt->execute([$lock]);
             if ((int)$stmt->fetchColumn() !== 1) {
-                $lock = null;
                 return decision_result(false, 'error', 'This person\'s record is busy right now. Please try again in a moment.', $app);
+            }
+                $locks[] = $lock;
             }
         }
 
         $pdo->beginTransaction();
 
         // Lock the row; whoever comes second waits here, then sees it is no longer Pending
-        $stmt = $pdo->prepare('SELECT status FROM applicant WHERE id = ? FOR UPDATE');
+        $stmt = $pdo->prepare('SELECT status, updated_at FROM applicant WHERE id = ? FOR UPDATE');
         $stmt->execute([$id]);
-        $nowStatus = $stmt->fetchColumn();
-        if ($nowStatus !== DECISION_PENDING) {
+        $lockedRow = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$lockedRow || $lockedRow['status'] !== DECISION_PENDING) {
             $pdo->rollBack();
-            return decision_result(false, 'already', decision_not_pending_text((string)$nowStatus), $app);
+            return decision_result(false, 'already', decision_not_pending_text((string)($lockedRow['status'] ?? '')), $app);
+        }
+        if ((string)$lockedRow['updated_at'] !== (string)$opts['expected_version']) {
+            $pdo->rollBack();
+            return decision_result(false, 'changed', 'This application changed since you opened it. Reload and review it before deciding.', $app);
         }
 
         if ($decision === 'approve') {
             $set = "status = 'Approved', approved_by = ?, approved_at = " . ($backdatedAt !== null ? '?' : 'NOW()');
+            $waitProblem = medical_approval_wait_problem($pdo, $peek, $backdatedAt ?? date('Y-m-d'));
+            if ($waitProblem !== null) {
+                $pdo->rollBack();
+                return decision_result(false, 'claim', $waitProblem, $app);
+            }
             $params = [$user['id']];
             if ($backdatedAt !== null) $params[] = $backdatedAt;
+            if (array_key_exists('approval_remarks', $opts)) {
+                $set .= ', remarks = ?';
+                $params[] = $opts['approval_remarks'];
+            }
             if ($amount !== null) {
                 $set .= ', amount = ?';
                 $params[] = $amount;
@@ -542,12 +588,15 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
         }
 
         $pdo->commit();
+    } catch (DomainException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        return decision_result(false, 'claim', $e->getMessage(), $app ?? null);
     } catch (Throwable $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('decide_application(' . $decision . ', #' . $id . '): ' . $e->getMessage());
         return decision_result(false, 'error', 'The decision could not be saved because of a problem on the server. Nothing was changed. Please try again.', $app ?? null);
     } finally {
-        if ($lock !== null) {
+        foreach (array_reverse($locks) as $lock) {
             try { $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$lock]); } catch (Throwable $e) { error_log('decide_application unlock: ' . $e->getMessage()); }
         }
         if ($budgetLock !== null) budget_release_lock($pdo, $budgetLock);
@@ -555,7 +604,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
 
     $label = $app['name'] . ' (Ref #' . $app['id'] . ')';
     if ($decision === 'approve') {
-        $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 2) : '') . '.'
+        $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 0) : '') . '.'
             . ($backdatedAt !== null ? ' Saved with ' . ui_date($backdatedAt, 'M j, Y') . ' as the approval date; no email was sent (a past paper record).' : ''), $app);
         // What the approval did to the budget: told once, so the admin knows how much is left (or that it went over)
         if ($budgetCheck !== null && $budgetCheck['before']['budget'] !== null) {
@@ -608,6 +657,9 @@ function decision_disapproval_compose($keys, $typed): array
         if (in_array((string)$key, $keys, true)) $lines[] = $sentence;
     }
     $typed = trim(preg_replace('/[ \t]+/u', ' ', (string)$typed) ?? '');
+    if (in_array('other', $keys, true) && $typed === '') {
+        return ['ok' => false, 'message' => 'Please explain the other reason so the applicant knows what to fix.'];
+    }
     if (mb_strlen($typed) > DISAPPROVAL_REMARKS_MAX) {
         return ['ok' => false, 'message' => 'The written reason is too long (up to ' . number_format(DISAPPROVAL_REMARKS_MAX) . ' characters).'];
     }
@@ -662,10 +714,11 @@ function decision_release_person(PDO $pdo, array $app, int $userId, string $why 
                 $decidedBy = (int)$pdo->query("SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1")->fetchColumn();
             }
         }
-        $pdo->prepare('INSERT INTO medical_reapply_decisions (beneficiary_id, based_on_application_id, reapply_allowed, decided_by, remarks, valid_until)
-                       VALUES (?, ?, 1, ?, ?, ?)')
+        $pdo->prepare('INSERT INTO medical_reapply_decisions (beneficiary_id, based_on_application_id, reapply_allowed, decided_by, remarks, valid_until, eligible_from, default_eligible_from, previous_eligible_from)
+                       VALUES (?, ?, 1, ?, ?, ?, ?, ?, ?)')
             ->execute([$grant['beneficiary_id'], $grant['based_on_application_id'], $decidedBy,
-                       'Permission given back: Medical application #' . $id . ' was ' . $why . '.', $grant['valid_until']]);
+                       'Permission given back: Medical application #' . $id . ' was ' . $why . '.', $grant['valid_until'],
+                       $grant['eligible_from'] ?? null, $grant['default_eligible_from'] ?? null, $grant['eligible_from'] ?? null]);
     }
 }
 
@@ -884,14 +937,15 @@ function decision_run_endpoint(PDO $pdo, string $decision, array $cfg = []): voi
         $result = decision_result(false, 'stale', 'This page was open for too long, or you signed in again since it opened. '
             . 'Nothing was changed. Reload the page and try again.');
     } else {
-        $opts = ['require_amount' => !empty($cfg['require_amount'])];
+        $opts = ['require_amount' => !empty($cfg['require_amount']),
+            'expected_version' => is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : ''];
         if (isset($cfg['expect_type'])) $opts['expect_type'] = (int)$cfg['expect_type'];
         if ($decision === 'approve') {
             decision_claim_ensure($pdo);   // here, before decide_application() opens its transaction
             $opts['amount'] = is_string($_POST['amount'] ?? null) ? trim($_POST['amount']) : null;
             $opts['claim'] = decision_claim_from_post();
             $opts['budget_reason'] = is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '';
-            $opts['backdated_approved_at'] = decision_backdated_approved_at(is_string($_POST['backdated_approved_at'] ?? null) ? $_POST['backdated_approved_at'] : null);
+            $opts['backdated_approved_at'] = is_string($_POST['backdated_approved_at'] ?? null) ? $_POST['backdated_approved_at'] : '';
         } else {
             $opts['reasons'] = decision_reasons_from_post();
             $opts['remarks'] = is_string($_POST['disapproval_remarks'] ?? null) ? $_POST['disapproval_remarks'] : '';
@@ -980,22 +1034,36 @@ function decision_save_update_form(PDO $pdo, array $row): array
                 'require_amount'         => decision_needs_amount($typeId),
                 'claim'                  => decision_claim_from_post(),
                 'budget_reason'          => is_string($_POST['budget_reason'] ?? null) ? $_POST['budget_reason'] : '',
-                'backdated_approved_at'  => decision_backdated_approved_at(is_string($_POST['backdated_approved_at'] ?? null) ? $_POST['backdated_approved_at'] : null),
+                'backdated_approved_at'  => is_string($_POST['backdated_approved_at'] ?? null) ? $_POST['backdated_approved_at'] : '',
+                'approval_remarks'        => $remarks === '' ? null : $remarks,
+                'expected_version'       => is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : '',
             ])
-            : decide_application($pdo, $row['id'], 'disapprove', ['reasons' => decision_reasons_from_post(), 'remarks' => $remarks]);
+            : decide_application($pdo, $row['id'], 'disapprove', ['reasons' => decision_reasons_from_post(), 'remarks' => $remarks,
+                'expected_version' => is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : '']);
         if (!$result['ok']) return ['ok' => false, 'message' => $result['message']];
         if (!empty($result['warning'])) $_SESSION['warning_message'] = $result['warning'];
         if ($choice === DECISION_DISAPPROVED) {
             return ['ok' => true, 'message' => $result['message']];   // the text was saved as the reason
         }
+        return ['ok' => true, 'message' => $result['message']];   // approval and remarks were saved together
     }
 
     try {
+        $version = is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : '';
+        $pdo->beginTransaction();
+        $locked = $pdo->prepare('SELECT status, updated_at FROM applicant WHERE id = ? FOR UPDATE');
+        $locked->execute([(int)$row['id']]);
+        $latest = $locked->fetch(PDO::FETCH_ASSOC);
+        if (!$latest || $version === '' || $latest['status'] !== $expected || (string)$latest['updated_at'] !== $version) {
+            $pdo->rollBack();
+            return ['ok' => false, 'message' => 'This application changed since you opened it. Reload and review it before saving remarks.'];
+        }
         $pdo->prepare('UPDATE applicant SET remarks = ? WHERE id = ?')->execute([$remarks === '' ? null : $remarks, (int)$row['id']]);
+        $pdo->commit();
     } catch (PDOException $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         error_log('decision_save_update_form remarks #' . (int)$row['id'] . ': ' . $e->getMessage());
-        return ['ok' => false, 'message' => ($result !== null ? 'The application was approved, but the remarks could not be saved. ' : '')
-            . 'Please try again; if it keeps happening, tell the system administrator.'];
+        return ['ok' => false, 'message' => 'Please try again; if it keeps happening, tell the system administrator.'];
     }
-    return ['ok' => true, 'message' => $result !== null ? $result['message'] : 'The remarks were saved.'];
+    return ['ok' => true, 'message' => 'The remarks were saved.'];
 }
