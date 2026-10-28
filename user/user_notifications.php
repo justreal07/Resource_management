@@ -28,7 +28,6 @@ $kinds = ['approved' => 0, 'not_approved' => 0, 'withdrawn' => 0, 'submitted' =>
 foreach ($notifications as $n) $kinds[$n['kind']] = ($kinds[$n['kind']] ?? 0) + 1;
 
 account_page_start($ctx, 'Notifications', 'notifications', [
-    'eyebrow'  => 'Updates',
     'title'    => 'Notifications',
     'subtitle' => $unread_before
         ? "You have $unread_before new update" . ($unread_before > 1 ? 's' : '') . ' since your last visit.'
@@ -37,7 +36,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
 ]);
 ?>
 
-<div class="ap-layout">
+<div>
     <div class="ap-card acc-list-card">
         <div class="acc-list-head">
             <h3 class="acc-h3">All updates</h3>
@@ -101,22 +100,7 @@ account_page_start($ctx, 'Notifications', 'notifications', [
             </div>
         <?php endif; ?>
     </div>
-
-    <aside class="ap-side">
-        <div class="ap-card ap-side-card">
-            <h3><i class="fas fa-info-circle"></i> About notifications</h3>
-            <ul class="acc-legend">
-                <li><span class="acc-n-icon tone-info"><i class="fas fa-paper-plane"></i></span> Your application was received</li>
-                <li><span class="acc-n-icon tone-success"><i class="fas fa-check-circle"></i></span> Your application was approved</li>
-                <li><span class="acc-n-icon tone-danger"><i class="fas fa-times-circle"></i></span> Your application was declined</li>
-                <li><span class="acc-n-icon tone-gold"><i class="fas fa-calendar-check"></i></span> You can apply again</li>
-            </ul>
-        </div>
-        <div class="ap-card ap-side-card ap-side-help">
-            <h3><i class="fas fa-headset"></i> Questions about a decision?</h3>
-            <p>Call <a href="tel:+63461234567">(046) 123-4567</a> or visit the Municipal Hall, Monday to Friday, 8:00 AM – 5:00 PM. Please have your application number ready.</p>
-        </div>
-    </aside>
+    <?php /* No side column: the "About notifications" legend only explained the icons the list already shows with their own words, and the phone number is in the footer */ ?>
 </div>
 
 <?php account_page_end(); ?>

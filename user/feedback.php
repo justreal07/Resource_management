@@ -37,9 +37,8 @@ function feedback_app_head(array $row, bool $focused): string {
 }
 
 account_page_start($ctx, 'Feedback', 'feedback', [
-    'eyebrow'  => 'Client feedback',
     'title'    => 'Rate our service',
-    'subtitle' => 'Tell us how we did on the requests the office approved. Only the office sees your answers, and they never affect an application.',
+    'subtitle' => 'Tell us how we did on your approved requests. Only the office sees your answer.',
     'icon'     => 'fa-star',
 ]);
 ?>

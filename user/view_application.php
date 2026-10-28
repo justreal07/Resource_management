@@ -199,22 +199,32 @@ account_page_start($ctx, "Application #$app_id", 'account', [
 <?php if ($can_change): ?>
 <!-- CHANGE OR WITHDRAW: only while the office has not decided -->
 <div class="ap-card acc-card no-print acc-change" id="change">
-    <h3 class="acc-h3"><i class="fas fa-pen-to-square"></i> Something wrong? Changed your mind?</h3>
-    <p class="ap-muted">While the office has not decided, you can correct your details or photos. It keeps its place in the line, and the office can see that you edited it.</p>
+    <h3 class="acc-h3">Change this application</h3>
     <div class="acc-change-actions">
         <a href="<?= e($form_href) ?>?edit=<?= (int)$app_id ?>" class="ap-btn ap-btn-primary"><i class="fas fa-pen"></i> Edit my details</a>
         <a href="edit_documents?id=<?= (int)$app_id ?>" class="ap-btn ap-btn-primary"><i class="fas fa-images"></i> Change my documents</a>
     </div>
-    <form method="post" action="withdraw_application" class="acc-withdraw" id="withdraw"
-          data-confirm="Withdraw this application?"
-          data-confirm-text="It will leave the office's line and you can't undo this. You may file a new application whenever you are ready."
-          data-confirm-ok="Yes, withdraw it" data-confirm-danger>
-        <?= csrf_field() ?>
-        <input type="hidden" name="id" value="<?= (int)$app_id ?>">
-        <label for="withdraw_reason">Why are you withdrawing? <span class="optional">(optional)</span></label>
-        <textarea id="withdraw_reason" name="reason" rows="2" maxlength="<?= WITHDRAWAL_REASON_MAX ?>" placeholder="e.g. I no longer need the assistance"></textarea>
-        <button type="submit" class="ap-btn acc-btn-danger"><i class="fas fa-ban"></i> Withdraw application</button>
-    </form>
+    <?php /* Withdrawing is folded away: it is the rare, final choice, so the form (and its warning colours) only shows when asked for. The #withdraw links from the edit pages open it. */ ?>
+    <details class="acc-withdraw-fold" id="withdraw-fold">
+        <summary>Withdraw this application</summary>
+        <form method="post" action="withdraw_application" class="acc-withdraw" id="withdraw"
+              data-confirm="Withdraw this application?"
+              data-confirm-text="It will leave the office's line and you can't undo this. You may file a new application whenever you are ready."
+              data-confirm-ok="Yes, withdraw it" data-confirm-danger>
+            <?= csrf_field() ?>
+            <input type="hidden" name="id" value="<?= (int)$app_id ?>">
+            <label for="withdraw_reason">Why are you withdrawing? <span class="optional">(optional)</span></label>
+            <textarea id="withdraw_reason" name="reason" rows="2" maxlength="<?= WITHDRAWAL_REASON_MAX ?>" placeholder="e.g. I no longer need the assistance"></textarea>
+            <button type="submit" class="ap-btn acc-btn-danger"><i class="fas fa-ban"></i> Withdraw application</button>
+        </form>
+    </details>
+    <script>
+    // A link to #withdraw (from the edit pages) opens the folded form
+    (function () {
+        var fold = document.getElementById('withdraw-fold');
+        if (fold && location.hash === '#withdraw') { fold.open = true; fold.scrollIntoView({ block: 'center' }); }
+    })();
+    </script>
 </div>
 <?php endif; ?>
 

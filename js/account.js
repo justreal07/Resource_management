@@ -96,7 +96,7 @@
             $$('[data-panel]').forEach(function (p) { p.hidden = p.dataset.panel !== name; });
             // Sidebar: highlight the menu item of the open section
             $$('[data-side-tab]').forEach(function (a) {
-                const on = a.dataset.sideTab === name;
+                const on = a.dataset.sideTab.split(' ').indexOf(name) !== -1;   // one menu item can stand for several tabs
                 a.classList.toggle('is-active', on);
                 if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
             });

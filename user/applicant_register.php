@@ -156,23 +156,15 @@ $value = function (string $key) use ($old, $contact): string {
 };
 
 auth_page_start('Sign up', 'register', function () { ?>
-    <span class="eyebrow"><i class="fas fa-user-plus"></i> Free for GMA residents</span>
     <h1>Create your account in <span class="accent">minutes</span>.</h1>
-    <p class="hero-lead">One account lets you request Medical, Burial and OPD assistance online — no long lines at the Municipal Hall.</p>
-    <ol class="mini-steps">
-        <li><span class="num">1</span><div><strong>Create your account</strong><span>Register with your basic details or your Google account.</span></div></li>
-        <li><span class="num">2</span><div><strong>Fill out the form</strong><span>Pick a program and upload your requirements.</span></div></li>
-        <li><span class="num">3</span><div><strong>Track your status</strong><span>Get notified once your request is reviewed.</span></div></li>
-    </ol>
+    <p class="hero-lead">One free account for Medical, Burial and OPD assistance. No long lines at the Municipal Hall.</p>
 <?php });
 ?>
     <?php /* A wide card (css/auth.css, .auth-page-register): the title, then the Google button on the left with
              "or sign up with a username" beside it, then the account and contact details side by side */ ?>
     <div class="auth-card-head auth-card-head-row">
-        <div class="card-icon"><i class="fas fa-user-plus"></i></div>
         <div class="auth-card-title">
             <h2>Create your account</h2>
-            <p>It's free and only takes a minute.</p>
         </div>
     </div>
 
@@ -229,7 +221,7 @@ auth_page_start('Sign up', 'register', function () { ?>
                 <input type="email" id="email" name="email" required maxlength="150" autocomplete="email" value="<?php echo $value('email'); ?>" placeholder="you@example.com">
                 <i class="fas fa-envelope"></i>
             </div>
-            <span class="field-hint">Needed to reset your password if you forget it. We'll email a link to confirm it.</span>
+            <span class="field-hint">We'll email a link to confirm it. You'll need it to reset your password.</span>
         </div>
 
         <div class="field-row">
@@ -311,10 +303,9 @@ auth_page_start('Sign up', 'register', function () { ?>
             <div class="auth-step-actions">
                 <button type="button" class="btn btn-outline" data-step-back hidden><i class="fas fa-arrow-left"></i> Back</button>
                 <button type="button" class="btn btn-primary" data-step-next hidden>Next <i class="fas fa-arrow-right"></i></button>
-                <button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create Account</button>
+                <button type="submit" class="btn btn-primary">Create account</button>
             </div>
             <p class="auth-switch">Already have an account? <a href="applicant_login">Log in here</a></p>
-            <a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
         </div>
     </form>
 

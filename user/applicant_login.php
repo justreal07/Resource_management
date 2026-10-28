@@ -85,19 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 auth_page_start('Log in', 'login', function () { ?>
-    <span class="eyebrow"><i class="fas fa-shield-alt"></i> Official LGU Assistance Portal</span>
     <h1>Welcome back, <span class="accent" style="white-space: nowrap">ka-GMA!</span></h1>
-    <p class="hero-lead">Log in to apply for Medical, Burial and OPD assistance, upload your requirements and follow your application every step of the way.</p>
-    <ul class="hero-trust">
-        <li><i class="fas fa-check-circle"></i> For GMA, Cavite residents</li>
-        <li><i class="fas fa-check-circle"></i> Apply online 24/7</li>
-        <li><i class="fas fa-check-circle"></i> Real-time status updates</li>
-    </ul>
+    <p class="hero-lead">Log in to apply for assistance and follow your applications.</p>
 <?php });
 ?>
     <div class="auth-card-head">
-        <h2>Log in to your account</h2>
-        <p>Mabuhay! Sign in to continue.</p>
+        <h2>Log in</h2>
     </div>
 
     <?php auth_alerts($errors, $success); ?>
@@ -132,6 +125,5 @@ auth_page_start('Log in', 'login', function () { ?>
     </form>
 
     <p class="auth-switch">Don't have an account? <a href="applicant_register">Sign up for free</a></p>
-       <a href="landingpage.php" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a>
 <?php
 auth_page_end();

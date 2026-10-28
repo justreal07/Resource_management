@@ -79,7 +79,6 @@ foreach ($ASSISTANCE_PROGRAMS as $p) {
     <div class="container pv-wrap">
 
         <div class="ann-head">
-            <span class="ann-eyebrow">Your privacy</span>
             <h1 class="ann-heading">Data Privacy Notice</h1>
             <p class="ann-lead">How we collect, use and protect your personal information on the LGU Assistance Portal,
                 as required by the Data Privacy Act of 2012 (Republic Act No. 10173).</p>

@@ -102,7 +102,7 @@ function program_columns(int $typeId, string $page): array
 {
     $who = [1 => 'Applicant', 2 => 'Claimant', 3 => 'Patient'][$typeId];
     $person = ['label' => $who, 'type' => 'person'];
-    $address = ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true); }];
+    $address = ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, true, true); }];
     $contact = ['label' => 'Contact number', 'type' => 'text', 'key' => 'contact_number'];
     $deceased = ['label' => 'Deceased', 'type' => 'text', 'key' => 'petitioner_name'];   // Burial: petitioner_name is the deceased
     $status = ['label' => 'Status', 'type' => 'html', 'render' => 'ui_status_cell'];   // the badge, plus "Edited" when the applicant changed it while waiting
@@ -119,13 +119,13 @@ function program_columns(int $typeId, string $page): array
                 ['label' => 'Reason for check-up', 'type' => 'text', 'key' => 'checkup_reason', 'class' => 'cell-clip'],
                 ['label' => 'Age', 'type' => 'text', 'key' => 'age'],
                 ['label' => 'Accompanied by', 'type' => 'text', 'value' => 'ui_opd_companion'],
-                ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address(['barangay' => $r['barangay'], 'municipality' => $r['municipality']]); }],
+                ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address(['barangay' => $r['barangay'], 'municipality' => $r['municipality']], false, true); }],
             ];
         }
         return array_values(array_filter([
             $person, $typeId === 2 ? $deceased : null, $status, $filed,
             ['label' => 'Amount', 'type' => 'amount', 'key' => 'amount'],
-            ['label' => 'Address', 'type' => 'text', 'value' => 'ui_address'],
+            ['label' => 'Address', 'type' => 'text', 'value' => function ($r) { return ui_address($r, false, true); }],
             $contact,
         ]));
     }
@@ -249,9 +249,9 @@ function program_list_page(int $typeId, string $page): void
     $rows = in_array($page, ['disapproved', 'withdrawn'], true) ? [] : program_rows($typeId, $page);
 
     admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId, $page)]);
-    echo ui_page_head($head[0], $head[1]);
     echo ui_type_tabs($typeId, $key);
-    if ($page === 'pending') echo ui_source_filter();
+    // The tab you are on already says which list this is: only Declined and Withdrawn keep their one-line explanation, under the tabs
+    if (in_array($page, ['disapproved', 'withdrawn'], true)) echo '<p class="page-intro">' . ui_e($head[1]) . '</p>';
     if ($page === 'disapproved' || $page === 'withdrawn') {
         echo $page === 'withdrawn' ? program_withdrawn_body($typeId) : program_declined_body($typeId);
         admin_layout_end();
@@ -260,6 +260,10 @@ function program_list_page(int $typeId, string $page): void
 
     $label = $page === 'all' ? $t['all_label'] : $head[0];
     $options = ['empty' => $t[$page . '_empty']];
+    // The Source filter shares the line with "Search this list"; with no rows there is no search line, so it stands alone (it must stay reachable to clear a filter)
+    if ($page === 'pending') {
+        if ($rows) $options['tools_extra'] = ui_source_filter(); else echo ui_source_filter();
+    }
     if ($page === 'pending' || $page === 'approved') {
         $review = $page === 'pending';
         $options['actions'] = $staff

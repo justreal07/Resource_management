@@ -303,6 +303,7 @@ function admin_layout_start(array $page): void
 {
     $title = $page['title'] ?? 'Admin';
     $section = $page['section'] ?? '';
+    $GLOBALS['ui_page_heading'] = (string)($page['heading'] ?? $title);   // the top bar's title: ui_page_head() won't repeat it
     $embed = !empty($page['embed_ok']) && ui_embed_requested();
     $GLOBALS['ui_embedded'] = $embed;
     if ($embed && !headers_sent()) header('X-Frame-Options: SAMEORIGIN');   // only this site may put it in a window
@@ -436,7 +437,8 @@ function admin_layout_start(array $page): void
             </button>
             <div class="topbar-title">
                 <h1><?= ui_e($page['heading'] ?? $title) ?></h1>
-                <p><?= ui_e(date('l, F j, Y')) ?></p>
+                <?php /* a line under the title only where the page asks for one (the dashboards show today's date) */ ?>
+                <?php if (!empty($page['subtitle'])): ?><p><?= ui_e($page['subtitle']) ?></p><?php endif; ?>
             </div>
             <?= $page['topbar_extra'] ?? '' ?>
             <?php if ($user): ?>

@@ -196,6 +196,7 @@ img { max-width: 100%; display: block; }
 }
 .ap-hero h1 { color: #fff; font-size: clamp(1.6rem, 3.4vw, 2.3rem); margin: 0 0 4px; }
 .ap-hero p { margin: 0; color: rgba(255, 255, 255, 0.85); }
+.ap-hero .ap-hero-note { margin-top: 6px; font-size: 0.93rem; color: rgba(255, 255, 255, 0.72); }
 
 .ap-stepper {
     list-style: none;

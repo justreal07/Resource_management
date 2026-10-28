@@ -375,6 +375,10 @@
 .acc-change > p { margin: 0 0 14px; }
 .acc-change-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .db-body .acc-change-actions .ap-btn, .db-body .acc-btn-edit { min-height: 44px; }
+.acc-withdraw-fold { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.acc-withdraw-fold > summary { cursor: pointer; display: inline-block; color: var(--danger); font-weight: 600; font-size: 0.95rem; }
+.acc-withdraw-fold > summary:hover { text-decoration: underline; }
+.acc-withdraw-fold .acc-withdraw { margin-top: 14px; padding-top: 0; border-top: 0; }
 .acc-withdraw { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); display: grid; gap: 8px; max-width: 560px; }
 .acc-withdraw label { font-weight: 700; font-size: 0.92rem; }
 .acc-withdraw textarea { width: 100%; resize: vertical; font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }

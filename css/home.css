@@ -176,6 +176,8 @@ a { color: var(--navy); }
     flex-wrap: wrap;
 }
 .topbar-info span { display: inline-flex; align-items: center; gap: 7px; }
+/* Only the municipality's name stays in the bar; the phone number and office hours are in the Contact section (every page that still prints them in its bar gets the same quiet bar) */
+.topbar-info span:not(:first-child) { display: none; }
 .topbar-info i { color: var(--gold); }
 
 .text-size {
@@ -552,6 +554,17 @@ a { color: var(--navy); }
     gap: 48px;
     align-items: center;
 }
+/* Signed-out home page: a headline and two buttons, no card beside them */
+.hero-grid-single { grid-template-columns: minmax(0, 40rem); }
+/* A taller banner so more of the background video shows: it fills most of the first screen (never shorter than 560px, never taller than 860px), with the text centred in it */
+.hero-home {
+    min-height: clamp(560px, calc(100vh - 160px), 860px);
+    display: flex;
+    align-items: center;
+    padding: 96px 0 140px;
+}
+.hero-home .hero-lead { margin-bottom: 28px; }
+.hero-home .hero-cta { margin-bottom: 0; }
 
 .eyebrow {
     display: inline-flex;
@@ -676,65 +689,18 @@ a { color: var(--navy); }
 .tone-gold { background: linear-gradient(135deg, #ffc93c, #e0a100); }
 
 /* ============================================
-   HIGHLIGHTS (overlapping hero)
-============================================ */
-.highlights {
-    position: relative;
-    margin-top: -90px;
-    z-index: 2;
-}
-.highlight-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    background: #fff;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow);
-    overflow: hidden;
-}
-.highlight {
-    display: flex;
-    gap: 14px;
-    padding: 26px 24px;
-    align-items: flex-start;
-}
-.highlight + .highlight { border-left: 1px solid var(--line); }
-.highlight-icon {
-    flex: none;
-    width: 50px;
-    height: 50px;
-    border-radius: 14px;
-    background: #eef2fb;
-    color: var(--navy);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-}
-.highlight h4 { font-size: 1rem; margin: 0 0 2px; }
-.highlight p { font-size: 0.88rem; color: var(--muted); margin: 0; line-height: 1.5; }
-
-/* ============================================
    SECTIONS
 ============================================ */
-.section { padding: 88px 0; }
+.section { padding: 72px 0; }
 .section-alt { background: #fff; }
 
 .section-head {
     text-align: center;
     max-width: 720px;
-    margin: 0 auto 48px;
+    margin: 0 auto 40px;
 }
-.section-tag {
-    display: inline-block;
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--red);
-    margin-bottom: 10px;
-}
-.section-head h2 { font-size: clamp(1.8rem, 3.2vw, 2.5rem); }
-.section-head p { color: var(--muted); font-size: 1.08rem; margin: 0; }
+.section-head h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); margin-bottom: 0; }
+.section-head p { color: var(--muted); font-size: 1.05rem; margin: 8px 0 0; }
 
 /* ============================================
    DASHBOARD (logged in)
@@ -1019,47 +985,52 @@ a { color: var(--navy); }
     height: 40px;
     background: linear-gradient(180deg, transparent, #fff);
 }
-.program-icon {
-    position: absolute;
-    left: 24px;
-    bottom: -28px;
-    width: 60px;
-    height: 60px;
-    border-radius: 18px;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.5rem;
-    border: 4px solid #fff;
-    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-    box-shadow: 0 10px 22px var(--accent-glow);
-    z-index: 4;
-    transition: transform 0.3s;
-}
-.program-card:hover .program-icon { transform: rotate(-8deg) scale(1.08); }
-
 /* ---- Text ---- */
 .program-body {
-    padding: 42px 24px 26px;
+    padding: 8px 24px 26px;
     display: flex;
     flex-direction: column;
     flex: 1;
 }
-.program-kicker {
-    align-self: flex-start;
-    font-size: 0.74rem;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: var(--accent-dark);
-    background: var(--accent-soft);
-    padding: 4px 10px;
-    border-radius: 6px;
-    margin-bottom: 10px;
-}
 .program-body h3 { font-size: 1.4rem; margin-bottom: 8px; }
 .program-body > p { color: var(--muted); font-size: 0.97rem; margin-bottom: 18px; }
+
+/* ---- What to prepare: folded, one line until opened ---- */
+.req-fold {
+    border-top: 1px solid var(--line);
+    margin-bottom: 20px;
+}
+.req-fold summary {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 0;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--ink);
+}
+.req-fold summary::-webkit-details-marker { display: none; }
+.req-fold summary::after {
+    content: "+";
+    flex: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-dark);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-left: auto;
+}
+.req-fold[open] summary::after { content: "–"; }
+.req-fold .req-count { margin-left: 2px; background: var(--accent-soft); }
+.req-fold .req-list { padding-bottom: 6px; }
 
 /* ---- Requirements ---- */
 .req-panel {
@@ -1247,34 +1218,31 @@ a { color: var(--navy); }
 .faq-answer ul { margin: 8px 0 0; padding-left: 20px; }
 .faq-answer li { margin-bottom: 4px; }
 
+/* Same flat card as the questions beside it (it was a loud maroon block) */
 .help-card {
-    background: linear-gradient(160deg, var(--maroon), #5a0018);
-    color: #fff;
-    border-radius: var(--radius-lg);
-    padding: 32px;
-    box-shadow: var(--shadow-lg);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 26px;
     position: sticky;
     top: calc(var(--header-h) + 24px);
 }
-.help-card .help-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.14);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.7rem;
-    color: var(--gold);
-    margin-bottom: 18px;
+.help-card h3 { font-size: 1.2rem; margin-bottom: 6px; }
+.help-card p { color: var(--muted); margin-bottom: 18px; }
+.help-card .help-tour {
+    display: block;
+    margin: 14px auto 0;
+    padding: 4px 8px;
+    background: none;
+    border: 0;
+    color: var(--navy);
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
 }
-.help-card h3 { color: #fff; font-size: 1.45rem; }
-.help-card p { color: rgba(255, 255, 255, 0.85); }
-.help-card .help-lines { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 10px; }
-.help-card .help-lines li { display: flex; gap: 12px; align-items: center; }
-.help-card .help-lines i { color: var(--gold); width: 18px; text-align: center; transition: opacity 0.3s, transform 0.3s; }
-.help-card .help-lines li.is-waiting i { opacity: 0; transform: scale(0.5); }   /* until its line starts typing */
-.help-card .typed-cursor { color: var(--gold); }
+.help-card .help-tour i { margin-right: 6px; }
+.help-card .help-tour:hover { text-decoration: underline; }
 
 /* ============================================
    CTA BAND
@@ -1306,28 +1274,24 @@ a { color: var(--navy); }
     gap: 28px;
     align-items: stretch;
 }
-.contact-cards { display: grid; gap: 14px; }
+/* A plain list (icon, label, value), not four boxes */
+.contact-cards { display: grid; gap: 22px; align-content: center; }
 .contact-card {
     display: flex;
     gap: 16px;
     align-items: flex-start;
-    background: #fff;
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 18px 20px;
-    box-shadow: var(--shadow-sm);
 }
 .contact-card .c-icon {
     flex: none;
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     background: #eef2fb;
     color: var(--navy);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.2rem;
+    font-size: 1.05rem;
 }
 .contact-card h4 { font-size: 0.95rem; margin: 0 0 2px; color: var(--muted); font-family: 'Inter', sans-serif; font-weight: 600; }
 .contact-card p, .contact-card a { margin: 0; color: var(--ink); font-weight: 600; text-decoration: none; }
@@ -1361,8 +1325,8 @@ a { color: var(--navy); }
 }
 .footer-grid {
     display: grid;
-    grid-template-columns: minmax(260px, 1.7fr) 1fr 1fr 1.2fr auto;
-    gap: 40px;
+    grid-template-columns: minmax(260px, 1.7fr) 1fr auto;
+    gap: 56px;
     padding-bottom: 44px;
 }
 .footer-qr img {
@@ -1685,9 +1649,6 @@ a { color: var(--navy); }
 @media (max-width: 1100px) {
     .hero-grid { grid-template-columns: 1fr; }
     .hero-card { max-width: 560px; }
-    .highlight-grid { grid-template-columns: repeat(2, 1fr); }
-    .highlight:nth-child(3) { border-left: 0; }
-    .highlight:nth-child(n+3) { border-top: 1px solid var(--line); }
     .stats-grid, .stats-grid.has-withdrawn { grid-template-columns: repeat(2, 1fr); }
     .program-grid { grid-template-columns: repeat(2, 1fr); }
     .footer-grid { grid-template-columns: 1fr 1fr; }
@@ -1758,12 +1719,10 @@ a { color: var(--navy); }
 
     .hero { padding: 64px 0 130px; }
     .hero-cta .btn { flex: 1 1 100%; }
+    .hero-home { padding: 56px 0 110px; min-height: 480px; }
     .hero-card { padding: 22px; }
 
-    .highlight-grid { grid-template-columns: 1fr; }
-    .highlight + .highlight { border-left: 0; border-top: 1px solid var(--line); }
-
-    .section { padding: 64px 0; }
+    .section { padding: 56px 0; }
     .dashboard-card { padding: 24px 20px; }
     .stats-grid, .stats-grid.has-withdrawn { grid-template-columns: 1fr 1fr; gap: 12px; }
     .stat-box { padding: 14px 14px 12px 18px; }

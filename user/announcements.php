@@ -150,11 +150,9 @@ $h = 'ann_e';
 <?php if (!$singleId): ?>
     <section class="ann-hero">
         <div class="container ann-hero-inner">
-            <span class="ann-hero-icon" aria-hidden="true"><?= ann_icon('bullhorn') ?></span>
             <div>
-                <span class="ann-eyebrow">From the Municipal Hall</span>
                 <h1 class="ann-heading">Announcements</h1>
-                <p class="ann-lead">Schedules, office hours, advisories and news about Medical, Burial and OPD assistance.</p>
+                <p class="ann-lead">News and schedules from the Municipal Hall.</p>
             </div>
         </div>
     </section>

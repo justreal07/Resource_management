@@ -51,7 +51,6 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
     <div class="container">
         <div class="topbar-info">
             <span><i class="fas fa-landmark" aria-hidden="true"></i> Municipality of General Mariano Alvarez, Cavite</span>
-            <span><i class="fas fa-phone" aria-hidden="true"></i> (046) 123-4567</span>
         </div>
         <?php portal_text_size_buttons(); ?>
     </div>
@@ -78,19 +77,9 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
     <div class="container">
 
         <div class="ch-intro">
-            <span class="ch-eyebrow">Your account is ready</span>
-            <h1 class="ch-title">Welcome<?= $first !== '' ? ', ' . $h($first) : '' ?>! What assistance do you need?</h1>
-            <p class="ch-lead">Choose a program to start your first application. You'll fill out a short form, then upload photos of the requirements.</p>
-
-            <!-- Where the applicant is in getting started -->
-            <ol class="ch-steps" aria-label="Getting started">
-                <li class="is-done"><span class="ch-step-dot" aria-hidden="true"><i class="fas fa-check"></i></span>
-                    <span><span class="pui-sr">Done: </span>Account created</span></li>
-                <li class="is-current" aria-current="step"><span class="ch-step-dot" aria-hidden="true">2</span>
-                    <span><span class="pui-sr">Current step: </span>Choose assistance</span></li>
-                <li><span class="ch-step-dot" aria-hidden="true">3</span>
-                    <span><span class="pui-sr">Next: </span>Fill out the form</span></li>
-            </ol>
+            <?php /* One heading and one sentence (the "Your account is ready" tag and the three-step strip repeated the heading and the form's own progress bar) */ ?>
+            <h1 class="ch-title">Welcome<?= $first !== '' ? ', ' . $h($first) : '' ?>! What do you need?</h1>
+            <p class="ch-lead">Choose a program to start your application.</p>
         </div>
 
         <ul class="program-grid ch-grid" aria-label="Assistance programs">
@@ -105,27 +94,24 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
             <li class="program-card ch-card is-<?= $h($p['tone']) ?><?= $open ? '' : ' is-disabled' ?>" aria-labelledby="<?= $h($title_id) ?>">
                 <div class="program-media">
                     <img src="../asset/<?= $h($key) ?>-illustration.svg" alt="" loading="lazy">
-                    <span class="program-icon tone-<?= $h($p['tone']) ?>" aria-hidden="true"><i class="fas <?= $h($p['icon']) ?>"></i></span>
                 </div>
                 <div class="program-body">
                     <h2 class="ch-card-title" id="<?= $h($title_id) ?>"><?= $h($p['name']) ?></h2>
                     <p class="ch-tagline"><?= $h($p['tagline']) ?></p>
 
-                    <p class="ch-often"><i class="fas fa-redo-alt" aria-hidden="true"></i>
-                        <span><strong>How often:</strong> <?= $h($p['frequency']) ?></span></p>
+                    <p class="ch-often"><?= $h($p['frequency']) ?></p>
 
-                    <div class="req-panel">
-                        <h3 class="req-title"><span><i class="fas fa-folder-open" aria-hidden="true"></i> What you'll need</span>
-                            <span class="req-count"><?= count($docs) ?> <?= count($docs) === 1 ? 'photo' : 'photos' ?></span></h3>
+                    <?php /* The list of papers is folded, like on the home page: the cards stay short and equal */ ?>
+                    <details class="req-fold">
+                        <summary>What you'll need <span class="req-count"><?= count($docs) ?></span></summary>
                         <ul class="req-list">
                             <?php foreach ($docs as $doc): ?>
                                 <li><i class="fas fa-check" aria-hidden="true"></i> <?= $h($doc) ?></li>
                             <?php endforeach; ?>
                         </ul>
-                    </div>
+                    </details>
 
                     <?php if ($open): ?>
-                        <p class="eligibility ok"><i class="fas fa-check-circle" aria-hidden="true"></i> <span>Start a form; eligibility is checked for the patient</span></p>
                         <a href="<?= $h($form_url) ?>" class="btn btn-primary btn-block program-cta ch-cta"
                            aria-label="Start application for <?= $h($p['name']) ?>">Start application <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
                     <?php else: ?>
@@ -142,11 +128,6 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
             </li>
             <?php endforeach; ?>
         </ul>
-
-        <p class="ch-skip">
-            Not sure yet? <a href="landingpage">Skip for now and go to my dashboard</a>.
-            You can apply anytime from the Programs section.
-        </p>
     </div>
 </main>
 

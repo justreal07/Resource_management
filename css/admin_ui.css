@@ -86,12 +86,12 @@
     --fs-xl: 1.5rem;     /* 24px */
     --fs-2xl: 2rem;      /* 32px */
 
-    --radius: 10px;
+    --radius: 12px;
     --radius-sm: 6px;
     --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
     --shadow-lg: 0 12px 32px rgba(16, 24, 40, 0.22);
-    --sidebar-w: 256px;
-    --topbar-h: 76px;   /* the top bar's height; the review page subtracts it */
+    --sidebar-w: 272px;
+    --topbar-h: 68px;   /* the top bar's height; the review page subtracts it */
 
     /* Which of the top bar's two theme icons shows (the moon in light mode, the sun in dark mode) */
     --theme-moon-display: inline-block;
@@ -477,9 +477,9 @@ a:hover { color: var(--c-primary-hover); }
 
 .content {
     display: grid;
-    gap: 20px;
+    gap: 24px;
     max-width: 1440px;
-    padding: 24px;
+    padding: 28px 28px 40px;
     margin: 0 auto;
 }
 .content > * { min-width: 0; }
@@ -598,13 +598,12 @@ a:hover { color: var(--c-primary-hover); }
 /* ---------- Panels ---------- */
 .panel {
     min-width: 0;
-    padding: 20px;
+    padding: 24px;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
     border-radius: var(--radius);
-    box-shadow: var(--shadow);
 }
-.panel-head { margin-bottom: 16px; }
+.panel-head { margin-bottom: 20px; }
 .panel-head h2, .panel-head h3 { font-size: var(--fs-lg); line-height: 1.3; }
 .panel-head-row {
     display: flex;
@@ -616,8 +615,6 @@ a:hover { color: var(--c-primary-hover); }
 .panel-sub { margin-top: 2px; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .panel-sub .icon { color: var(--c-approved-text); }
 .panel-note { margin-top: 12px; color: var(--c-text-muted); font-size: var(--fs-sm); }
-
-.panel-action { border-top: 4px solid var(--c-accent); }
 
 /* ---------- Badges ---------- */
 .badge {
@@ -690,18 +687,14 @@ a:hover { color: var(--c-primary-hover); }
     flex-direction: column;
     gap: 4px;
     height: 100%;
-    padding: 16px;
+    padding: 18px 20px;
     color: var(--c-text);
     text-decoration: none;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-top: 4px solid var(--c-primary);
-    border-radius: var(--radius-sm);
-    box-shadow: var(--shadow);
+    border-radius: var(--radius);
 }
 a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border-color: var(--c-primary); }
-.stat-card.stat-pending { border-top-color: var(--c-pending-border); }
-.stat-card.stat-approved { border-top-color: var(--c-approved-text); }
 .stat-label { display: flex; align-items: center; gap: 6px; color: var(--c-text-muted); font-size: var(--fs-sm); font-weight: 600; }
 .stat-pending .stat-label .icon { color: var(--c-pending-text); }
 .stat-approved .stat-label .icon { color: var(--c-approved-text); }
@@ -710,22 +703,20 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
 .stat-go { display: inline-flex; align-items: center; margin-top: auto; padding-top: 6px; color: var(--c-primary); font-size: var(--fs-sm); font-weight: 600; }
 
 /* ---------- 1. Needs your action (dashboard) ---------- */
-.queue-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.queue-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .queue-card {
     display: flex;
-    align-items: flex-start;
-    gap: 12px;
+    align-items: center;
+    gap: 14px;
     height: 100%;
-    padding: 16px;
+    padding: 18px 20px;
     color: var(--c-text);
     text-decoration: none;
     background: var(--c-surface);
-    border: 1px solid var(--c-border-strong);
-    border-left: 5px solid var(--c-pending-border);
-    border-radius: var(--radius-sm);
+    border: 1px solid var(--c-border);
+    border-radius: var(--radius);
 }
 .queue-card:hover { background: var(--c-surface-2); color: var(--c-text); border-color: var(--c-primary); }
-.queue-card.is-clear { border-left-color: var(--c-approved-border); border-color: var(--c-border); }
 .queue-icon {
     display: grid;
     place-items: center;
@@ -823,16 +814,15 @@ a.stat-card:hover { background: var(--c-surface-2); color: var(--c-text); border
     display: flex;
     flex-direction: column;
     gap: 8px;
-    padding: 16px;
+    padding: 18px 20px;
     background: var(--c-surface-2);
-    border: 1px solid var(--c-border);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
 }
 .type-card h3 { display: flex; align-items: center; gap: 8px; font-size: var(--fs-base); }
 .type-card h3 .icon { color: var(--c-primary); }
 .type-total strong { font-size: var(--fs-2xl); line-height: 1.1; }
-.status-counts { display: grid; gap: 6px; }
-.status-counts li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.status-counts { display: flex; flex-wrap: wrap; gap: 8px 16px; }   /* "Pending 1   Approved 21" on one line, not a stack */
+.status-counts li { display: inline-flex; align-items: center; gap: 8px; }
 .status-counts strong { font-variant-numeric: tabular-nums; }
 .type-note { color: var(--c-text-muted); font-size: var(--fs-sm); }
 .type-foot {
@@ -974,11 +964,7 @@ input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; accent-
     grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
     gap: 12px;
     align-items: end;
-    padding: 16px;
-    margin-bottom: 16px;
-    background: var(--c-surface-2);
-    border: 1px solid var(--c-border);
-    border-radius: var(--radius-sm);
+    margin-bottom: 18px;   /* no grey box around the filters: the fields are enough */
 }
 .field-search { grid-column: span 2; }
 .filter-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -1332,7 +1318,7 @@ td .field-error { margin-top: 4px; }
 /* Budget (includes/budget.php): the panel on the dashboard and program pages, the Budget page, and the note in the Approve dialog.
    The state is always in words with an icon; the colour only backs it up. */
 .budget-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
-.budget-item { display: grid; gap: 8px; padding: 14px 16px; background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.budget-item { display: grid; gap: 8px; padding: 16px 18px; background: var(--c-surface-2); border-radius: var(--radius); }
 .budget-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; }
 .budget-name { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; }
 .budget-name .icon, .budget-state .icon { width: 18px; height: 18px; flex: none; }
@@ -1342,10 +1328,10 @@ td .field-error { margin-top: 4px; }
 .budget-figures { margin: 0; color: var(--c-text-muted); font-size: var(--fs-sm); }
 .budget-figures strong { color: var(--c-text); }
 .budget-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.budget-item.state-warn { border-color: var(--c-pending-border); }
+.budget-item.state-warn { border: 1px solid var(--c-pending-border); }   /* the one state that needs a look gets an edge */
 .budget-item.state-warn .budget-state { color: var(--c-pending-text); }
 .budget-item.state-warn .budget-bar span { background: var(--c-pending-text); }
-.budget-item.state-over { border-color: var(--c-danger-border); }
+.budget-item.state-over { border: 1px solid var(--c-danger-border); }
 .budget-item.state-over .budget-state { color: var(--c-danger-text); }
 .budget-item.state-over .budget-bar span { background: var(--c-danger-text); }
 .budget-item.state-none .budget-state { color: var(--c-text-muted); }
@@ -1826,8 +1812,8 @@ kbd {
     grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
     gap: 16px;
-    height: calc(100vh - var(--topbar-h) - 48px);
-    height: calc(100dvh - var(--topbar-h) - 48px);
+    height: calc(100vh - var(--topbar-h) - 68px);     /* 68px = the page's own padding above (28px) and below (40px) */
+    height: calc(100dvh - var(--topbar-h) - 68px);
     min-height: 520px;
 }
 .review-docs { display: flex; flex-direction: column; gap: 10px; min-height: 0; padding: 14px; }
@@ -2036,6 +2022,7 @@ kbd {
     .btn-logout { padding: 8px 12px; }
     .topbar { gap: 6px; padding: 8px 12px; }
     .topbar-title p { display: none; }   /* keeps the sticky bar one line tall */
+    .topbar-title h1 { overflow: hidden; font-size: 1.375rem; text-overflow: ellipsis; white-space: nowrap; }   /* a phone: smaller, and a long name is cut with … instead of running under the buttons */
     .queue-card { flex-wrap: wrap; }
     .queue-icon { display: none; }
     .queue-main { flex-basis: 100%; }
@@ -2097,6 +2084,143 @@ kbd {
     /* The light/dark button in the menu keeps its icon and the old look (white text on navy would vanish on a white sidebar) */
     .sidebar-theme .nav-link { color: var(--c-side-text); }
     .sidebar-theme .nav-link:hover { background: var(--c-side-hover); color: var(--c-heading); }
+}
+
+/* ---------- Calm look ----------
+   Fewer boxes and fewer words, so what matters stands out: one thin-bordered card, one heading style, and colour only where
+   it means something (a status, a waiting count, a warning). Screen only (a printout keeps the plain look); colours are tokens,
+   so the dark theme follows. */
+@media screen {
+    /* Sidebar: the office, then the menu. The signed-in person is in the top bar already, and a menu needs no "Menu" label. */
+    .sidebar { padding: 16px 12px; }
+    .sidebar-brand { gap: 8px; padding: 0 8px 16px; margin-bottom: 12px; }
+    .sidebar-brand img { width: 84px; height: 84px; }
+    .sidebar-brand strong { font-size: var(--fs-sm); }
+    .sidebar-heading { display: none; }
+    .nav-list .nav-link { gap: 10px; min-height: 42px; padding: 8px 10px; border-radius: 8px; }
+    .nav-list .nav-link[aria-current="page"] { background: var(--c-primary-soft); }
+    .nav-count { min-width: 22px; padding: 0 7px; }
+    @media (min-width: 761px) { .sidebar-user { display: none; } }
+
+    /* Top bar: the role as a plain line instead of a pill, and a Log out without a frame */
+    .topbar .role-badge { padding: 0; background: none; color: var(--c-nav-muted); font-size: var(--fs-sm); font-weight: 500; }
+    .topbar .btn-logout { border-color: transparent; }
+
+    /* The top bar already names the page: a note under it is one quiet line, never a second title */
+    .page-intro { color: var(--c-text-muted); font-size: var(--fs-sm); }
+
+    /* The buttons at the top of the dashboard: one main action, the rest as plain links */
+    .quick-actions { align-items: center; gap: 8px; }
+    .quick-actions .btn-secondary { background: transparent; border-color: transparent; }
+    .quick-actions .btn-secondary:hover:not(:disabled) { background: var(--c-primary-soft); }
+
+    /* "Needs your action": the counts are the point, so the 14-day trend line is not drawn on the cards.
+       The icon and the text sit side by side and "Review" goes on its own line under them, so the text has the whole width. */
+    .queue-card .spark { display: none; }
+    .queue-card { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "icon main" "go go"; align-items: start; gap: 12px 14px; }
+    .queue-card .queue-icon { grid-area: icon; }
+    .queue-card .queue-main { grid-area: main; }
+    .queue-card .queue-go { grid-area: go; justify-self: end; align-self: end; }
+    .queue-warn { white-space: nowrap; }
+    .budget-panel .panel-sub { display: none; }
+    .type-foot { padding-top: 4px; border-top: 0; }
+
+    /* A section that is a second look at the same numbers folds away behind its heading (details/summary, no script) */
+    .panel-fold { padding: 0; }
+    .panel-fold > summary {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 24px;
+        list-style: none;
+        cursor: pointer;
+        border-radius: var(--radius);
+    }
+    .panel-fold > summary::-webkit-details-marker { display: none; }
+    .panel-fold > summary:hover { background: var(--c-surface-2); }
+    .panel-fold > summary h2 { margin-right: auto; font-size: var(--fs-lg); }
+    .panel-fold > summary .fold-hint { color: var(--c-primary); font-size: var(--fs-sm); font-weight: 600; }
+    .panel-fold > summary::after {
+        content: "";
+        flex: none;
+        width: 9px;
+        height: 9px;
+        margin: -4px 4px 0 0;
+        border-right: 2px solid var(--c-text-muted);
+        border-bottom: 2px solid var(--c-text-muted);
+        transform: rotate(45deg);
+        transition: transform 0.15s;
+    }
+    .panel-fold[open] > summary { border-bottom: 1px solid var(--c-border); border-radius: var(--radius) var(--radius) 0 0; }
+    .panel-fold[open] > summary::after { margin-top: 4px; transform: rotate(225deg); }
+    .panel-fold:not([open]) .fold-hide, .panel-fold[open] .fold-show { display: none; }
+    .panel-fold > .fold-body { padding: 20px 24px 24px; }
+    .panel-fold .panel-sub { margin: 0 0 16px; }
+
+    /* Trends: the charts sit straight on the panel instead of in a card of their own inside it */
+    .trends .chart { padding: 0; background: none; border: 0; }
+    .trends .chart figcaption h3 { font-size: var(--fs-md); }
+    .hm-summary span:nth-child(2) { display: none; }   /* the grey tiles already show which barangays have none */
+
+    /* Lists: the date is enough (the time is on the record). A row's buttons are quiet text buttons; where there are two,
+       the first (Review / View, the main one) keeps its frame. */
+    .cell-time { display: none; }
+    .data-table .cell-action .btn-secondary { border-color: transparent; }
+    .data-table .cell-action .btn-secondary:hover:not(:disabled) { background: var(--c-primary-soft); }
+    .data-table .row-actions > .btn-secondary:first-child:not(:only-child) { border-color: var(--c-primary); }
+    .nowrap { white-space: nowrap; }
+    /* Number cards: a row of 3, 4 or 6 fills its line instead of leaving one card alone on the next (a row of 5 keeps auto-fit) */
+    .stat-grid:has(> li:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .stat-grid:has(> li:nth-child(4):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stat-grid:has(> li:nth-child(6):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (min-width: 1100px) { .stat-grid:has(> li:nth-child(4):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+    @media (min-width: 1300px) { .stat-grid:has(> li:nth-child(6):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+    @media (max-width: 600px) {
+        .stat-grid:has(> li:nth-child(3):last-child) { grid-template-columns: minmax(0, 1fr); }
+        .stat-grid:has(> li:nth-child(6):last-child) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    .report-notes-fold > summary {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 36px;
+        color: var(--c-primary);
+        font-size: var(--fs-sm);
+        font-weight: 600;
+        list-style: none;
+        cursor: pointer;
+    }
+    .report-notes-fold > summary::-webkit-details-marker { display: none; }
+    .report-notes-fold > summary::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        border-right: 2px solid currentColor;
+        border-bottom: 2px solid currentColor;
+        transform: rotate(-45deg);
+        transition: transform 0.15s;
+    }
+    .report-notes-fold[open] > summary::before { transform: rotate(45deg); }
+    .report-notes-fold .report-notes { margin-top: 6px; }
+    .table-tools .source-filter { margin: 0; padding-bottom: 2px; }
+    .queue-warn { align-self: flex-start; }
+    .budget-head { gap: 4px 10px; }
+    .detail-missing { margin-top: 12px; padding-top: 12px; color: var(--c-text-muted); font-size: var(--fs-sm); border-top: 1px solid var(--c-border); }
+    .detail-card .detail-list + .detail-missing { margin-top: 4px; }
+}
+/* A phone hides the cards' icon (above): the text then takes the whole card, with no empty column in front of it */
+@media screen and (max-width: 480px) {
+    .queue-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "go"; }
+}
+/* Two charts: side by side from tablet width up (the reports' three-chart grid keeps its own columns) */
+@media screen and (min-width: 760px) {
+    .chart-grid.chart-grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .chart-grid.chart-grid-2 > :last-child:nth-child(n) { grid-column: auto; }
+}
+/* Dashboard, wide screens: Recent activity is as tall as the column beside it and scrolls inside, so neither leaves a blank strip */
+@media screen and (min-width: 1200px) {
+    .dash-grid > .activity { display: flex; flex-direction: column; min-height: 440px; contain: size; }
+    .dash-grid > .activity .activity-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 }
 
 /* ---------- Glass ----------

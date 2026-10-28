@@ -129,11 +129,7 @@ apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : 
               data-prefilled="<?= in_array($prefill['source'], ['same', 'other', 'profile']) ? '1' : '0' ?>"<?= own_data_attributes($prefill) ?>>
             <?php if ($edit !== null) render_edit_fields($edit); ?>
             <div class="ap-form-top">
-                <?php if ($edit !== null): ?>
-                    <span class="ap-eligible-chip ap-edit-chip"><i class="fas fa-pen"></i> Editing application #<?= (int)$edit['id'] ?></span>
-                <?php else: ?>
-                    <span class="ap-eligible-chip"><i class="fas fa-check-circle"></i> You're eligible to apply</span>
-                <?php endif; ?>
+                <?php /* No "You're eligible" / "Editing application" chip: being on this page already means it, and the banner above says it for an edit */ ?>
                 <p>Fields marked <span class="req">*</span> are required.</p>
             </div>
 

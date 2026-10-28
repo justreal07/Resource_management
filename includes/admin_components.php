@@ -103,12 +103,14 @@ function ui_status_cell(array $row): string
     return $html;
 }
 
-/** The Pending list's Source column: "Online", or "Walk-in · <name>" who encoded it (applicant.account_id / encoded_by). */
+/** The Pending list's Source column: "Online", or "Walk-in" with who keyed it in as the hover text (applicant.account_id / encoded_by). */
 function ui_source_cell(array $row): string
 {
     if (array_key_exists('account_id', $row) && $row['account_id'] !== null) return 'Online';
     $name = trim((string)($row['encoded_by_name'] ?? ''));
-    return 'Walk-in' . ($name !== '' ? ' · ' . ui_e($name) : '');
+    // The column says "Walk-in" on one line; who keyed it in is in the hover text (and on the record). "Walk-in · Jerome Vincent
+    // Lucban" wrapped over four or five lines in this narrow column and made every row tall.
+    return '<span class="nowrap"' . ($name !== '' ? ' title="Walk-in, keyed in by ' . ui_e($name) . '"' : '') . '>Walk-in</span>';
 }
 
 /** The Source filter on a Pending list (?source=online|walkin): which one is chosen, or null for both. */
@@ -270,9 +272,12 @@ function ui_load_error(string $what, string $retryUrl): string
 /** Title block at the top of the content area. */
 function ui_page_head(string $title, string $intro = '', string $actionsHtml = ''): string
 {
-    return '<div class="page-head"><div><h2>' . ui_e($title) . '</h2>'
-        . ($intro !== '' ? '<p class="panel-sub">' . ui_e($intro) . '</p>' : '') . '</div>'
-        . ($actionsHtml !== '' ? '<div class="page-actions">' . $actionsHtml . '</div>' : '') . '</div>';
+    // The top bar already shows the page's name: the same words again as a second heading right under it are only noise
+    $same = isset($GLOBALS['ui_page_heading']) && strcasecmp(trim($title), trim((string)$GLOBALS['ui_page_heading'])) === 0;
+    $left = ($same ? '' : '<h2>' . ui_e($title) . '</h2>') . ($intro !== '' ? '<p class="panel-sub">' . ui_e($intro) . '</p>' : '');
+    $actions = $actionsHtml !== '' ? '<div class="page-actions">' . $actionsHtml . '</div>' : '';
+    if ($left === '' && $actions === '') return '';
+    return '<div class="page-head">' . ($left !== '' ? '<div>' . $left . '</div>' : '') . $actions . '</div>';
 }
 
 /** What was typed in the "find an applicant by name" bar of a program page (?name=), trimmed; '' when empty. */
@@ -330,7 +335,7 @@ function ui_name_search(int $typeId, string $current): string
     return '<form class="name-search" method="GET" action="' . ui_e(ui_type_url($typeId, 'all')) . '" role="search">'
         . '<label for="nameSearch" class="visually-hidden">Find a ' . ui_e($short) . ' applicant by name</label>'
         . '<div class="input-icon">' . ui_icon('search')
-        . '<input type="search" id="nameSearch" name="name" maxlength="100" autocomplete="off" placeholder="Find a ' . ui_e($short) . ' applicant by name"></div>'
+        . '<input type="search" id="nameSearch" name="name" maxlength="100" autocomplete="off" placeholder="Find an applicant by name"></div>'   // (the page already says which program: no "a OPD")
         . '<button type="submit" class="btn btn-primary btn-sm">Find</button>'
         . '</form>';
 }
@@ -463,6 +468,7 @@ function ui_table(array $rows, array $columns, array $opts = []): string
         $html .= '<div class="table-tools">'
             . '<div class="field field-search"><label for="' . $id . 'q">Search this list</label>'
             . '<div class="input-icon">' . ui_icon('search') . '<input type="search" id="' . $id . 'q" data-table-search="' . $id . '" placeholder="' . ui_e($search) . '" autocomplete="off"></div></div>'
+            . ($opts['tools_extra'] ?? '')   // another control of the list (the Pending list's Source filter) on the same line as the search
             . '<p class="table-count" data-search-count="' . $id . '" data-noun="' . ui_e($noun) . '" data-total="' . $count . '" aria-live="polite">' . $plural($count) . '</p>'
             . '</div>';
     }
@@ -508,7 +514,7 @@ function ui_table(array $rows, array $columns, array $opts = []): string
                     break;
                 case 'datetime':
                     $content = $value ? '<time datetime="' . ui_e(date('c', strtotime($value))) . '">' . ui_e(ui_date($value)) . '</time>'
-                        . '<span class="cell-sub">' . ui_e(ui_date($value, 'g:i A')) . '</span>' : '<span class="muted">Not set</span>';
+                        . '<span class="cell-sub cell-time">' . ui_e(ui_date($value, 'g:i A')) . '</span>' : '<span class="muted">Not set</span>';
                     $sortKey = $value ? date('Y-m-d H:i:s', strtotime($value)) : '';
                     break;
                 case 'amount':
@@ -546,10 +552,19 @@ function ui_table(array $rows, array $columns, array $opts = []): string
 }
 
 /** Comma-separated address from whichever parts the row has. */
-function ui_address(array $row, bool $withStreet = false): string
+function ui_address(array $row, bool $withStreet = false, bool $skipServiceArea = false): string
 {
     $parts = $withStreet ? [trim(($row['house_no'] ?? '') . ' ' . ($row['street'] ?? ''))] : [];
-    foreach (['barangay', 'municipality', 'province'] as $k) $parts[] = $row[$k] ?? '';
+    foreach (['barangay', 'municipality', 'province'] as $k) {
+        $value = trim((string)($row[$k] ?? ''));
+        // $skipServiceArea (the lists on screen): every applicant is from General Mariano Alvarez, Cavite, so repeating it on each row
+        // is noise; a record from anywhere else still shows its place. Reports and exports keep the full address.
+        if ($skipServiceArea && defined('SERVICE_MUNICIPALITY') && defined('SERVICE_PROVINCE')
+            && (($k === 'municipality' && strcasecmp($value, SERVICE_MUNICIPALITY) === 0) || ($k === 'province' && strcasecmp($value, SERVICE_PROVINCE) === 0))) {
+            continue;
+        }
+        $parts[] = $value;
+    }
     return implode(', ', array_filter(array_map('trim', $parts), 'strlen'));
 }
 
@@ -1139,8 +1154,7 @@ function ui_type_overview(int $typeId, array $stats, array $recent, array $month
     $t = ui_types()[$typeId];
     [$short, $long] = ui_month_labels();
 
-    $html = ui_page_head($t['name'], 'Counts include every date. The chart shows the year you choose.')
-        . ui_type_tabs($typeId, 'overview');
+    $html = ui_type_tabs($typeId, 'overview');   // (the top bar names the program; the tabs say where you are)
 
     $cards = [
         ['label' => 'All applications', 'value' => number_format((int)$stats['total']), 'href' => ui_type_url($typeId, 'all'), 'icon' => 'inbox'],
@@ -1151,8 +1165,7 @@ function ui_type_overview(int $typeId, array $stats, array $recent, array $month
     $budget = in_array($typeId, budget_types(), true) && ui_area() === 'admin' ? ui_budget_panel($GLOBALS['pdo'], $typeId) : '';
     $html .= ui_stat_cards($cards) . $budget . $afterCards;
 
-    $html .= '<section class="panel" aria-labelledby="recentTitle"><div class="panel-head"><h3 id="recentTitle">Recent applications</h3>'
-        . '<p class="panel-sub">The 10 newest, from any date</p></div>'
+    $html .= '<section class="panel" aria-labelledby="recentTitle"><div class="panel-head"><h3 id="recentTitle">Recent applications</h3></div>'
         . ui_table($recent, [
             ['label' => 'Applicant', 'type' => 'person'],
             ['label' => 'Status', 'type' => 'status', 'key' => 'status'],
@@ -1268,8 +1281,17 @@ function ui_is_self_claimant(array $a): bool
 
 function ui_detail_card(string $title, string $icon, array $details): string
 {
-    return '<section class="panel detail-card"><h3>' . ui_icon($icon) . ui_e($title) . '</h3><dl class="detail-list">'
-        . implode('', $details) . '</dl></section>';
+    // A field nobody filled in is not a whole row of "Not given": the card lists what there is, and names what is missing once,
+    // in a quiet line under it (so the office still sees at a glance that, say, the contact number was left out)
+    $filled = $missing = [];
+    foreach ($details as $d) {
+        if (strpos($d, '<dd class="muted">Not given</dd>') !== false && preg_match('#<dt>(.*?)</dt>#', $d, $m)) $missing[] = $m[1];   // (the label is already escaped by ui_detail)
+        else $filled[] = $d;
+    }
+    return '<section class="panel detail-card"><h3>' . ui_icon($icon) . ui_e($title) . '</h3>'
+        . ($filled ? '<dl class="detail-list">' . implode('', $filled) . '</dl>' : '')
+        . ($missing ? '<p class="detail-missing">Not given: ' . implode(', ', $missing) . '</p>' : '')
+        . '</section>';
 }
 
 /**
@@ -1427,7 +1449,7 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
         . '<a class="back-link" href="' . ui_e($backHref) . '">' . ui_icon('chevron-left') . ui_e($backLabel) . '</a>'
         . '<div class="record-title"><div>'
         . '<h2>' . ui_e(ui_full_name($a)) . '</h2>'
-        . '<p class="panel-sub">Ref #' . (int)$a['id'] . ' · ' . ui_e($typeName) . ' · Filed ' . ui_e(date('M j, Y, g:i A', $filed)) . '</p>'
+        . '<p class="panel-sub">Ref #' . (int)$a['id'] . ' · ' . ui_e($typeName) . '</p>'   // (when it was filed is the first fact below)
         . '</div>' . ($review !== '' ? '<div class="record-title-side">' . ui_badge($a['status']) . $review . '</div>' : ui_badge($a['status'])) . '</div>'
         // At a glance: what the office looks at first
         . '<dl class="record-facts">'
@@ -1450,8 +1472,7 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
     $html .= ui_medical_reapply_panel($a);
 
     // Documents
-    $html .= '<section class="panel" aria-labelledby="docsTitle"><div class="panel-head"><h3 id="docsTitle">Submitted documents</h3>'
-        . '<p class="panel-sub">' . (count($documents) === 1 ? '1 document' : count($documents) . ' documents') . '</p></div>';
+    $html .= '<section class="panel" aria-labelledby="docsTitle"><div class="panel-head"><h3 id="docsTitle">Submitted documents</h3></div>';   // (the count is in the facts above)
     if (!$documents) {
         $html .= ui_state('inbox', 'No documents uploaded', 'Documents the applicant uploads online appear here.');
     } else {

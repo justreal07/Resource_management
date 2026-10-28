@@ -40,20 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 auth_page_start('Forgot password', 'login', function () { ?>
-    <span class="eyebrow"><i class="fas fa-key"></i> Account recovery</span>
     <h1>Forgot your <span class="accent">password</span>?</h1>
-    <p class="hero-lead">It happens. Tell us your username or email and we'll send you a link to choose a new password.</p>
-    <ul class="hero-trust">
-        <li><i class="fas fa-check-circle"></i> The link works once</li>
-        <li><i class="fas fa-check-circle"></i> It expires in <?php echo PASSWORD_RESET_MINUTES; ?> minutes</li>
-        <li><i class="fas fa-check-circle"></i> Your applications stay safe</li>
-    </ul>
+    <p class="hero-lead">Tell us your username or email and we'll send you a link to choose a new one. The link works once and expires in <?php echo PASSWORD_RESET_MINUTES; ?> minutes.</p>
 <?php });
 ?>
     <div class="auth-card-head">
-        <div class="card-icon"><i class="fas fa-key"></i></div>
         <h2><?php echo $sent ? 'Check your email' : 'Reset your password'; ?></h2>
-        <p><?php echo $sent ? 'We have done what we can from here.' : 'We\'ll email you a link to choose a new one.'; ?></p>
     </div>
 
     <?php auth_alerts($errors); ?>
@@ -76,7 +68,7 @@ auth_page_start('Forgot password', 'login', function () { ?>
             </ul>
         </div>
 
-        <a href="applicant_login" class="btn btn-primary btn-block"><i class="fas fa-arrow-left"></i> Back to Log in</a>
+        <a href="applicant_login" class="btn btn-primary btn-block">Back to log in</a>
         <p class="auth-switch"><a href="forgot_password">Try a different username or email</a></p>
     <?php else: ?>
         <form method="POST" class="auth-form" data-auth-form novalidate>
@@ -92,11 +84,9 @@ auth_page_start('Forgot password', 'login', function () { ?>
                 <span class="field-hint">We'll send the link to the email saved on your account.</span>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block"><i class="fas fa-paper-plane"></i> Send reset link</button>
+            <button type="submit" class="btn btn-primary btn-block">Send reset link</button>
         </form>
 
-        <p class="auth-switch">Remembered it? <a href="applicant_login">Log in</a></p>
-        <div class="auth-links"><a href="landingpage" class="auth-back"><i class="fas fa-arrow-left"></i> Back to Home</a></div>
-    <?php endif; ?>
+        <p class="auth-switch">Remembered it? <a href="applicant_login">Log in</a></p>    <?php endif; ?>
 <?php
 auth_page_end();

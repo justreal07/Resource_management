@@ -150,16 +150,16 @@ function apply_page_start(string $title, array $program, int $step, ?array $edit
 <section class="ap-hero tone-<?= e($program['tone']) ?>">
     <div class="ap-container">
         <div class="ap-hero-main">
-            <span class="ap-hero-icon"><i class="fas <?= e($program['icon']) ?>"></i></span>
             <div>
                 <?php if ($edit): ?>
                     <span class="ap-eyebrow">Editing · Application #<?= (int)$edit['id'] ?></span>
                     <h1><?= e($program['name']) ?></h1>
                     <p>Change what is wrong, then save. The office has not decided yet, so you can still correct it.</p>
                 <?php else: ?>
-                    <span class="ap-eyebrow">Application · <?= e($program['frequency']) ?></span>
+                    <?php /* The frequency rule is plain text under the title (it was an upper-case tag line above it) */ ?>
                     <h1><?= e($program['name']) ?></h1>
                     <p><?= e($program['tagline']) ?></p>
+                    <p class="ap-hero-note"><?= e($program['frequency']) ?></p>
                 <?php endif; ?>
             </div>
         </div>
@@ -251,7 +251,7 @@ function render_prefill_notice(array $prefill, array $program): void {
     ?>
     <div class="ap-notice ap-notice-info" id="prefillNotice">
         <i class="fas fa-magic"></i>
-        <div><strong>Saved you some time!</strong> <?= e($text) ?> Highlighted fields were filled in for you.</div>
+        <div><?= e($text) ?> Highlighted fields were filled in for you.</div>
         <button type="button" class="ap-link-btn" id="clearForm"><i class="fas fa-eraser"></i> Clear form</button>
     </div>
     <?php
@@ -281,19 +281,10 @@ function render_edit_notice(array $edit): void {
 function render_edit_sidebar(array $edit, string $other): void {
     ?>
     <aside class="ap-side">
+        <?php /* The notice at the top of the page already says how editing works, so this is only the two ways out */ ?>
         <div class="ap-card ap-side-card">
-            <h3><i class="fas fa-circle-info"></i> Good to know</h3>
-            <ul class="ap-checklist">
-                <li><i class="fas fa-hourglass-half"></i> Only a waiting application can be edited.</li>
-                <li><i class="fas fa-eye"></i> The office sees that you edited it.</li>
-                <li><i class="fas fa-list-ol"></i> It keeps its place in the line.</li>
-            </ul>
             <a href="<?= e($other) ?>" class="ap-link-btn"><i class="fas fa-arrow-right"></i> <?= strpos($other, 'edit_documents') === 0 ? 'Change my documents' : 'Edit my details' ?></a>
-        </div>
-        <div class="ap-card ap-side-card ap-side-help">
-            <h3><i class="fas fa-ban"></i> Not continuing?</h3>
-            <p>You can withdraw this application instead. You may apply again whenever you are ready.</p>
-            <a href="view_application?id=<?= (int)$edit['id'] ?>#withdraw" class="ap-link-btn"><i class="fas fa-arrow-right"></i> Withdraw this application</a>
+            <a href="view_application?id=<?= (int)$edit['id'] ?>#withdraw" class="ap-link-btn"><i class="fas fa-ban"></i> Withdraw instead</a>
         </div>
     </aside>
     <?php
@@ -312,10 +303,7 @@ function render_form_sidebar(array $program): void {
                 <?php endforeach; ?>
             </ul>
         </div>
-        <div class="ap-card ap-side-card ap-side-help">
-            <h3><i class="fas fa-headset"></i> Need help?</h3>
-            <p>Call <a href="tel:+63461234567">(046) 123-4567</a> or visit the Municipal Hall, Monday to Friday, 8:00 AM – 5:00 PM.</p>
-        </div>
+        <?php /* The phone number is in the footer of every page, so there is no separate "Need help?" card here */ ?>
     </aside>
     <?php
 }

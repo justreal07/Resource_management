@@ -99,11 +99,15 @@ echo ui_tabs($tabItems, $f['report'], 'Report type');
 ?>
 
 <?php if ($model['notes']): ?>
-    <ul class="report-notes">
-        <?php foreach ($model['notes'] as $note): ?>
-            <li><?= ui_icon('info') ?><span><?= ui_e($note) ?></span></li>
-        <?php endforeach; ?>
-    </ul>
+    <?php /* the long "how to read the numbers" lines sit behind one heading until someone wants them */ ?>
+    <details class="report-notes-fold no-print">
+        <summary>How the numbers are counted</summary>
+        <ul class="report-notes">
+            <?php foreach ($model['notes'] as $note): ?>
+                <li><?= ui_icon('info') ?><span><?= ui_e($note) ?></span></li>
+            <?php endforeach; ?>
+        </ul>
+    </details>
 <?php endif; ?>
 
 <div class="report-section" id="reportContent">

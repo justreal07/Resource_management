@@ -85,29 +85,10 @@
 .ch-grid { list-style: none; margin: 0; padding: 0; }
 .ch-card-title { font-size: 1.4rem; margin: 0 0 8px; color: var(--ink); line-height: 1.25; }
 .ch-tagline { margin: 0 0 14px; color: var(--body); font-size: 0.97rem; }
-.ch-often {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    margin: 0 0 16px;
-    font-size: 0.93rem;
-    color: var(--ink);
-}
-.ch-often i { margin-top: 0.25em; color: var(--navy); }
+.ch-often { margin: 0 0 16px; font-size: 0.93rem; color: var(--muted); }   /* how often one can apply: plain muted text */
 
-/* The program's own colour on its icon (tone-red / tone-blue / tone-green from home.css);
-   scoped here so the home page keeps its one-colour cards */
-.ch-card .program-icon.tone-red   { background: linear-gradient(135deg, #ef5350, #c62828); }
-.ch-card .program-icon.tone-blue  { background: linear-gradient(135deg, #3f6fd8, var(--navy)); }
-.ch-card .program-icon.tone-green { background: linear-gradient(135deg, #2bb673, #1b7f4c); }
-
-/* The icon sits inside the picture area (it would be cut off at the picture's lower edge) */
-.ch-card .program-icon { bottom: 14px; }
-.ch-card .program-body { padding-top: 26px; }
-
-/* "What you'll need" is a heading here (for screen readers), shown at the size of the home page's label */
-.ch-card .program-body .req-title { font-size: 0.78rem; line-height: 1.4; margin: 0 0 12px; }
-.ch-card .req-count { flex: none; white-space: nowrap; }   /* "5 photos" stays on one line */
+.ch-card .program-body { padding-top: 8px; }
+.ch-card .req-count { flex: none; white-space: nowrap; }
 
 /* The status line ("Available") sits right above the button */
 .ch-card .eligibility { margin: 0 0 14px; }

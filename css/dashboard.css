@@ -130,6 +130,7 @@
 }
 .db-topbar::before { display: none; }
 .db-topbar-inner { height: 60px; padding: 0 28px; gap: 12px; }
+.db-topbar-inner .acc-nav { margin-left: auto; }   /* the date that used to push these to the right is gone */
 .db-topbar-date { margin-right: auto; color: var(--db-muted); font-size: 0.88rem; display: inline-flex; align-items: center; gap: 8px; }
 .db-menu-toggle, .db-topbar-brand { display: none; }
 .db-topbar-brand .ap-brand-logos img { width: 34px; height: 34px; }

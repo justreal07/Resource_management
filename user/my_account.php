@@ -218,9 +218,7 @@ if ($initial_filter === 'Not_approved') $initial_filter = 'Disapproved';
 if (!in_array($initial_filter, ['All', 'Pending', 'Approved', 'Disapproved', 'Withdrawn'], true)) $initial_filter = 'All';
 
 account_page_start($ctx, 'My Account', 'account', [
-    'eyebrow'  => 'My Account',
     'title'    => 'Hello, ' . $user['firstname'] . '!',
-    'subtitle' => 'Track your applications and manage your account settings.',
     'icon'     => 'fa-user-circle',
     'actions'  => '<a href="landingpage#programs" class="ap-btn acc-btn-gold"><i class="fas fa-plus"></i> New Application</a>',
 ], 'account');
@@ -243,7 +241,7 @@ account_page_start($ctx, 'My Account', 'account', [
         <div class="acc-completion-top"><span>Profile completeness</span><strong><?= $completion ?>%</strong></div>
         <div class="ap-progress-bar"><span style="width: <?= $completion ?>%"></span></div>
         <?php if ($completion < 100): ?>
-            <a href="#profile" class="ap-link-btn" data-tab-link="profile"><i class="fas fa-user-edit"></i> Complete your profile to auto-fill forms faster</a>
+            <a href="#profile" class="ap-link-btn" data-tab-link="profile"><i class="fas fa-user-edit"></i> Complete your profile</a>
         <?php else: ?>
             <p class="acc-small acc-ok"><i class="fas fa-check-circle"></i> Your profile is complete.</p>
         <?php endif; ?>
@@ -260,15 +258,7 @@ account_page_start($ctx, 'My Account', 'account', [
 
 <!-- ============ APPLICATIONS ============ -->
 <section class="acc-panel" data-panel="applications" role="tabpanel">
-    <div class="acc-stats<?= $counts['Withdrawn'] > 0 ? ' has-withdrawn' : '' ?>">
-        <?php foreach (array_filter([['All', 'Total', 'fa-folder', 'navy'], ['Pending', 'Pending', 'fa-hourglass-half', 'amber'], ['Approved', 'Approved', 'fa-check', 'green'], ['Disapproved', 'Declined', 'fa-times', 'red'], $counts['Withdrawn'] > 0 ? ['Withdrawn', 'Withdrawn', 'fa-ban', 'slate'] : null]) as [$key, $label, $icon, $tone]): ?>
-        <button type="button" class="acc-stat tone-<?= $tone ?>" data-filter-status="<?= $key ?>">
-            <span class="acc-stat-icon"><i class="fas <?= $icon ?>"></i></span>
-            <span><strong><?= $counts[$key === 'All' ? 'all' : $key] ?></strong><small><?= $label ?></small></span>
-        </button>
-        <?php endforeach; ?>
-    </div>
-
+    <?php /* The four count tiles are gone: the status chips above the list (All / Pending / Approved / Declined, with the same counts) do the same filtering */ ?>
     <h3 class="acc-h3">Apply for assistance</h3>
     <div class="acc-programs">
         <?php foreach ($program_status as $p):
@@ -278,13 +268,11 @@ account_page_start($ctx, 'My Account', 'account', [
             <span class="acc-program-icon tone-<?= $p['tone'] ?>"><i class="fas <?= $p['icon'] ?>"></i></span>
             <div class="acc-program-body">
                 <h4><?= e($p['name']) ?></h4>
-                <small class="ap-muted"><?= e($p['frequency']) ?></small>
+                <?php /* Only a status that matters: when one can apply again, or that one is waiting. (The long "how often" rule is on the form itself.) */ ?>
                 <?php if (!$ok && $next): ?>
                     <p class="acc-state wait"><i class="fas fa-calendar-alt"></i> Available on <?= e(date('M d, Y', strtotime($next))) ?></p>
                 <?php elseif ($p['pending']): ?>
-                    <p class="acc-state info"><i class="fas fa-hourglass-half"></i> <?= $p['pending'] ?> pending application<?= $p['pending'] > 1 ? 's' : '' ?></p>
-                <?php else: ?>
-                    <p class="acc-state ok"><i class="fas fa-check-circle"></i> <?= (int)$p['type_id'] === 1 ? 'Open your Medical record for your next date and permission status' : 'You can start a form; eligibility is checked for the patient' ?></p>
+                    <p class="acc-state info"><i class="fas fa-hourglass-half"></i> <?= $p['pending'] ?> pending</p>
                 <?php endif; ?>
             </div>
             <?php if ($ok): ?>

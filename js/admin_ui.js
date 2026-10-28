@@ -1026,6 +1026,19 @@
         return texts.reduce((w, t) => Math.max(w, t ? ctx.measureText(t).width : 0), 0);
     }
 
+    // Chart.js gives the names beside the bars at most 40% of the chart's width and clips what does not fit ("edical Assistance" in a
+    // narrow card): a name that would not fit is cut with "…" (the hover box still shows it whole). 16px stay free for the axis's padding.
+    function fitLabel(text, chartWidth, font) {
+        const room = chartWidth * 0.4 - 16;
+        if (!(room > 40)) return text;   // the chart has not been measured yet: leave the name alone
+        const ctx = document.createElement('canvas').getContext('2d');
+        ctx.font = '14px ' + font;
+        if (ctx.measureText(text).width <= room) return text;
+        let cut = text;
+        while (cut.length > 1 && ctx.measureText(cut + '…').width > room) cut = cut.slice(0, -1);
+        return cut.trimEnd() + '…';
+    }
+
     // Every colour of a chart comes from the page's theme (light or dark): paintChart() puts them into the chart's settings,
     // when it is drawn and again when the theme changes, so a chart never has to be rebuilt (the staff page's "top 10" cut stays)
     function paintChart(spec, config) {
@@ -1137,7 +1150,8 @@
                     scales: {
                         x: { display: false, beginAtZero: true },
                         y: { grid: { display: false }, border: { display: false },
-                             ticks: { callback(v) { const l = this.getLabelForValue(v); return l.length > 24 ? l.slice(0, 23) + '…' : l; } } }
+                             ticks: { callback(v) { const l = this.getLabelForValue(v); return fitLabel(l.length > 24 ? l.slice(0, 23) + '…' : l, this.chart.width, font); } },
+                             afterFit(scale) { scale.width += 10; } }   // a bar's name is drawn a few pixels wider than Chart.js measured it: without this room its first letter is cut at the card's edge
                     },
                     plugins: { tooltip: tooltip }
                 }
@@ -1154,7 +1168,8 @@
                     layout: { padding: { right: endLabelRoom } },
                     scales: {
                         x: { stacked: true, display: false, beginAtZero: true },
-                        y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { font: { weight: '600' } } }
+                        y: { stacked: true, grid: { display: false }, border: { display: false }, ticks: { font: { weight: '600' } },
+                             afterFit(scale) { scale.width += 10; } }   // (same room as the single-colour bars)
                     },
                     plugins: {
                         legend: { display: true, position: 'top', align: 'start', onClick: () => {},

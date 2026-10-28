@@ -27,8 +27,6 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
     <div class="container">
         <div class="topbar-info">
             <span><i class="fas fa-landmark"></i> Municipality of General Mariano Alvarez, Cavite</span>
-            <span><i class="fas fa-phone"></i> (046) 123-4567</span>
-            <span><i class="far fa-clock"></i> Mon – Fri, 8:00 AM – 5:00 PM</span>
         </div>
         <?php portal_text_size_buttons(); ?>
     </div>
@@ -101,7 +99,6 @@ function auth_page_end(): void {
     <div class="footer-bottom">
         <div class="container">
             <span>&copy; <?= date("Y") ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>
-            <span class="gold">LGU Assistance Portal</span>
         </div>
     </div>
 </footer>

@@ -129,10 +129,9 @@ $programs = [
 <!-- TOP UTILITY BAR -->
 <div class="topbar">
     <div class="container">
+        <?php /* The phone number and office hours are in the Contact section; the top bar only names the municipality */ ?>
         <div class="topbar-info">
             <span><i class="fas fa-landmark"></i> Municipality of General Mariano Alvarez, Cavite</span>
-            <span><i class="fas fa-phone"></i> (046) 123-4567</span>
-            <span><i class="far fa-clock"></i> Mon – Fri, 8:00 AM – 5:00 PM</span>
         </div>
         <?php portal_text_size_buttons(); ?>
     </div>
@@ -244,7 +243,7 @@ $programs = [
 <main id="main">
 
 <!-- HERO -->
-<section class="hero">
+<section class="hero hero-home">
     <div class="hero-media" aria-hidden="true">
         <?php /* The photo shows first. The (small) video is only loaded on a wider screen, when the visitor isn't saving data and hasn't asked for less motion, so a phone on mobile data never downloads it. */ ?>
         <video id="heroVideo" muted loop playsinline preload="none" poster="../asset/hero-municipal.jpg" data-src="../asset/muni-small.mp4"></video>
@@ -260,83 +259,38 @@ $programs = [
         </script>
     </div>
 
-    <div class="container hero-grid">
+    <?php /* Signed out: a headline and the two ways in. Signed in: the greeting and the three programs to start from. (The old "3 easy steps" card, the badge, the tick list and the four-box strip repeated How to Apply, the Contact section and the menu.) */ ?>
+    <div class="container hero-grid<?php echo $is_logged_in ? '' : ' hero-grid-single'; ?>">
         <div class="hero-text">
-            <span class="eyebrow"><i class="fas fa-shield-alt"></i> Official LGU Assistance Portal</span>
-
             <?php if($is_logged_in): ?>
                 <?php /* The greeting is re-written by the script below with the time on the visitor's own device, typed out */ ?>
                 <h1 class="hero-greeting" data-greeting data-name="<?php echo htmlspecialchars($_SESSION['applicant']['firstname']); ?>"><?php echo $greeting; ?>, <span class="accent"><?php echo htmlspecialchars($_SESSION['applicant']['firstname']); ?></span>!</h1>
-                <p class="hero-lead"><span data-greeting-fil>Magandang araw!</span> Apply for assistance, upload your requirements and follow your application — all in one place, anytime.</p>
-                
+                <p class="hero-lead">Start a new application, or check on one you already sent.</p>
             <?php else: ?>
                 <h1>Tulong para sa bawat <span class="accent">pamilyang GMA</span>.</h1>
-                <p class="hero-lead">Request Medical, Burial and OPD assistance from your municipal government online — no long lines, and you can follow your application every step of the way.</p>
+                <p class="hero-lead">Apply for Medical, Burial and OPD assistance online. No long lines, and you can follow your application from home.</p>
                 <div class="hero-cta">
-                    <a href="#programs" class="btn btn-ghost-light"><i class="fas fa-th-large"></i> View Programs</a>
+                    <a href="applicant_register" class="btn btn-gold">Create free account</a>
+                    <a href="applicant_login" class="btn btn-ghost-light">Log in</a>
                 </div>
             <?php endif; ?>
-
-            <ul class="hero-trust">
-                <li><i class="fas fa-check-circle"></i> For GMA, Cavite residents</li>
-                <li><i class="fas fa-check-circle"></i> Apply online 24/7</li>
-                <li><i class="fas fa-check-circle"></i> Real-time status updates</li>
-                <li><i class="fas fa-check-circle"></i> Office hours 8:00 AM - 5:00 PM</li>
-            </ul>
         </div>
 
+        <?php if($is_logged_in): ?>
         <aside class="hero-card">
-            <?php if($is_logged_in): ?>
-                <h3>Quick apply</h3>
-                <p>Choose the assistance you need to get started.</p>
-                <div class="quick-apply-list">
-                    <?php foreach($programs as $p): ?>
-                    <a href="<?php echo $p['url']; ?>" class="quick-apply">
-                        <span class="qa-icon <?php echo $p['tone']; ?>"><i class="fas <?php echo $p['icon']; ?>"></i></span>
-                        <span><?php echo $p['name']; ?><small><?php echo $p['short']; ?></small></span>
-                        <i class="fas fa-arrow-right"></i>
-                    </a>
-                    <?php endforeach; ?>
-                </div>
-                <a href="my_documents" class="btn btn-outline btn-block btn-sm"><i class="fas fa-folder-open"></i> My Documents</a>
-            <?php else: ?>
-                <h3>Get help in 3 easy steps</h3>
-                <p>Mabilis at madali — no need to visit the office first.</p>
-                <ol class="mini-steps">
-                    <li><span class="num">1</span><div><strong>Create your account</strong><span>Register with your basic details.</span></div></li>
-                    <li><span class="num">2</span><div><strong>Fill out the form</strong><span>Pick a program and upload requirements.</span></div></li>
-                    <li><span class="num">3</span><div><strong>Track your status</strong><span>Get notified once it's reviewed.</span></div></li>
-                </ol>
-                <div class="hero-card-actions">
-                    <a href="applicant_login" class="btn btn-outline btn-sm">Log in</a>
-                    <a href="applicant_register" class="btn btn-primary btn-sm">Sign up</a>
-                </div>
-            <?php endif; ?>
+            <h3>Quick apply</h3>
+            <div class="quick-apply-list">
+                <?php foreach($programs as $p): ?>
+                <a href="<?php echo $p['url']; ?>" class="quick-apply">
+                    <span class="qa-icon <?php echo $p['tone']; ?>"><i class="fas <?php echo $p['icon']; ?>"></i></span>
+                    <span><?php echo $p['name']; ?><small><?php echo $p['short']; ?></small></span>
+                    <i class="fas fa-arrow-right"></i>
+                </a>
+                <?php endforeach; ?>
+            </div>
+            <a href="my_documents" class="btn btn-outline btn-block btn-sm"><i class="fas fa-folder-open"></i> My Documents</a>
         </aside>
-    </div>
-</section>
-
-<!-- HIGHLIGHTS -->
-<section class="highlights">
-    <div class="container">
-        <div class="highlight-grid reveal">
-            <div class="highlight">
-                <div class="highlight-icon"><i class="fas fa-home"></i></div>
-                <div><h4>For Residents</h4><p>Services for legitimate residents of GMA, Cavite.</p></div>
-            </div>
-            <div class="highlight">
-                <div class="highlight-icon"><i class="fas fa-laptop-house"></i></div>
-                <div><h4>Apply from Home</h4><p>Submit forms and documents online, anytime.</p></div>
-            </div>
-            <div class="highlight">
-                <div class="highlight-icon"><i class="fas fa-bell"></i></div>
-                <div><h4>Stay Updated</h4><p>See if your request is pending, approved or declined.</p></div>
-            </div>
-            <div class="highlight">
-                <div class="highlight-icon"><i class="fas fa-comments"></i></div>
-                <div><h4>Help Is Here</h4><p>Ask our assistant in Filipino or English.</p></div>
-            </div>
-        </div>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -353,18 +307,14 @@ $programs = [
                     </a>
                     <div>
                         <h2>Welcome back, <?php echo htmlspecialchars($_SESSION['applicant']['firstname']); ?>!</h2>
-                        <p>
-                            <?php if($notification_count): ?>
-                                You have <strong><?php echo $notification_count; ?> new update<?php echo $notification_count > 1 ? 's' : ''; ?></strong> on your applications.
-                            <?php else: ?>
-                                Here's an overview of your applications.
-                            <?php endif; ?>
-                        </p>
+                        <?php /* Only said when there is news; otherwise the heading is enough. (The bell in the header and the Latest Updates card below already open the updates, so there is no separate Updates button.) */ ?>
+                        <?php if($notification_count): ?>
+                        <p>You have <strong><?php echo $notification_count; ?> new update<?php echo $notification_count > 1 ? 's' : ''; ?></strong> on your applications.</p>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <div class="dashboard-actions">
-                    <a href="user_notifications" class="btn btn-ghost-light btn-sm"><i class="fas fa-bell"></i> Updates<?php if($notification_count): ?> <span class="pill"><?php echo $notification_count; ?></span><?php endif; ?></a>
-                    <a href="my_account" class="btn btn-gold btn-sm"><i class="fas fa-external-link-alt"></i> View Full Dashboard</a>
+                    <a href="my_account" class="btn btn-gold btn-sm">My account <i class="fas fa-arrow-right"></i></a>
                 </div>
             </div>
 
@@ -458,9 +408,8 @@ $programs = [
 <section class="section" id="programs">
     <div class="container">
         <div class="section-head reveal">
-            <span class="section-tag">Our Services</span>
-            <h2>Available Assistance Programs</h2>
-            <p>Select the assistance you need. Prepare the listed requirements to make your application faster.</p>
+            <h2>Assistance programs</h2>
+            <p>Choose the help you need.</p>
         </div>
 
         <div class="program-grid">
@@ -468,24 +417,20 @@ $programs = [
             <article class="program-card is-<?php echo str_replace('tone-', '', $p['tone']); ?> reveal">
                 <div class="program-media">
                     <img src="<?php echo $p['img']; ?>" alt="<?php echo $p['name']; ?>" loading="lazy">
-                    <span class="program-icon"><i class="fas <?php echo $p['icon']; ?>"></i></span>
                 </div>
                 <div class="program-body">
-                    <span class="program-kicker"><?php echo $p['short']; ?></span>
                     <h3><?php echo $p['name']; ?></h3>
                     <p><?php echo $p['desc']; ?></p>
 
-                    <div class="req-panel">
-                        <div class="req-title">
-                            <span><i class="fas fa-folder-open"></i> What to prepare</span>
-                            <span class="req-count"><?php echo count($p['reqs']); ?> items</span>
-                        </div>
+                    <?php /* The list of papers is folded, so the three cards stay the same short height; one click opens it */ ?>
+                    <details class="req-fold">
+                        <summary>What to prepare <span class="req-count"><?php echo count($p['reqs']); ?></span></summary>
                         <ul class="req-list">
                             <?php foreach($p['reqs'] as $req): ?>
                                 <li><i class="fas fa-check"></i> <?php echo htmlspecialchars($req); ?></li>
                             <?php endforeach; ?>
                         </ul>
-                    </div>
+                    </details>
 
                     <?php if($is_logged_in): ?>
                         <?php $elig = $assistance_eligibility[$type_id] ?? null; ?>
@@ -500,9 +445,9 @@ $programs = [
                                 <span>You're eligible to apply</span>
                             </div>
                         <?php endif; ?>
-                        <a href="<?php echo $p['url']; ?>" class="btn btn-primary btn-block program-cta">Apply Now <i class="fas fa-arrow-right"></i></a>
+                        <a href="<?php echo $p['url']; ?>" class="btn btn-primary btn-block program-cta">Apply now <i class="fas fa-arrow-right"></i></a>
                     <?php else: ?>
-                        <a href="applicant_login" class="btn btn-primary btn-block program-cta"><i class="fas fa-sign-in-alt"></i> Log in to Apply <i class="fas fa-arrow-right"></i></a>
+                        <a href="applicant_login" class="btn btn-primary btn-block program-cta">Log in to apply <i class="fas fa-arrow-right"></i></a>
                     <?php endif; ?>
                 </div>
             </article>
@@ -515,9 +460,8 @@ $programs = [
 <section class="section section-alt" id="how-it-works">
     <div class="container">
         <div class="section-head reveal">
-            <span class="section-tag">Paano Mag-apply</span>
-            <h2>How to Apply</h2>
-            <p>Four simple steps from sign-up to approval.</p>
+            <h2>How to apply</h2>
+            <p>Four steps, from sign-up to approval.</p>
         </div>
         <div class="steps-grid">
             <div class="step reveal">
@@ -548,9 +492,7 @@ $programs = [
 <section class="section" id="faq">
     <div class="container">
         <div class="section-head reveal">
-            <span class="section-tag">Mga Madalas Itanong</span>
-            <h2>Frequently Asked Questions</h2>
-            <p>Quick answers to the most common questions from applicants.</p>
+            <h2>Frequently asked questions</h2>
         </div>
 
         <div class="faq-layout">
@@ -623,26 +565,16 @@ $programs = [
                 </details>
             </div>
 
-            <?php /* data-type-line: typed out one after another when the card scrolls into view (script below) */ ?>
-            <aside class="help-card reveal" data-type-card>
-                <div class="help-icon"><i class="fas fa-headset"></i></div>
-                <h3>Need more help?</h3>
+            <?php /* The phone, email and hours are in the Contact section just below, so this card only offers the chat and the tour */ ?>
+            <aside class="help-card reveal">
+                <h3>Still have a question?</h3>
+                <p>Ask our virtual assistant in Filipino or English.</p>
                 <?php if($is_logged_in): ?>
-                <p data-type-line>Our virtual assistant can answer your questions in Filipino or English, or you can reach our office directly.</p>
+                <button type="button" class="btn btn-primary btn-block" onclick="openChat()"><i class="fas fa-comment-dots"></i> Chat with Assistant</button>
                 <?php else: ?>
-                <p data-type-line>Sign in to ask our virtual assistant in Filipino or English, or reach our office directly.</p>
+                <a href="applicant_login" class="btn btn-primary btn-block">Log in to chat</a>
                 <?php endif; ?>
-                <ul class="help-lines">
-                    <li><i class="fas fa-phone"></i> <span data-type-line>(046) 123-4567</span></li>
-                    <li><i class="fas fa-envelope"></i> <span data-type-line>assistance@lgu.gov.ph</span></li>
-                    <li><i class="far fa-clock"></i> <span data-type-line>Mon – Fri, 8:00 AM – 5:00 PM</span></li>
-                </ul>
-                <?php if($is_logged_in): ?>
-                <button type="button" class="btn btn-gold btn-block" onclick="openChat()"><i class="fas fa-comment-dots"></i> Chat with Assistant</button>
-                <?php else: ?>
-                <a href="applicant_login" class="btn btn-gold btn-block"><i class="fas fa-sign-in-alt"></i> Sign in to chat with our Assistant</a>
-                <?php endif; ?>
-                <button type="button" class="btn btn-ghost-light btn-block" data-tour-start><i class="fas fa-route"></i> Take a guided tour</button>
+                <button type="button" class="help-tour" data-tour-start><i class="fas fa-route"></i> Take a guided tour</button>
             </aside>
         </div>
     </div>
@@ -654,9 +586,7 @@ $programs = [
 <section class="section section-alt" id="contact">
     <div class="container">
         <div class="section-head reveal">
-            <span class="section-tag">Visit or Call Us</span>
-            <h2>Contact Information</h2>
-            <p>Our team at the Municipal Hall is ready to assist you.</p>
+            <h2>Contact us</h2>
         </div>
         <div class="contact-grid">
             <div class="contact-cards reveal">
@@ -706,7 +636,6 @@ $programs = [
                     <small>LGU General Mariano Alvarez</small>
                 </span>
             </a>
-            <p>Making public assistance simpler, faster and more accessible for every resident of GMA, Cavite.</p>
             <div class="footer-social">
                 <a href="https://www.facebook.com/CommunityAffairsECAccess" target="_blank" rel="noopener" class="social-fb" aria-label="Facebook" title="Facebook"><i class="fab fa-facebook-f"></i></a>
                 <a href="https://www.instagram.com/lgu_gma/" target="_blank" rel="noopener" class="social-ig" aria-label="Instagram" title="Instagram"><i class="fab fa-instagram"></i></a>
@@ -737,23 +666,7 @@ $programs = [
                 <?php endif; ?>
             </ul>
         </div>
-        <div>
-            <h4>Programs</h4>
-            <ul class="footer-links">
-                <?php foreach($programs as $p): ?>
-                    <li><a href="#programs"><?php echo $p['name']; ?></a></li>
-                <?php endforeach; ?>
-            </ul>
-        </div>
-        <div>
-            <h4>Get in Touch</h4>
-            <ul class="footer-links">
-                <li><i class="fas fa-phone"></i>(046) 123-4567</li>
-                <li><i class="fas fa-envelope"></i>assistance@lgu.gov.ph</li>
-                <li><i class="far fa-clock"></i>Mon – Fri, 8 AM – 5 PM</li>
-                <li><i class="fas fa-map-marker-alt"></i>Municipal Hall, GMA, Cavite</li>
-            </ul>
-        </div>
+        <?php /* No Programs or contact columns here: the Programs and Contact sections sit right above the footer */ ?>
         <div class="footer-qr">
             <h4>Scan Me</h4>
             <img src="../asset/footer_qr.jpg" alt="QR code" width="240" height="240" loading="lazy">
@@ -762,8 +675,6 @@ $programs = [
     <div class="footer-bottom">
         <div class="container">
             <span>&copy; <?= date("Y") ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>
-            <span class="gold">LGU Assistance Portal</span>
-            <span><a href="privacy" style="color:inherit;">Data Privacy Notice</a></span>
             <!-- Required credit: program illustrations are from Storyset (Freepik License) -->
             <span><a href="https://storyset.com/" target="_blank" rel="noopener" style="color:inherit;">Illustrations by Storyset</a></span>
         </div>

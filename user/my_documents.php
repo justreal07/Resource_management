@@ -25,7 +25,6 @@ foreach ($rows as $r) {
 }
 
 account_page_start($ctx, 'My Documents', 'documents', [
-    'eyebrow'  => 'My Account',
     'title'    => 'My Documents',
     'subtitle' => count($rows) . ' file' . (count($rows) === 1 ? '' : 's') . ' from ' . count($apps) . ' application' . (count($apps) === 1 ? '' : 's') . '.',
     'icon'     => 'fa-folder-open',

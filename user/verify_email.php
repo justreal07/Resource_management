@@ -22,14 +22,12 @@ try {
 $signedIn = isset($_SESSION['applicant']);
 
 auth_page_start('Confirm your email', 'login', function () { ?>
-    <span class="eyebrow"><i class="fas fa-envelope-circle-check"></i> Email confirmation</span>
     <h1>Confirm your <span class="accent">email</span>.</h1>
     <p class="hero-lead">A confirmed email lets you reset your password yourself, any time, without going to the office.</p>
 <?php });
 ?>
     <?php if ($account): ?>
         <div class="auth-card-head">
-            <div class="card-icon"><i class="fas fa-circle-check"></i></div>
             <h2>Email confirmed</h2>
             <p><?php echo htmlspecialchars($account['email']); ?></p>
         </div>
@@ -44,7 +42,6 @@ auth_page_start('Confirm your email', 'login', function () { ?>
         <?php endif; ?>
     <?php else: ?>
         <div class="auth-card-head">
-            <div class="card-icon"><i class="fas fa-link-slash"></i></div>
             <h2>This link is not valid</h2>
             <p>It may have expired, was already used, or your email was changed.</p>
         </div>

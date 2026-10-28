@@ -59,18 +59,12 @@ if ($account && $_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 auth_page_start('Choose a new password', 'login', function () { ?>
-    <span class="eyebrow"><i class="fas fa-key"></i> Account recovery</span>
     <h1>Choose a <span class="accent">new password</span>.</h1>
-    <p class="hero-lead">Pick something you'll remember, with at least 8 characters, letters and numbers.</p>
-    <ul class="hero-trust">
-        <li><i class="fas fa-check-circle"></i> Your applications stay as they are</li>
-        <li><i class="fas fa-check-circle"></i> You'll log in with the new password</li>
-    </ul>
+    <p class="hero-lead">Use at least 8 characters, with letters and numbers. Your applications stay as they are.</p>
 <?php });
 ?>
     <?php if (!$account): ?>
         <div class="auth-card-head">
-            <div class="card-icon"><i class="fas fa-link-slash"></i></div>
             <h2>This link is not valid</h2>
             <p>It may have expired, or it was already used.</p>
         </div>
@@ -82,7 +76,6 @@ auth_page_start('Choose a new password', 'login', function () { ?>
         <p class="auth-switch"><a href="applicant_login">Back to Log in</a></p>
     <?php else: ?>
         <div class="auth-card-head">
-            <div class="card-icon"><i class="fas fa-lock"></i></div>
             <h2>Choose a new password</h2>
             <p>For <strong><?php echo htmlspecialchars($account['firstname'] . ' ' . $account['lastname']); ?></strong> (@<?php echo htmlspecialchars($account['username']); ?>)</p>
         </div>

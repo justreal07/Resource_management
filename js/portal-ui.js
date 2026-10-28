@@ -343,7 +343,7 @@
             steps: [
                 { el: '.acc-summary', title: 'Your profile', text: 'A complete profile fills in your application forms for you.' },
                 { el: '.acc-tabs', title: 'Account sections', text: 'Switch between your applications, profile, password and preferences such as text size.' },
-                { el: '.acc-stats', title: 'Filter by status', text: 'Tap a box to show only pending, approved or declined applications.' },
+                { el: '.acc-chips', title: 'Filter by status', text: 'Tap one to show only pending, approved or declined applications.' },
                 { el: '.acc-programs', title: 'Apply for assistance', text: 'See which programs you can apply for right now.' },
                 { el: '#applicationsCard', title: 'Your applications', text: 'Search your applications, then tap View for the details, documents and timeline.', side: 'top' },
                 { el: '.pui-bottom-nav', title: 'Your quick menu', text: 'Home, your account, a new application, your documents and updates are always one tap away.', side: 'top' }

@@ -5,6 +5,7 @@
 ============================================ */
 
 .pv-wrap { max-width: 860px; }
+.pv-wrap .ann-head { padding-top: 36px; }   /* the page now starts with the title (the small tag above it is gone), so give it room under the header */
 .pv-updated { display: flex; align-items: center; gap: 6px; margin: 10px 0 0; color: #5b6380; font-size: 0.9rem; font-weight: 600; }
 
 /* "In short" box, in Filipino */

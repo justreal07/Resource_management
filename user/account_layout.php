@@ -31,10 +31,9 @@ function account_page_start(array $ctx, string $title, string $active, array $he
             ['feedback', 'fa-star', 'Feedback', $active === 'feedback', null],
             ['announcements', 'fa-bullhorn', 'Announcements', false, null],
         ],
+        // One link for the three settings tabs (Profile, Password & Security, Preferences): My Account has those tabs itself
         'Account' => [
-            ['my_account#profile', 'fa-user-pen', 'Profile', false, 'profile'],
-            ['my_account#security', 'fa-shield-halved', 'Password & Security', false, 'security'],
-            ['my_account#preferences', 'fa-sliders', 'Preferences', false, 'preferences'],
+            ['my_account#profile', 'fa-user-gear', 'Account settings', false, 'profile security preferences'],
         ],
     ];
     ?>
@@ -109,7 +108,6 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                 <img src="../asset/ACCESS.jpg" alt="ACCESS Logo">
             </span>
         </a>
-        <span class="db-topbar-date"><i class="far fa-calendar"></i> <?= e(date('l, F j, Y')) ?></span>
 
         <nav class="acc-nav" aria-label="Account">
 
@@ -154,13 +152,9 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                         <img src="<?= e($avatar) ?>" alt="">
                         <div><strong><?= e($user['firstname'] . ' ' . $user['lastname']) ?></strong><span>@<?= e($user['username']) ?></span></div>
                     </div>
+                    <?php /* Only the person's own things here; the other pages are in the side menu (and the bottom bar on a phone) */ ?>
                     <a href="my_account#applications"><i class="fas fa-list"></i> My Applications</a>
-                    <a href="my_documents"><i class="fas fa-folder-open"></i> My Documents</a>
-                    <a href="user_notifications"><i class="fas fa-bell"></i> Notifications</a>
-                    <a href="feedback"><i class="fas fa-star"></i> Feedback</a>
-                    <a href="my_account#profile"><i class="fas fa-user-edit"></i> Edit Profile</a>
-                    <a href="my_account#security"><i class="fas fa-shield-alt"></i> Password &amp; Security</a>
-                    <a href="my_account#preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
+                    <a href="my_account#profile"><i class="fas fa-user-gear"></i> Account settings</a>
                     <a href="#tour" role="button" data-tour-start><i class="fas fa-route"></i> Take a tour of this page</a>
                     <a href="applicant_logout" class="acc-logout"><i class="fas fa-sign-out-alt"></i> Log out</a>
                 </div>

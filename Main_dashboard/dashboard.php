@@ -394,6 +394,7 @@ foreach (range(1, $pages) as $p) {
 admin_layout_start([
     'title' => 'Dashboard',
     'section' => 'dashboard',
+    'subtitle' => date('l, F j, Y'),
     'topbar_extra' => '<a class="icon-btn bell" href="#activity">' . ui_icon('bell')
         . '<span class="bell-count" data-unread-count hidden></span>'
         . '<span class="visually-hidden" data-bell-label>Recent activity</span></a>',
@@ -447,7 +448,7 @@ admin_layout_start([
                             <span data-live-when="none"<?= $queueTotal === 0 ? '' : ' hidden' ?>><?= ui_icon('check-circle') ?> All caught up: no applications are waiting for review.</span>
                             <span data-live-when="some"<?= $queueTotal === 0 ? ' hidden' : '' ?>>
                                 <strong data-live="pendingTotal"><?= number_format($queueTotal) ?></strong>
-                                <span data-live-plural="pendingTotal" data-one="application is" data-many="applications are"><?= $queueTotal === 1 ? 'application is' : 'applications are' ?></span> waiting for review (any date)
+                                <span data-live-plural="pendingTotal" data-one="application" data-many="applications"><?= $queueTotal === 1 ? 'application' : 'applications' ?></span> waiting for review
                             </span>
                             <?php if (empty($loadFailed['stats'])): ?>
                                 · <span data-live="today"><?= number_format((int)$today) ?></span> new today
@@ -508,9 +509,6 @@ admin_layout_start([
                    Requests aren't stored online, so there is no count to show here. */ ?>
             </section>
 
-            <!-- ============ 1b. BUDGET (this year; the Budget page sets it, includes/budget.php) ============ -->
-            <?= ui_budget_panel($pdo) ?>
-
             <div class="dash-grid">
               <div class="dash-col">
                 <!-- ============ 2. OVERVIEW FOR THE SELECTED YEAR ============ -->
@@ -551,9 +549,6 @@ admin_layout_start([
                                         <?php endforeach; ?>
                                     </ul>
                                     <p class="type-foot">
-                                        <?php if (empty($loadFailed['stats'])): ?>
-                                            <span>All time: <?= number_format((int)$allTimeByType[$id]) ?></span>
-                                        <?php endif; ?>
                                         <a href="<?= ui_e($t['home']) ?>">Open <?= ui_e($t['short']) ?><?= ui_icon('chevron-right') ?></a>
                                     </p>
                                 </article>
@@ -578,6 +573,9 @@ admin_layout_start([
                         </p>
                     <?php endif; ?>
                 </section>
+
+                <!-- ============ 2a. BUDGET (this year; the Budget page sets it, includes/budget.php) ============ -->
+                <?= ui_budget_panel($pdo) ?>
               </div>
 
                 <!-- ============ 3. RECENT ACTIVITY (unread state: admin_dashboard.js) ============ -->
@@ -611,7 +609,7 @@ admin_layout_start([
                                         <p class="activity-title">
                                             <a href="view_applicant?applicant_id=<?= (int)$ev['id'] ?>"><?= ui_e(ui_person_name($ev)) ?></a>
                                         </p>
-                                        <p class="activity-text"><?= ui_e($evText) ?> · <?= ui_e($typeInfo[(int)$ev['assistance_type_id']]['short'] ?? 'Other') ?> · Ref #<?= (int)$ev['id'] ?></p>
+                                        <p class="activity-text"><?= ui_e($evText) ?> · <?= ui_e($typeInfo[(int)$ev['assistance_type_id']]['short'] ?? 'Other') ?> · <span class="nowrap">Ref #<?= (int)$ev['id'] ?></span></p>
                                         <p class="activity-meta">
                                             <span class="new-tag" data-new-tag hidden>New</span>
                                             <time datetime="<?= ui_e(date('c', $ts)) ?>" title="<?= ui_e(date('M j, Y g:i A', $ts)) ?>" data-ts-relative="<?= (int)$ts ?>"><?= ui_e(ui_ago($ts, $now)) ?></time>
@@ -623,7 +621,6 @@ admin_layout_start([
                         <?php /* CONNECT (needs your approval): "read" is remembered in this browser only.
                            To share it across computers, add users.notifications_seen_at (like
                            applicant_accounts.notifications_seen_at) and save it from "Mark all as read". */ ?>
-                        <p class="panel-note">"Mark all as read" is remembered on this computer.</p>
                     <?php endif; ?>
                 </section>
 
@@ -635,9 +632,8 @@ admin_layout_start([
             <section class="panel trends" id="trends" aria-labelledby="trendsTitle">
                 <div class="panel-head">
                     <h2 id="trendsTitle">Trends for <?= ui_e($year) ?></h2>
-                    <p class="panel-sub">Applications filed <?= ui_e($rangeText) ?>. Change the year in the Overview.</p>
                 </div>
-                <div class="chart-grid">
+                <div class="chart-grid chart-grid-2">
                     <?php
                     // 1. Applications per month
                     if (!empty($loadFailed['charts'])) {
@@ -663,48 +659,23 @@ admin_layout_start([
                     }
                     echo ui_chart_card('Amount approved per month', 'Approved applications, by the month they were filed', $chart, 'No approved amounts for applications filed in ' . $year . '.');
 
-                    // 3. Status by assistance type
-                    if (!empty($loadFailed['summary'])) {
-                        $chart = ui_load_error('this chart', $url([], 'trends'));
-                    } elseif ($yearTotal === 0) {
-                        $chart = '';
-                    } else {
-                        $groups = $statusRows = [];
-                        foreach ($typeInfo as $id => $t) {
-                            $groups[$t['short']] = $summary[$id] ?? [];
-                            $row = [$t['name']];
-                            foreach ($statusInfo as $status => $s) $row[] = number_format($summary[$id][$status] ?? 0);
-                            $row[] = number_format(array_sum($summary[$id] ?? []));
-                            $statusRows[] = $row;
-                        }
-                        $chart = ui_status_bars($groups)
-                            . ui_table_view(array_merge(['Type'], array_column($statusInfo, 'label'), ['Total']), $statusRows);
-                    }
-                    echo ui_chart_card('Status by assistance type', "Share of each type's applications", $chart, 'No applications were filed in ' . $year . '.');
-
-                    // 4. Applications by barangay
-                    if (!empty($loadFailed['barangays'])) {
-                        $chart = ui_load_error('this chart', $url([], 'trends'));
-                    } elseif (!$barangays) {
-                        $chart = '';
-                    } else {
-                        $items = array_map(function ($b) { return ['label' => $b['barangay'], 'value' => $b['n']]; }, $barangays);
-                        $otherCount = empty($loadFailed['summary']) ? max(0, $yearTotal - array_sum(array_column($barangays, 'n'))) : 0;
-                        if ($otherCount > 0) $items[] = ['label' => 'Other barangays', 'value' => $otherCount, 'other' => true];
-                        $chart = ui_bar_list($items, function ($v) { return number_format($v); })
-                            . ui_table_view(['Barangay', 'Applications'], array_map(function ($i) { return [trim($i['label']) !== '' ? $i['label'] : '(not given)', number_format($i['value'])]; }, $items));
-                    }
-                    echo ui_chart_card('Applications by barangay', 'Barangays with the most applications', $chart, 'No applications were filed in ' . $year . '.');
+                    /* Two charts are left on purpose: "status by type" repeats the Overview's counts, and "applications by
+                       barangay" repeats the barangay map below, so they are not drawn a second time. */
                     ?>
                 </div>
             </section>
 
             <!-- ============ 2b. BARANGAY HEAT MAP (selected year; tiles: includes/barangay_map.php) ============ -->
-            <section class="panel" id="barangays" aria-labelledby="barangaysTitle">
-                <div class="panel-head">
+            <?php /* Folded by default (a second look at the same applications); opens by itself when the map could not load */ ?>
+            <details class="panel panel-fold" id="barangays"<?= !empty($loadFailed['barangaymap']) ? ' open' : '' ?>>
+                <summary>
                     <h2 id="barangaysTitle">Applications by barangay</h2>
-                    <p class="panel-sub">Applications filed <strong><?= ui_e($rangeText) ?></strong>, every program. Darker means more, and the number is on each tile. Select a barangay to see its applications.</p>
-                </div>
+                    <span class="fold-hint fold-show">Show map</span><span class="fold-hint fold-hide">Hide map</span>
+                </summary>
+                <div class="fold-body">
+                <?php if (empty($loadFailed['barangaymap']) && $brgyMap && $brgyMap['total'] > 0): ?>
+                    <p class="panel-sub">Filed <strong><?= ui_e($rangeText) ?></strong>. Darker means more. Select a barangay to see its applications.</p>
+                <?php endif; ?>
                 <?php if (!empty($loadFailed['barangaymap'])): ?>
                     <?= ui_load_error('the barangay map', $url([], 'barangays')) ?>
                 <?php elseif (!$brgyMap || $brgyMap['total'] === 0): ?>
@@ -722,13 +693,13 @@ admin_layout_start([
                     <?= ui_barangay_map($brgyMap, $mapTypes, $mapLink) ?>
                     <?= ui_table_view(['Barangay', 'Applications', 'Share'], $tableRows) ?>
                 <?php endif; ?>
-            </section>
+                </div>
+            </details>
 
             <!-- ============ 4. APPLICATIONS: search, filter, sort, pages ============ -->
             <section class="panel" id="applications" aria-labelledby="appsTitle">
                 <div class="panel-head">
                     <h2 id="appsTitle">Applications</h2>
-                    <p class="panel-sub">Every application, from any date. Search by name or reference number.</p>
                 </div>
 
                 <form class="filters" method="GET" action="dashboard#applications" role="search" data-filter-form novalidate>
@@ -790,7 +761,6 @@ admin_layout_start([
                         Showing <strong><?= number_format($first) ?>–<?= number_format($last) ?></strong> of <strong><?= number_format($rowCount) ?></strong>
                         <?= $rowCount === 1 ? 'application' : 'applications' ?>
                         <?php if ($activeLabels): ?> · Filtered by <?= ui_e(implode(', ', $activeLabels)) ?><?php endif; ?>
-                        · <?= ui_e($sorts[$filters['sort']]['label']) ?>
                     </p>
 
                     <div class="table-wrap" data-table-wrap>
@@ -836,7 +806,7 @@ admin_layout_start([
                                         </td>
                                         <td data-label="Date filed">
                                             <time datetime="<?= ui_e(date('c', $created)) ?>"><?= ui_e(date('M j, Y', $created)) ?></time>
-                                            <span class="cell-sub"><?= ui_e(date('g:i A', $created)) ?></span>
+                                            <span class="cell-sub cell-time"><?= ui_e(date('g:i A', $created)) ?></span>
                                         </td>
                                         <td data-label="Barangay"><?= ui_e($row['barangay']) ?></td>
                                         <td data-label="Amount" class="num">
