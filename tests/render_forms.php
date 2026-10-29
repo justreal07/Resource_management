@@ -5,7 +5,7 @@ $db = getenv('LGU_TEST_DB');
 if (!$db || !preg_match('/^lgu_logic_test_[a-z0-9_]+$/', $db)) throw new RuntimeException('Use a disposable database.');
 $pages = ['medical'=>'user/Medical Assistance.php','burial'=>'user/burial_assistance_form.php',
     'opd'=>'user/opdform.php','account'=>'user/my_account.php','view'=>'user/view_application.php',
-    'edit'=>'Main_dashboard/edit_applicant.php','integrity'=>'Main_dashboard/data_integrity.php',
+    'edit'=>'Main_dashboard/edit_applicant.php',
     'admin_view'=>'medical/view_medical_applicants.php'];
 $renderPageKey = $argv[1] ?? '';
 if (!isset($pages[$renderPageKey])) throw new RuntimeException('Choose a known page.');
@@ -17,7 +17,7 @@ $pdo = new PDO('mysql:host=localhost;dbname=' . $db . ';charset=utf8mb4','root',
 $pdo->exec("INSERT IGNORE INTO applicant_accounts(id,firstname,lastname,username,password,birthdate)
     VALUES(99,'Test','Applicant','render_applicant','test','1980-01-01')");
 $pdo->exec('UPDATE applicant SET account_id=99 WHERE id=1');
-if (in_array($renderPageKey,['edit','integrity','admin_view'],true)) {
+if (in_array($renderPageKey,['edit','admin_view'],true)) {
     $_SESSION['user'] = ['id'=>1,'role'=>'admin','username'=>'test_admin','name'=>'Test Admin'];
 } else {
     $_SESSION['applicant'] = ['id'=>99,'username'=>'render_applicant','firstname'=>'Test','lastname'=>'Applicant','pwv'=>hash('sha256','test')];

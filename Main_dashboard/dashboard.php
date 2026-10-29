@@ -36,7 +36,6 @@ $userRole = $_SESSION['user']['role'];
 
 $quickActions = [
     ['href' => '../reports/reports', 'label' => 'Generate report', 'icon' => 'chart', 'roles' => ['admin']],
-    ['href' => 'data_integrity', 'label' => 'Check data records', 'icon' => 'alert', 'roles' => ['admin']],
     ['href' => '../login/register', 'label' => 'Add staff account', 'icon' => 'user-plus', 'roles' => ['admin'], 'modal' => 'addstaff'],   // opens Admin settings > Add staff as a window
 ];
 
