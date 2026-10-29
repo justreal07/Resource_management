@@ -273,6 +273,11 @@ a { color: var(--navy); }
     color: var(--muted);
     font-weight: 500;
 }
+/* Header name: bigger, on one line, and centred against the two logos */
+.site-header .brand { align-items: center; }
+.site-header .brand-text { max-width: none; justify-content: center; align-self: center; gap: 4px; }
+.site-header .brand-text strong { font-size: clamp(1.25rem, 0.9vw + 1rem, 1.75rem); line-height: 1.15; }
+.site-header .brand-text small { font-size: clamp(0.9rem, 0.3vw + 0.8rem, 1.05rem); }
 
 .nav-menu {
     display: flex;
@@ -322,6 +327,7 @@ a { color: var(--navy); }
     padding-left: 14px;
     border-left: 1px solid var(--line);
 }
+.nav-actions:not(:has(*)) { display: none; }   /* signed out on the home page: no buttons, so no divider line or gap either */
 .nav-actions .btn-sm { padding: 10px 14px; font-size: 0.92em; }   /* Log in / Sign up: a little narrower, so the menu fits beside the logos */
 
 .nav-toggle {
@@ -556,6 +562,32 @@ a { color: var(--navy); }
 }
 /* Signed-out home page: a headline and two buttons, no card beside them */
 .hero-grid-single { grid-template-columns: minmax(0, 40rem); }
+/* Signed out: the text on the left, the person large in the right corner, cut out so the background video shows around them */
+.hero-grid-photo { grid-template-columns: minmax(0, 1fr); }
+.hero-grid-photo .hero-text { position: relative; z-index: 1; max-width: min(33%, 30rem); }
+.hero-photo {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    bottom: 64px;   /* stands on the banner's curved bottom edge, so nothing is cut by it */
+    display: flex;
+    align-items: flex-end;
+    margin: 0;
+    z-index: -1;   /* above the video and its tint, below the white curve at the bottom, so the picture stays inside the banner */
+    pointer-events: none;
+}
+.hero-photo img {
+    display: block;
+    width: auto;
+    /* the white background of the picture is removed; a soft white glow keeps the dark and blue letters readable on the video */
+    filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.7)) drop-shadow(0 0 22px rgba(255, 255, 255, 0.35));
+}
+.hero-photo .hero-person { height: 98%; }          /* the person is big, his head near the banner's top corner */
+.hero-photo .hero-person { margin-left: auto; }
+.hero-photo .hero-lettering { position: absolute; left: 49%; top: 50%; height: 60%; transform: translate(-50%, -50%); z-index: 1; }   /* the name in the middle of the banner, in front of the person */
+/* The banner's content lines up with the logo in the header (the page body below stays narrower) */
+.hero-home > .container { max-width: 1900px; }
 /* A taller banner so more of the background video shows: it fills most of the first screen (never shorter than 560px, never taller than 860px), with the text centred in it */
 .hero-home {
     min-height: clamp(560px, calc(100vh - 160px), 860px);
@@ -564,6 +596,7 @@ a { color: var(--navy); }
     padding: 96px 0 140px;
 }
 .hero-home .hero-lead { margin-bottom: 28px; }
+.hero.hero-home h1 { font-size: clamp(2rem, 3.7vw, 3.1rem); }
 .hero-home .hero-cta { margin-bottom: 0; }
 
 .eyebrow {
@@ -1014,22 +1047,17 @@ a { color: var(--navy); }
 }
 .req-fold summary::-webkit-details-marker { display: none; }
 .req-fold summary::after {
-    content: "+";
+    content: "View more";
     flex: none;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
+    padding: 4px 12px;
+    border-radius: 999px;
     background: var(--accent-soft);
     color: var(--accent-dark);
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1rem;
+    font-size: 0.8rem;
     font-weight: 600;
     margin-left: auto;
 }
-.req-fold[open] summary::after { content: "–"; }
-.req-fold .req-count { margin-left: 2px; background: var(--accent-soft); }
+.req-fold[open] summary::after { content: "View less"; }.req-fold .req-count { margin-left: 2px; background: var(--accent-soft); }
 .req-fold .req-list { padding-bottom: 6px; }
 
 /* ---- Requirements ---- */
@@ -1648,6 +1676,9 @@ a { color: var(--navy); }
 ============================================ */
 @media (max-width: 1100px) {
     .hero-grid { grid-template-columns: 1fr; }
+    .hero-photo { opacity: 0.4; }
+    .hero-photo .hero-lettering { display: none; }
+    .hero-grid-photo .hero-text { max-width: none; }
     .hero-card { max-width: 560px; }
     .stats-grid, .stats-grid.has-withdrawn { grid-template-columns: repeat(2, 1fr); }
     .program-grid { grid-template-columns: repeat(2, 1fr); }

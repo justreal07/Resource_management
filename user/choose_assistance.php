@@ -144,6 +144,21 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
 <?php portal_bottom_nav('apply', $unread); ?>
 
 <?php portal_scripts(); ?>
+<script>
+// "View more" on one program card opens (or closes) the requirements of all of them
+(function () {
+    var folds = document.querySelectorAll('details.req-fold');
+    var busy = false;
+    folds.forEach(function (d) {
+        d.addEventListener('toggle', function () {
+            if (busy) return;
+            busy = true;
+            folds.forEach(function (o) { o.open = d.open; });
+            busy = false;
+        });
+    });
+})();
+</script>
 <?php /* Text size buttons: js/portal-ui.js */ ?>
 </body>
 </html>

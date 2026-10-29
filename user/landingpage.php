@@ -232,8 +232,7 @@ $programs = [
                     </div>
                 </div>
             <?php else: ?>
-                <a href="applicant_login" class="btn btn-outline btn-sm"><i class="fas fa-sign-in-alt"></i> Log in</a>
-                <a href="applicant_register" class="btn btn-primary btn-sm"><i class="fas fa-user-plus"></i> Sign up</a>
+                <?php /* No Log in / Sign up buttons in the menu when signed out: the banner right below has "Create free account" and "Log in" */ ?>
             <?php endif; ?>
             </div>
         </nav>
@@ -260,7 +259,7 @@ $programs = [
     </div>
 
     <?php /* Signed out: a headline and the two ways in. Signed in: the greeting and the three programs to start from. (The old "3 easy steps" card, the badge, the tick list and the four-box strip repeated How to Apply, the Contact section and the menu.) */ ?>
-    <div class="container hero-grid<?php echo $is_logged_in ? '' : ' hero-grid-single'; ?>">
+    <div class="container hero-grid<?php echo $is_logged_in ? '' : ' hero-grid-photo'; ?>">
         <div class="hero-text">
             <?php if($is_logged_in): ?>
                 <?php /* The greeting is re-written by the script below with the time on the visitor's own device, typed out */ ?>
@@ -276,7 +275,9 @@ $programs = [
             <?php endif; ?>
         </div>
 
-        <?php if($is_logged_in): ?>
+        <?php if(!$is_logged_in): ?>
+        <figure class="hero-photo"><img class="hero-lettering" src="../asset/hero-access-lettering.png" alt="Mayor Ed Custodio, ACCESS" width="435" height="300"><img class="hero-person" src="../asset/hero-access-person.png" alt="" width="343" height="300"></figure>
+        <?php else: ?>
         <aside class="hero-card">
             <h3>Quick apply</h3>
             <div class="quick-apply-list">
@@ -736,6 +737,21 @@ $programs = [
 <?php endif; ?>
 
 <?php portal_scripts(); ?>
+<script>
+// "View more" on one program card opens (or closes) the requirements of all of them
+(function () {
+    var folds = document.querySelectorAll('details.req-fold');
+    var busy = false;
+    folds.forEach(function (d) {
+        d.addEventListener('toggle', function () {
+            if (busy) return;
+            busy = true;
+            folds.forEach(function (o) { o.open = d.open; });
+            busy = false;
+        });
+    });
+})();
+</script>
 <script>
 // ========================================
 // TEXT SIZE: the "A A A" buttons are run by js/portal-ui.js (same on every applicant page)
