@@ -2,6 +2,7 @@
 require_once '../config.php';
 require_once '../includes/admin_layout.php';
 require_once '../includes/password_reset.php';
+require_once '../includes/office_password_reset.php';   // the admin's email and "forgot password" by email
 require_once '../includes/mailer.php';
 require_once '../includes/mail_settings.php';
 
@@ -34,6 +35,8 @@ if (!$admin) {
 
 // The Email tab's table (app_settings), made here before any save opens a transaction
 mail_settings_ensure($pdo);
+office_reset_ensure($pdo);   // users.email_verified_at and the reset tables (made here, never inside a save's transaction)
+$admin = array_merge(['email' => null, 'email_verified_at' => null], $admin);
 $postText = function (string $name): string { return is_string($_POST[$name] ?? null) ? $_POST[$name] : ''; };
 
 // Handle form submission
@@ -68,21 +71,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if (!$errors) {
-            $stmt = $pdo->prepare("UPDATE users SET full_name = ?, username = ? WHERE id = ?");
-            $oldUsername = $admin['username'];
-            if ($stmt->execute([$new_fullname, $new_username, $admin_id])) {
-                activity_log('profile_updated', $oldUsername !== $new_username
-                    ? 'Name and/or username changed (username "' . $oldUsername . '" is now "' . $new_username . '").'
-                    : 'Full name changed.');
-                $_SESSION['user']['name'] = $new_fullname;
-                $_SESSION['user']['username'] = $new_username;
-                $admin['full_name'] = $new_fullname;
-                $admin['username'] = $new_username;
-                $success = "Profile updated successfully!";
-            } else {
-                $errors[] = "Failed to update profile.";
+        // The email is how a forgotten password is reset (includes/office_password_reset.php). Changing it needs the current
+        // password, so someone at an unattended screen cannot point the reset link at their own inbox; the new address
+        // must then be confirmed again by its own link before it can be used.
+        $new_email = mb_strtolower(trim($postText('new_email')));
+        $old_email = mb_strtolower((string)($admin['email'] ?? ''));
+        $emailChanged = $new_email !== $old_email;
+        if ($emailChanged) {
+            if ($new_email === '') {
+                $errors[] = "An administrator needs an email address, so a forgotten password can be reset by email.";
+            } elseif (($problem = office_email_problem($pdo, $new_email, (int)$admin_id)) !== null) {
+                $errors[] = $problem;
+            } elseif (!password_verify($postText('email_current_password'), $admin['password'])) {
+                $errors[] = "Type your current password to change your email address.";
             }
+        }
+
+        if (!$errors) {
+            $oldUsername = $admin['username'];
+            if ($emailChanged && ($emailError = office_email_set($pdo, (int)$admin_id, $new_email)) !== null) {
+                $errors[] = $emailError;
+            } else {
+                $stmt = $pdo->prepare("UPDATE users SET full_name = ?, username = ? WHERE id = ?");
+                if ($stmt->execute([$new_fullname, $new_username, $admin_id])) {
+                    $log = $oldUsername !== $new_username
+                        ? 'Name and/or username changed (username "' . $oldUsername . '" is now "' . $new_username . '").'
+                        : 'Full name changed.';
+                    if ($emailChanged) $log .= ' Email changed to ' . office_mask_email($new_email) . ' (not confirmed yet).';
+                    activity_log('profile_updated', $log);
+                    $_SESSION['user']['name'] = $new_fullname;
+                    $_SESSION['user']['username'] = $new_username;
+                    $admin['full_name'] = $new_fullname;
+                    $admin['username'] = $new_username;
+                    $success = "Profile updated successfully!";
+                    if ($emailChanged) {
+                        $admin['email'] = $new_email;
+                        $admin['email_verified_at'] = null;
+                        // A failed email never undoes the change: the Profile tab offers to send it again
+                        $confirmSent = office_email_verify_send($pdo, (int)$admin_id);
+                        office_email_notify_changed($old_email, $new_fullname, $new_email);
+                        $success = $confirmSent
+                            ? "Profile updated. A confirmation link was emailed to $new_email: open it to confirm the address"
+                            : "Profile updated, but the confirmation email to $new_email could not be sent. Choose Send the confirmation email again below";
+                    }
+                } else {
+                    $errors[] = "Failed to update profile.";
+                }
+            }
+        }
+    }
+    elseif ($action === 'resend_email_confirm') {
+        if (trim((string)($admin['email'] ?? '')) === '') {
+            $errors[] = 'Add an email address first.';
+        } elseif (office_email_is_verified($admin)) {
+            $success = 'Your email address is already confirmed';
+        } elseif (office_email_verify_send($pdo, (int)$admin_id)) {
+            $success = 'A confirmation link was emailed to ' . $admin['email'] . '. Open it to confirm the address';
+        } else {
+            $errors[] = 'The confirmation email could not be sent (too many were sent this hour, there is no internet, or the sending email is not set up). Try again later.';
         }
     }
     elseif ($action === 'change_password') {
@@ -165,11 +211,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($action === 'create_staff') {
         // A new OPD staff, Medical & Burial staff or admin account: the same checks as login/register.php (staff_account_create())
         $field = function (string $name): string { return is_string($_POST[$name] ?? null) ? trim($_POST[$name]) : ''; };
+        $newEmail = mb_strtolower($field('new_staff_email'));
         $problems = staff_account_create($pdo, $field('new_staff_fullname'), $field('new_staff_username'), $field('new_staff_password'),
-            $field('new_staff_confirm'), $field('new_staff_role'), true);
+            $field('new_staff_confirm'), $field('new_staff_role'), true, null, $newEmail, $emailSent);
         if (!$problems) {
             $_SESSION['staff_flash'] = (STAFF_ACCOUNT_KINDS[$field('new_staff_role')] ?? 'Staff') . ' account for ' . $field('new_staff_fullname')
-                . ' (@' . $field('new_staff_username') . ') was created. Tell them the username and password in person; the password is not shown or sent anywhere.';
+                . ' (@' . $field('new_staff_username') . ') was created. Tell them the username and password in person; the password is not shown or sent anywhere.'
+                . ($emailSent ? ' A confirmation link was emailed to ' . $newEmail . ': they must open it before that email can reset a forgotten password.'
+                    : ($newEmail !== '' ? ' The confirmation email to ' . $newEmail . ' could not be sent; they can ask for it again after signing in.' : ''));
             header('Location: ' . $self(['tab' => 'staff']));
             exit;
         }
@@ -442,9 +491,12 @@ if (!$embed) echo ui_page_head('Admin settings', 'Your own account, the staff ac
 $profileSent  = ($_POST['action'] ?? '') === 'update_profile';
 $fullnameVal  = $profileSent ? ($_POST['new_fullname'] ?? '') : ($admin['full_name'] ?? '');
 $usernameVal  = $profileSent ? ($_POST['new_username'] ?? '') : $admin['username'];
+$emailVal     = $profileSent ? $postText('new_email') : (string)($admin['email'] ?? '');
+$emailSaved   = trim((string)($admin['email'] ?? ''));   // what is stored now (after a save, the new address)
+$emailConfirmed = office_email_is_verified($admin);
 $staffActions = ['delete_staff', 'toggle_staff', 'toggle_admin', 'reset_staff_password', 'remove_staff_avatar'];
 $tabs = [
-    'profile'    => ['Profile',    'user',      'Your name and the username you sign in with.'],
+    'profile'    => ['Profile',    'user',      'Your name, the username you sign in with, and the email used to reset a forgotten password.'],
     'security'   => ['Password',   'lock',      'Choose a new password for your account.'],
     'staff'      => ['Staff',      'van',       'Who can sign in as OPD staff or Medical & Burial staff, and which other administrators can sign in. Turn an account off, or reset a staff password. An account that never decided or encoded anything can also be removed.'],
     'addstaff'   => ['Add staff',  'user-plus', 'Give someone an account: OPD staff, Medical & Burial staff, or another administrator.'],
@@ -452,7 +504,7 @@ $tabs = [
     'email'      => ['Email',      'inbox',     'The Gmail account that sends the approval, decline and password emails. Change it here when the office changes the account or its app password.'],
 ];
 // The tab that opens: the one the saved form belongs to, else ?tab=, else Profile
-$tabOfAction = ['update_profile' => 'profile', 'change_password' => 'security', 'create_staff' => 'addstaff', 'reset_applicant_password' => 'applicants',
+$tabOfAction = ['update_profile' => 'profile', 'resend_email_confirm' => 'profile', 'change_password' => 'security', 'create_staff' => 'addstaff', 'reset_applicant_password' => 'applicants',
                 'save_mail' => 'email', 'test_mail' => 'email'];
 
 // The Email tab: what is used now and where it comes from. The app password itself is never put on the page.
@@ -514,7 +566,33 @@ $active       = $tabOfAction[$_POST['action'] ?? ''] ?? (isset($tabs[$requestedT
                     <input type="text" id="new_username" name="new_username" value="<?= ui_e($usernameVal) ?>" data-initial="<?= ui_e($admin['username']) ?>" maxlength="50" autocomplete="username" required data-message="Enter a username." aria-describedby="new_usernameHelp">
                     <p class="field-help" id="new_usernameHelp">You will use it the next time you sign in. It must not be used by another account.</p>
                 </div>
+                <div class="field">
+                    <label for="new_email">Email address</label>
+                    <input type="email" id="new_email" name="new_email" value="<?= ui_e($emailVal) ?>" data-initial="<?= ui_e($admin['email'] ?? '') ?>" maxlength="100" autocomplete="email" placeholder="name@example.com" aria-describedby="new_emailHelp">
+                    <p class="field-help" id="new_emailHelp">
+                        <?php if ($emailSaved === ''): ?>
+                            <span class="badge badge-neutral">No email yet</span> Add one so you can reset a forgotten password from the sign-in page.
+                        <?php elseif ($emailConfirmed): ?>
+                            <span class="badge badge-approved">Confirmed</span> The reset link for a forgotten password is sent here.
+                        <?php else: ?>
+                            <span class="badge badge-pending">Not confirmed</span> Open the link we emailed to confirm it. Until then it can't be used to reset a password.
+                        <?php endif; ?>
+                    </p>
+                </div>
+                <div class="field">
+                    <label for="email_current_password">Current password</label>
+                    <input type="password" id="email_current_password" name="email_current_password" autocomplete="current-password" aria-describedby="email_current_passwordHelp">
+                    <p class="field-help" id="email_current_passwordHelp">Only needed when you change the email address. The new address is confirmed again by its own link.</p>
+                </div>
             </form>
+            <?= $messageFor('resend_email_confirm') ?>
+            <?php if ($emailSaved !== '' && !$emailConfirmed): ?>
+                <form class="iis-form" method="POST" novalidate data-busy="Sending…">
+                    <?= decision_csrf_field() ?>
+                    <input type="hidden" name="action" value="resend_email_confirm">
+                    <button type="submit" class="btn btn-secondary btn-sm"><?= ui_icon('inbox') ?>Send the confirmation email again</button>
+                </form>
+            <?php endif; ?>
             <dl class="detail-list iis-facts">
                 <?= ui_detail('Role', 'Administrator') ?>
                 <?= ui_detail('Account created', date('F j, Y g:i A', strtotime($admin['created_at']))) ?>
@@ -754,6 +832,7 @@ $active       = $tabOfAction[$_POST['action'] ?? ''] ?? (isset($tabs[$requestedT
             $addRole = $addSent && is_string($_POST['new_staff_role'] ?? null) && isset(STAFF_ACCOUNT_KINDS[$_POST['new_staff_role']]) ? $_POST['new_staff_role'] : 'staff';
             $addName = $addSent && is_string($_POST['new_staff_fullname'] ?? null) ? $_POST['new_staff_fullname'] : '';
             $addUser = $addSent && is_string($_POST['new_staff_username'] ?? null) ? $_POST['new_staff_username'] : '';
+            $addEmail = $addSent && is_string($_POST['new_staff_email'] ?? null) ? $_POST['new_staff_email'] : '';
             $kindNotes = ['staff' => 'Approves and declines OPD requests', 'aid_staff' => 'Encodes Medical and Burial walk-ins', 'admin' => 'Opens everything, manages accounts'];
             ?>
             <form id="addStaffForm" class="iis-form iis-cols iis-cols-2" method="POST" novalidate data-busy="Creating…">
@@ -776,6 +855,11 @@ $active       = $tabOfAction[$_POST['action'] ?? ''] ?? (isset($tabs[$requestedT
                     <label for="new_staff_username">Username <span class="req" aria-hidden="true">*</span></label>
                     <input type="text" id="new_staff_username" name="new_staff_username" value="<?= ui_e($addUser) ?>" minlength="3" maxlength="50" pattern="[A-Za-z0-9._\-]+" autocomplete="off" required data-message="Enter a username of 3 to 50 letters, numbers, dots, dashes or underscores." aria-describedby="newStaffUsernameHelp">
                     <p class="field-help" id="newStaffUsernameHelp">Letters, numbers, dot, dash or underscore. No spaces.</p>
+                </div>
+                <div class="field span-all" data-admin-only<?= $addRole === 'admin' ? '' : ' hidden' ?>>
+                    <label for="new_staff_email">Email address <span class="req" aria-hidden="true">*</span></label>
+                    <input type="email" id="new_staff_email" name="new_staff_email" value="<?= ui_e($addEmail) ?>" maxlength="100" autocomplete="off" aria-describedby="newStaffEmailHelp" placeholder="name@example.com"<?= $addRole === 'admin' ? ' required' : ' disabled' ?> data-message="Enter the administrator's email address.">
+                    <p class="field-help" id="newStaffEmailHelp">Used to reset a forgotten password, and we email a link to confirm it first. Staff accounts have no email.</p>
                 </div>
                 <div class="field">
                     <label for="new_staff_password">Password <span class="req" aria-hidden="true">*</span></label>
@@ -1178,6 +1262,20 @@ $active       = $tabOfAction[$_POST['action'] ?? ''] ?? (isset($tabs[$requestedT
         });
     });
 
+    // Add staff: the email box is only for an Admin account (staff have no email)
+    var adminOnly = root.querySelector('[data-admin-only]');
+    if (adminOnly) {
+        var emailBox = adminOnly.querySelector('input');
+        root.querySelectorAll('input[name="new_staff_role"]').forEach(function (radio) {
+            radio.addEventListener('change', function () {
+                var isAdmin = radio.value === 'admin' && radio.checked;
+                adminOnly.hidden = !isAdmin;
+                emailBox.disabled = !isAdmin;
+                emailBox.required = isAdmin;
+            });
+        });
+    }
+
     // Profile: Save and Discard stay off until a field differs from what is stored
     var profile = document.querySelector('[data-profile-form]');
     var save = root.querySelector('[data-save-profile]');
@@ -1192,6 +1290,8 @@ $active       = $tabOfAction[$_POST['action'] ?? ''] ?? (isset($tabs[$requestedT
     sync();
     discard.addEventListener('click', function () {
         fields.forEach(function (f) { f.value = f.dataset.initial; });
+        var emailPw = document.getElementById('email_current_password');
+        if (emailPw) emailPw.value = '';
         sync();
         fields[0].focus();
     });

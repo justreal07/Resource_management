@@ -732,6 +732,9 @@ img { max-width: 100%; display: block; }
 .ap-doc-title { flex: 1; min-width: 0; }
 .ap-doc-title h3 { font-size: 1.02rem; margin: 2px 0 2px; font-family: 'Inter', sans-serif; font-weight: 700; }
 .ap-doc-title p { margin: 0; font-size: 0.88rem; color: var(--muted); }
+/* Whose photo this box is for (the patient's ID, then the claimant's ID ...): the name is what they should be holding up */
+.ap-doc-title p.ap-doc-person { margin: 2px 0 4px; font-size: 0.95rem; font-weight: 500; color: var(--navy); }
+.ap-doc-person i { margin-right: 4px; }
 .ap-status {
     flex: none;
     display: inline-flex;

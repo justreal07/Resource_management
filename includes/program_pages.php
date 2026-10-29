@@ -386,16 +386,24 @@ function program_view_page(int $typeId): void
     if ($staff && basename((string)parse_url($backHref, PHP_URL_PATH), '.php') === (ui_types()[$typeId]['staff_pages']['update'] ?? '')) {
         [$backHref, $backLabel] = [$list, $t['view_fallback'][1]];
     }
-    admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId)]);
+    // The lists' View button opens this record in a window over the list (?embed=1: only the content, no menu or top bar)
+    admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId), 'embed_ok' => true]);
+    $embedded = ui_embedded();
+    if ($embedded) echo '<div class="embed-pane embed-record">';
     // Update (status and remarks) from the record too, as on the lists; a declined request is closed. Only for a role
     // that may actually decide this program (OPD staff; never Medical & Burial staff, who only encode and view).
+    $record = '';
     if ($staff && !in_array($applicant['status'], ['Disapproved', 'Withdrawn'], true) && decision_can(decision_user(), $typeId)) {
-        echo '<div class="page-actions">' . ui_staff_update_link($typeId, $applicant) . '</div>';
+        $record .= '<div class="page-actions">' . ui_staff_update_link($typeId, $applicant) . '</div>';
     }
-    if (!$staff && in_array($typeId, [1, 2], true) && $applicant['status'] === 'Approved') {
-        echo '<div class="page-actions"><a class="btn btn-primary" href="../Main_dashboard/release_assistance?id=' . $id . '">Record or view payment</a></div>';
+    $record .= ui_applicant_record($applicant, $documents, $backHref, $backLabel);
+    if ($embedded) {
+        // A link or form that leaves the record (Review, Update, the Medical re-apply form) takes the whole tab, not the little window
+        $record = preg_replace('/<a (?![^>]*\btarget=)/', '<a target="_top" ', $record);
+        $record = preg_replace('/<form (?![^>]*\btarget=)/', '<form target="_top" ', $record);
     }
-    echo ui_applicant_record($applicant, $documents, $backHref, $backLabel);
+    echo $record;
+    if ($embedded) echo '</div>';
     admin_layout_end();
 }
 

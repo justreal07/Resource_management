@@ -366,7 +366,33 @@ auth_page_start('Sign up', 'register', function () { ?>
         pw.addEventListener('input', function () { pw.setCustomValidity(''); again.setCustomValidity(''); });
         again.addEventListener('input', function () { again.setCustomValidity(''); });
 
-        next.addEventListener('click', function () { if (stepOneOk()) show(2, true); });
+        // Also ask the server whether the username / email is already used, so that is found now, not after step 2
+        var checking = false;
+        function showProblem(field, message) {
+            field.setCustomValidity(message);
+            field.reportValidity();
+            field.addEventListener('input', function clear() { field.setCustomValidity(''); field.removeEventListener('input', clear); });
+        }
+        next.addEventListener('click', function () {
+            if (checking || !stepOneOk()) return;
+            checking = true;
+            next.disabled = true;
+            var body = new URLSearchParams();
+            body.set('csrf_token', form.elements.csrf_token.value);
+            body.set('username', form.elements.username.value);
+            body.set('email', form.elements.email.value);
+            fetch('check_register.php', { method: 'POST', body: body, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .catch(function () { return { ok: false }; })   // can't check: go on, the final save checks again
+                .then(function (res) {
+                    checking = false;
+                    next.disabled = false;
+                    var p = (res && res.ok && res.problems) || {};
+                    if (p.username) { showProblem(form.elements.username, p.username); return; }
+                    if (p.email) { showProblem(form.elements.email, p.email); return; }
+                    show(2, true);
+                });
+        });
         back.addEventListener('click', function () { show(1, true); });
 
         // Enter inside a step-1 box means "Next", never "send the form"

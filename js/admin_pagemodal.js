@@ -19,7 +19,7 @@
     const frame = dialog.querySelector('[data-pm-frame]');
     const heading = dialog.querySelector('[data-pm-title]');
     const header = dialog.querySelector('.modal-header');
-    const SIZES = ['narrow', 'wide'];
+    const SIZES = ['narrow', 'wide', 'record'];   // record = an application's information (a little wider than wide)
     let opener = null;          // the link that opened it: gets the focus back
     let reloadOnClose = false;  // the page inside changed something the page behind shows (your name, your picture)
     let contentHeight = 0;      // how tall the page inside says it is

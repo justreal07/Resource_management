@@ -860,8 +860,7 @@ admin_layout_end([
     'scripts' => ['../js/admin_dashboard.js'],
     'config' => [
         'viewUrl' => 'view_applicant?applicant_id=',
-        // The paper documents to check for each program: the same list the online upload step asks for
-        'documents' => [1 => array_keys(get_program('medical')['documents']), 2 => array_keys(get_program('burial')['documents']),
-                        3 => array_keys(get_program('opd')['documents'])],
+        // The papers to tick for each program: the same list the online upload step asks for (one per person where a requirement covers two)
+        'documents' => walkin_documents_config(),
     ],
 ]);

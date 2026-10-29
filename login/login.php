@@ -23,6 +23,9 @@ $loggedOut = isset($_GET['logged_out']);
 // Just registered? Fill in the new username for them (shown once)
 $registered = $_SESSION['register_flash'] ?? null;
 unset($_SESSION['register_flash']);
+// Just reset the password by email (login/reset_password.php)? Say so once.
+$loginNotice = is_string($_SESSION['login_notice'] ?? null) ? $_SESSION['login_notice'] : '';
+unset($_SESSION['login_notice']);
 if ($registered) {
     $username = $registered['username'];
 }
@@ -108,6 +111,8 @@ auth_side(
 
             <?php if (!empty($errors)): ?>
                 <?= auth_alert('error', 'alert', implode('', array_map(fn($e) => '<div>' . auth_e($e) . '</div>', $errors))) ?>
+            <?php elseif ($loginNotice !== ''): ?>
+                <?= auth_alert('success', 'check-circle', auth_e($loginNotice)) ?>
             <?php elseif ($registered): ?>
                 <?= auth_alert('success', 'check-circle', 'Your account is ready. Enter your password to sign in.') ?>
             <?php elseif ($loggedOut): ?>
@@ -151,7 +156,7 @@ auth_side(
                 <?php endif; ?>
             </p>
             <p class="login-help">
-                Forgot your password? Please ask the system administrator to reset it.
+                Administrator who forgot the password? <a href="forgot_password">Reset it by email</a>. Staff: please ask the system administrator to reset it.
             </p>
         </section>
 

@@ -177,6 +177,7 @@ CREATE TABLE `applicant` (
   `withdrawal_reason` varchar(500) DEFAULT NULL COMMENT 'Optional reason the applicant gave for withdrawing',
   `edited_at` datetime DEFAULT NULL COMMENT 'When the applicant last edited this application online; NULL = never',
   `edit_count` int(11) NOT NULL DEFAULT 0 COMMENT 'How many times the applicant saved an edit of the details or the documents',
+  `paper_received` text DEFAULT NULL COMMENT 'Walk-in: the required papers the office received, one name|person per line',
   `updated_at` datetime(6) NOT NULL DEFAULT current_timestamp(6) ON UPDATE current_timestamp(6) COMMENT 'Changes whenever the row changes: the edit page uses it to notice a change made since it was opened',
   `person_rule_key` varchar(20) GENERATED ALWAYS AS (case when `beneficiary_id` is null then NULL when `assistance_type_id` = 2 and `status` not in ('Disapproved','Withdrawn') then concat('B-',`beneficiary_id`) when `assistance_type_id` = 1 and `status` = 'Pending' then concat('M-',`beneficiary_id`) end) STORED COMMENT 'Unique: one Burial per person (a Declined or Withdrawn one does not count), one pending Medical per person',
   PRIMARY KEY (`id`),
@@ -253,6 +254,10 @@ CREATE TABLE `applicant_documents` (
   `uploaded_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `quality_flags` varchar(40) DEFAULT NULL COMMENT 'Clarity check on the applicant''s device: NULL not checked, ok, or what they were warned about',
   `quality_metrics` varchar(80) DEFAULT NULL COMMENT 'The numbers behind the clarity check, for tuning the limits',
+  `person_role` varchar(20) DEFAULT NULL COMMENT 'Whose photo: patient, claimant or deceased; NULL = not said (older photos)',
+  `review_status` varchar(10) DEFAULT NULL COMMENT 'The office''s check of this photo: ok, unclear or wrong; NULL = not looked at',
+  `reviewed_by` int(11) DEFAULT NULL COMMENT 'users.id of who marked it',
+  `reviewed_at` datetime DEFAULT NULL COMMENT 'When it was marked',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_document_file` (`file_path`),
   KEY `applicant_id` (`applicant_id`),
@@ -606,9 +611,53 @@ CREATE TABLE `users` (
   `is_active` tinyint(1) NOT NULL DEFAULT 1,
   `last_login_at` datetime DEFAULT NULL,
   `avatar` varchar(80) DEFAULT NULL,
+  `email_verified_at` datetime DEFAULT NULL COMMENT 'When the owner proved they can read users.email (link); NULL = not confirmed',
   PRIMARY KEY (`id`),
   UNIQUE KEY `username` (`username`),
   UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `user_email_verifications` (office email confirmation: includes/office_password_reset.php)
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `user_email_verifications` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `email` varchar(100) NOT NULL COMMENT 'The address this link confirms; if the account email changes meanwhile, the link no longer counts',
+  `token_hash` char(64) NOT NULL COMMENT 'SHA-256 of the secret in the emailed link',
+  `created_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_user_verify_token` (`token_hash`),
+  KEY `idx_user_verify_user` (`user_id`,`created_at`),
+  CONSTRAINT `fk_user_verify_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `user_password_resets` (office "forgot password": includes/office_password_reset.php)
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `user_password_resets` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `token_hash` char(64) NOT NULL COMMENT 'SHA-256 of the secret in the emailed link; the secret itself is never stored',
+  `created_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `used_at` datetime DEFAULT NULL,
+  `ip` varchar(45) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_user_reset_token` (`token_hash`),
+  KEY `idx_user_reset_user` (`user_id`,`created_at`),
+  KEY `idx_user_reset_ip` (`ip`,`created_at`),
+  CONSTRAINT `fk_user_reset_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;

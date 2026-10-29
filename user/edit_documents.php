@@ -8,7 +8,7 @@ require_once '../config.php';
 require_once 'assistance_config.php';
 require_once 'apply_layout.php';
 require_once '../includes/documents.php';
-require_once '../includes/application_changes.php';
+require_once '../includes/application_changes.php';   // (also loads includes/document_slots.php)
 
 if (!isset($_SESSION['applicant'])) {
     header('Location: applicant_login');
@@ -31,6 +31,7 @@ if (($problem = application_change_problem($edit, 'changed')) !== null) {
 
 $form_key = application_form_key($edit);
 $program = get_program($form_key);
+$slots = document_slots($form_key, $program, $edit);   // one box per requirement, or per person where it covers two
 $upload_errors = [];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -40,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ? 'The photos are too large altogether. Nothing was changed. Please use fewer or smaller photos.'
             : 'This page was open for too long. Nothing was changed. Please add the photos again and press Save.';
     } else {
-        $read = application_read_uploads($program, false);
+        $read = application_read_uploads($slots, false);
         $upload_errors = $read['errors'];
         if (!$upload_errors) {
             $saved = application_documents_save($pdo, $edit, $program, $read['photos'], (array)($_POST['remove'] ?? []), ['version' => (string)($_POST['version'] ?? '')]);
@@ -59,9 +60,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
     // Shown again with what is saved now
     $edit = application_owned($pdo, (int)$edit['id'], $account_id) ?? $edit;
+    $slots = document_slots($form_key, $program, $edit);
 }
 
-$grouped = application_documents_grouped($pdo, (int)$edit['id'], $program);
+$grouped = application_documents_grouped($pdo, (int)$edit['id'], $slots);
 
 apply_page_start('Change documents', $program, 2, $edit);
 ?>
@@ -104,31 +106,39 @@ apply_page_start('Change documents', $program, 2, $edit);
         <div class="ap-upload-head">
             <h2>Required documents</h2>
             <div class="ap-progress" aria-live="polite">
-                <div class="ap-progress-text"><span>Requirements with a photo</span><span id="progressText">0 of <?= count($program['documents']) ?></span></div>
+                <div class="ap-progress-text"><span>Requirements with a photo</span><span id="progressText">0 of <?= count($slots) ?></span></div>
                 <div class="ap-progress-bar"><span id="progressBar"></span></div>
             </div>
         </div>
 
         <ol class="ap-docs">
-            <?php $i = 0; foreach ($program['documents'] as $doc_name => $hint): ?>
+            <?php foreach ($slots as $i => $slot):
+                $doc_name = $slot['title'];
+                // Photos of this requirement sent before each person had a box: shown with the first box of the requirement
+                $isFirstOfName = $i === 0 || $slots[$i - 1]['name'] !== $slot['name'];
+                $shown = $grouped['slots'][$slot['key']] ?? [];
+                if ($isFirstOfName && $slot['role'] !== null) $shown = array_merge($grouped['legacy'][$slot['name']] ?? [], $shown); ?>
             <li class="ap-doc" data-doc>
                 <div class="ap-doc-head">
-                    <span class="ap-doc-num"><?= $i + 1 ?></span>
+                    <span class="ap-doc-num"><?= e($slot['number']) ?></span>
                     <div class="ap-doc-title">
-                        <h3><?= e($doc_name) ?></h3>
-                        <?php if ($hint): ?><p><?= e($hint) ?></p><?php endif; ?>
+                        <h3><?= e($slot['name']) ?></h3>
+                        <?php if ($slot['person'] !== ''): ?>
+                            <p class="ap-doc-person"><i class="fas fa-user" aria-hidden="true"></i> <strong><?= e($slot['person']) ?><?= $slot['who'] !== '' ? ':' : '' ?></strong> <?= e($slot['who']) ?></p>
+                        <?php endif; ?>
+                        <?php if ($slot['hint']): ?><p><?= e($slot['hint']) ?></p><?php endif; ?>
                     </div>
                     <span class="ap-status" data-status><i class="far fa-clock"></i> Needed</span>
                 </div>
 
-                <?php if ($grouped[$doc_name]): ?>
+                <?php if ($shown): ?>
                 <div class="ap-thumbs ap-existing" data-existing>
-                    <?php foreach ($grouped[$doc_name] as $n => $doc): ?>
+                    <?php foreach ($shown as $n => $doc): ?>
                     <figure class="ap-thumb ap-thumb-existing" data-existing-photo>
                         <a href="<?= e(document_url((int)$doc['id'], false, '')) ?>" target="_blank" rel="noopener" aria-label="Open the saved photo <?= $n + 1 ?> of <?= e($doc_name) ?>">
                             <img src="<?= e(document_url((int)$doc['id'], false, '')) ?>" alt="Saved photo <?= $n + 1 ?> of <?= e($doc_name) ?>" loading="lazy">
                         </a>
-                        <figcaption title="<?= !empty($doc['uploaded_at']) ? e('Saved ' . date('M j, Y', strtotime($doc['uploaded_at']))) : '' ?>">Saved photo</figcaption>
+                        <figcaption title="<?= !empty($doc['uploaded_at']) ? e('Saved ' . date('M j, Y', strtotime($doc['uploaded_at']))) : '' ?>"><?= ($doc['person_role'] ?? '') === '' && $slot['role'] !== null ? 'Earlier photo' : 'Saved photo' ?></figcaption>
                         <label class="ap-thumb-toggle">
                             <input type="checkbox" name="remove[]" value="<?= (int)$doc['id'] ?>" data-remove>
                             <span><i class="fas fa-trash-can" aria-hidden="true"></i> Remove</span>
@@ -161,7 +171,7 @@ apply_page_start('Change documents', $program, 2, $edit);
                 <div class="ap-quality-notes" data-notes aria-live="polite"></div>
                 <p class="ap-doc-error" data-error role="alert"></p>
             </li>
-            <?php $i++; endforeach; ?>
+            <?php endforeach; ?>
         </ol>
 
         <?php if ($grouped['other']): ?>

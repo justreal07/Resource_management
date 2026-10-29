@@ -209,10 +209,14 @@ const STAFF_ACCOUNT_KINDS = ['staff' => 'OPD staff', 'aid_staff' => 'Medical & B
  *
  * @param bool       $canMakeAdmin whether an Admin account may be made (a signed-in admin, or the first admin)
  * @param array|null $actor        who the activity log credits: null = whoever is signed in; ['name' =>, 'role' =>] for the first admin (nobody is signed in yet)
+ * @param string     $email        the account's email, used to reset a forgotten password (includes/office_password_reset.php): required for an
+ *                                 Admin account, ignored for staff (they have none). Saved unconfirmed; a confirmation link is emailed to it.
+ * @param bool|null  $emailSent    set to whether that confirmation email went out (false when there is no email or sending failed)
  * @return string[]  what is wrong, in plain words; empty = the account was made
  */
-function staff_account_create(PDO $pdo, string $fullname, string $username, string $password, string $confirm, string $role, bool $canMakeAdmin, ?array $actor = null): array
+function staff_account_create(PDO $pdo, string $fullname, string $username, string $password, string $confirm, string $role, bool $canMakeAdmin, ?array $actor = null, string $email = '', ?bool &$emailSent = null): array
 {
+    $emailSent = false;
     if ($fullname === '' || $username === '' || $password === '' || $confirm === '') {
         return ['Please fill in all the fields.'];
     }
@@ -233,7 +237,19 @@ function staff_account_create(PDO $pdo, string $fullname, string $username, stri
     } elseif ($role === 'admin' && !$canMakeAdmin) {
         $errors[] = 'Admin accounts can only be created by a signed-in admin. Choose Staff, or ask your admin to make one for you.';
     }
+    // An admin must be able to get back in: the email is how a forgotten password is reset
+    // Only an Admin account has an email: staff have none, and an admin resets a staff password in Admin settings
+    $email = $role === 'admin' ? mb_strtolower(trim($email)) : '';
+    if ($email === '' && $role === 'admin') {
+        $errors[] = 'An Admin account needs an email address, so a forgotten password can be reset by email.';
+    }
     if ($errors) return $errors;
+
+    require_once __DIR__ . '/office_password_reset.php';   // loaded here, not at the top: that file loads this one
+    office_reset_ensure($pdo);                              // the email_verified_at column (DDL: never inside a transaction)
+    if ($email !== '' && ($problem = office_email_problem($pdo, $email)) !== null) {
+        return [$problem];
+    }
 
     $stmt = $pdo->prepare('SELECT 1 FROM users WHERE username = ?');
     $stmt->execute([$username]);
@@ -241,14 +257,16 @@ function staff_account_create(PDO $pdo, string $fullname, string $username, stri
         return ['That username is already taken. Please try another one.'];
     }
     try {
-        $pdo->prepare('INSERT INTO users (username, password, full_name, role) VALUES (?, ?, ?, ?)')
-            ->execute([$username, password_hash($password, PASSWORD_DEFAULT), $fullname, $role]);
+        $pdo->prepare('INSERT INTO users (username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?)')
+            ->execute([$username, $email !== '' ? $email : null, password_hash($password, PASSWORD_DEFAULT), $fullname, $role]);
+        $newId = (int)$pdo->lastInsertId();
     } catch (PDOException $e) {
         return [$e->getCode() === '23000'
-            ? 'That username is already taken. Please try another one.'
+            ? 'That username or email address is already taken. Please try another one.'
             : 'Something went wrong while saving the account. Please try again.'];
     }
     activity_log('staff_created', STAFF_ACCOUNT_KINDS[$role] . ' account created: ' . $fullname . ' (@' . $username . ').', $actor);
+    if ($email !== '') $emailSent = office_email_verify_send($pdo, $newId);   // a failed email never undoes the account
     return [];
 }
 
@@ -287,6 +305,10 @@ function activity_actions(): array
         'staff_enabled'           => ['Access turned on',           'accounts',  'approved'],
         'staff_password_reset'    => ['Password reset',             'accounts',  'pending'],
         'applicant_password_reset' => ['Applicant password reset',  'accounts',  'pending'],
+        'password_reset_sent'     => ['Password reset link emailed', 'accounts', 'pending'],
+        'password_reset_failed'   => ['Password reset email failed', 'accounts', 'danger'],
+        'password_reset_done'     => ['Password reset by email',    'accounts',  'pending'],
+        'email_confirmed'         => ['Account email confirmed',    'accounts',  'approved'],
         'profile_updated'         => ['Profile changed',            'settings',  'neutral'],
         'avatar_changed'          => ['Profile picture changed',    'settings',  'neutral'],
         'password_changed'        => ['Password changed',           'settings',  'neutral'],

@@ -6,6 +6,7 @@
  * $action: where the form posts (submit_admin_applicant.php, relative to the page that shows it).
  */
 require_once __DIR__ . '/../user/assistance_config.php';   // the online forms' lists (barangays, purposes, documents)
+require_once __DIR__ . '/document_slots.php';              // walkin_documents_config(): the papers to tick, one per person where needed
 
 function walkin_form_html(array $typeInfo, string $action): string
 {
@@ -59,13 +60,17 @@ function walkin_form_html(array $typeInfo, string $action): string
                 <div id="modalFormFields" class="modal-form-fields"></div>
             </form>
 
-            <!-- The old upload boxes sat outside the form and submit_admin_applicant.php does not save files,
-                 so attached files were silently dropped. This checklist is honest about that.
-                 CONNECT (needs your approval): to store scans, the backend must accept document_files[]. -->
+            <!-- No files are uploaded for a walk-in: the office keeps the papers. This checklist is what is saved, and every
+                 paper is required, the same as the online application needs a photo of every requirement
+                 (the boxes belong to the form through form="modalApplicantForm"; submit_admin_applicant.php checks them again). -->
             <section class="doc-checklist" id="modalDocumentsSection" aria-labelledby="docTitle">
-                <h3 id="docTitle">Documents to check</h3>
-                <p class="field-help">Tick each paper document you have seen. This list is a reminder only; it is not saved and no files are uploaded.</p>
+                <div class="doc-checklist-head">
+                    <h3 id="docTitle">Papers received <span class="req" aria-hidden="true">*</span></h3>
+                    <button type="button" class="btn btn-link btn-sm" id="modalDocumentsAll">Tick all</button>
+                </div>
+                <p class="field-help">Tick each paper the applicant handed in. All of them are required; the list is saved with the application.</p>
                 <ul id="modalDocumentsList"></ul>
+                <p class="field-error" id="modalDocumentsError" role="alert" hidden></p>
             </section>
         </div>
 

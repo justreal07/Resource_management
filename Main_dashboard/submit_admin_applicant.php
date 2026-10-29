@@ -10,6 +10,7 @@ require_once '../config.php';
 require_once '../includes/application_decision.php';   // decision_csrf_ok(): the form carries the page's form token
 require_once '../user/assistance_config.php';          // the fields, limits and checks of the online forms
 require_once '../user/person_rules.php';
+require_once '../includes/document_slots.php';         // document_slots(): the papers every application needs
 
 admin_tools_ensure($pdo);   // the activity log table, in case this is reached before any admin page loaded it
 
@@ -147,6 +148,17 @@ if ($form_type === 'opd') {
     if ($choice_error) $errors['checkup_reason'] = $choice_error;
 }
 
+// The papers handed in: every requirement of the program, one per person where it covers two (the same boxes the online upload
+// step has, includes/document_slots.php), must be ticked. No files are kept for a walk-in; the ticked list is what is saved.
+$slots = document_slots($form_type, get_program($form_type), $values);
+$ticked = array_values(array_filter((array)($_POST['paper_received'] ?? []), 'is_string'));
+$missingPapers = array_values(array_filter($slots, function ($slot) use ($ticked) { return !in_array($slot['key'], $ticked, true); }));
+if ($missingPapers) {
+    $errors['paper_received'] = 'Tick every paper the applicant handed in. Still missing: '
+        . implode('; ', array_map(function ($slot) { return $slot['title']; }, $missingPapers)) . '.';
+}
+$paper_received = implode("\n", array_map(function ($slot) { return $slot['key']; }, $slots));   // all of them, once the check above passed
+
 if ($errors) {
     walkin_respond($is_ajax, 422, ['success' => false, 'safe' => true, 'errors' => $errors,
         'message' => count($errors) === 1 ? 'Please fix the highlighted field below.' : 'Please fix the ' . count($errors) . ' highlighted fields below.']);
@@ -169,13 +181,14 @@ if (!$check['ok']) {
 $created_at = $application_date . ' ' . date('H:i:s');
 $type_id = ['medical' => 1, 'burial' => 2, 'opd' => 3][$form_type];
 $with_person_columns = person_rules_installed($pdo);   // the birthdate / date of death columns
+$with_papers = paper_received_ensure($pdo);            // the checklist column (added before the transaction: ALTER TABLE would end it)
 $v = $values;
 
 // Account ID is NULL for walk-ins (they don't belong to an applicant account). encoded_by is who keyed it in
 // (the admin too), so the Pending list can show "Walk-in, added by <name>".
 // date_released stays empty: it is the day the assistance is handed over (it used to get the filing date).
 $encoded_by = (int)$walkin_user['id'];
-$insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $created_at, $with_person_columns, $encoded_by): int {
+$insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $created_at, $with_person_columns, $encoded_by, $with_papers, $paper_received): int {
     $row = [
         'account_id' => null, 'encoded_by' => $encoded_by ?: null, 'assistance_type_id' => $type_id, 'status' => 'Pending', 'created_at' => $created_at,
         'first_name' => $v['first_name'], 'middle_name' => $v['middle_name'], 'last_name' => $v['last_name'],
@@ -186,6 +199,7 @@ $insert = function (?int $beneficiary_id) use ($pdo, $form_type, $type_id, $v, $
         'claimant_birthdate' => $v['claimant_birthdate'] !== '' ? $v['claimant_birthdate'] : null,
         'claimant_age' => $v['claimant_age'] !== '' ? $v['claimant_age'] : null,
     ];
+    if ($with_papers) $row['paper_received'] = $paper_received;
     if ($form_type === 'opd') {
         $row += ['age' => $v['age'] !== '' ? $v['age'] : null, 'hospital' => $v['hospital'], 'checkup_date' => $v['checkup_date'],
                  'checkup_reason' => $v['checkup_reason'], 'wheelchair' => $v['wheelchair'], 'stretcher' => $v['stretcher']];

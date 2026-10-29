@@ -42,7 +42,7 @@ $payment = $status === 'Approved' && in_array($type, [1, 2], true) ? assistance_
 
 $stmt = $pdo->prepare("SELECT * FROM applicant_documents WHERE applicant_id = ? ORDER BY document_name, id");
 $stmt->execute([$app_id]);
-$documents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$documents = documents_sort($stmt->fetchAll(PDO::FETCH_ASSOC), $program ?? ['documents' => []]);   // by requirement, then by person
 
 $stmt = $pdo->prepare("SELECT remarks, created_at FROM application_remarks WHERE application_id = ? ORDER BY created_at");
 $stmt->execute([$app_id]);
@@ -307,14 +307,14 @@ account_page_start($ctx, "Application #$app_id", 'account', [
                     $url = document_url((int)$d['id'], false, '');   // opened through document.php (checks it is yours)
                     $is_img = preg_match('/\.(jpe?g|png|webp|gif)$/i', $d['file_path']); ?>
                     <?php if ($is_img): ?>
-                        <a href="<?= e($url) ?>" class="acc-shot" data-lightbox data-caption="<?= e($d['document_name']) ?>">
-                            <img src="<?= e($url) ?>" alt="<?= e($d['document_name']) ?>" loading="lazy">
-                            <span><?= e($d['document_name']) ?></span>
+                        <a href="<?= e($url) ?>" class="acc-shot" data-lightbox data-caption="<?= e(document_label($d)) ?>">
+                            <img src="<?= e($url) ?>" alt="<?= e(document_label($d)) ?>" loading="lazy">
+                            <span><?= e(document_label($d)) ?></span>
                         </a>
                     <?php else: ?>
                         <a href="<?= e($url) ?>" class="acc-shot acc-shot-file" target="_blank" rel="noopener">
                             <i class="far fa-file-alt"></i>
-                            <span><?= e($d['document_name']) ?></span>
+                            <span><?= e(document_label($d)) ?></span>
                         </a>
                     <?php endif; ?>
                 <?php endforeach; ?>

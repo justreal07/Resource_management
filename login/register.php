@@ -7,6 +7,7 @@ admin_tools_ensure($pdo);
 $errors = [];
 $fullname = '';
 $username = '';
+$email = '';
 $roleLabels = ['admin' => 'Admin', 'staff' => 'OPD staff', 'aid_staff' => 'Medical & Burial staff'];
 
 // Accounts are given by the office: only a signed-in admin creates staff and admin accounts
@@ -26,6 +27,7 @@ unset($_SESSION['register_flash']);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $fullname = trim($_POST['fullname'] ?? '');
     $username = trim($_POST['username'] ?? '');
+    $email    = is_string($_POST['email'] ?? null) ? mb_strtolower(trim($_POST['email'])) : '';
     $password = trim($_POST['password'] ?? '');
     $confirm  = trim($_POST['confirm_password'] ?? '');
     $role     = $_POST['role'] ?? 'staff';
@@ -39,9 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // The same checks as Admin settings > Add staff (includes/admin_security.php); the activity log credits
         // whoever is signed in, or the new account itself when it is the very first admin
         $errors = staff_account_create($pdo, $fullname, $username, $password, $confirm, $role, $canMakeAdmin,
-            $signedInAdmin ? null : ['name' => $fullname, 'role' => $role]);
+            $signedInAdmin ? null : ['name' => $fullname, 'role' => $role], $email, $emailSent);
         if (!$errors) {
-            $_SESSION['register_flash'] = ['username' => $username, 'role' => $role];
+            $_SESSION['register_flash'] = ['username' => $username, 'role' => $role, 'email_sent' => $emailSent ? $email : ''];
             // An admin adding accounts stays here; everyone else goes on to sign in
             header('Location: ' . ($signedInAdmin ? 'register' : 'login?role=' . $role));
             exit;
@@ -92,7 +94,8 @@ auth_side(
             <?php if (!empty($errors)): ?>
                 <?= auth_alert('error', 'alert', implode('', array_map(fn($e) => '<div>' . auth_e($e) . '</div>', $errors))) ?>
             <?php elseif ($created): ?>
-                <?= auth_alert('success', 'check-circle', auth_e($roleLabels[$created['role']] ?? ucfirst($created['role'])) . ' account <strong>' . auth_e($created['username']) . '</strong> was created.') ?>
+                <?= auth_alert('success', 'check-circle', auth_e($roleLabels[$created['role']] ?? ucfirst($created['role'])) . ' account <strong>' . auth_e($created['username']) . '</strong> was created.'
+                    . (($created['email_sent'] ?? '') !== '' ? '<div>A confirmation link was emailed to <strong>' . auth_e($created['email_sent']) . '</strong>. It must be opened before that email can reset a forgotten password.</div>' : '')) ?>
             <?php endif; ?>
 
             <form method="POST" action="" class="auth-form" data-loading-text="Creating account…">
@@ -129,6 +132,15 @@ auth_side(
                            minlength="3" maxlength="50" pattern="[A-Za-z0-9._\-]+"
                            autocomplete="username" aria-describedby="usernameHelp" required>
                     <div class="field-help" id="usernameHelp">Letters, numbers, dot, dash or underscore. No spaces.</div>
+                </div>
+
+                <div class="field" data-role-only="admin"<?= $role === 'admin' ? '' : ' hidden' ?>>
+                    <label for="email">Email address</label>
+                    <input type="email" id="email" name="email"
+                           value="<?= auth_e($email) ?>"
+                           maxlength="100" autocomplete="email" aria-describedby="emailHelp"
+                           <?= $role === 'admin' ? 'required' : 'disabled' ?>>
+                    <div class="field-help" id="emailHelp">Used to reset a forgotten password, and we email a link to confirm it first. Staff accounts have no email.</div>
                 </div>
 
                 <div class="auth-grid">

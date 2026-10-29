@@ -2,12 +2,13 @@
 require_once '../config.php';
 require_once 'account_layout.php';
 require_once '../includes/documents.php';
+require_once '../includes/document_slots.php';
 
 $ctx = account_context($pdo);
 $account_id = (int)$ctx['user']['id'];
 
 $stmt = $pdo->prepare("
-    SELECT d.id, d.document_name, d.file_path, d.uploaded_at,
+    SELECT d.*,
            a.id AS app_id, a.assistance_type_id, a.status, a.created_at AS applied_at
     FROM applicant_documents d
     JOIN applicant a ON d.applicant_id = a.id
@@ -66,16 +67,16 @@ account_page_start($ctx, 'My Documents', 'documents', [
             <?php foreach ($g['docs'] as $d):
                 $url = document_url((int)$d['id'], false, '');   // opened through document.php (checks it is yours)
                 $is_img = preg_match('/\.(jpe?g|png|webp|gif)$/i', $d['file_path']); ?>
-            <figure class="acc-doc" data-doc data-name="<?= e(strtolower($d['document_name'])) ?>">
+            <figure class="acc-doc" data-doc data-name="<?= e(strtolower(document_label($d))) ?>">
                 <?php if ($is_img): ?>
-                    <a href="<?= e($url) ?>" class="acc-shot" data-lightbox data-caption="<?= e($d['document_name']) ?>">
-                        <img src="<?= e($url) ?>" alt="<?= e($d['document_name']) ?>" loading="lazy">
+                    <a href="<?= e($url) ?>" class="acc-shot" data-lightbox data-caption="<?= e(document_label($d)) ?>">
+                        <img src="<?= e($url) ?>" alt="<?= e(document_label($d)) ?>" loading="lazy">
                     </a>
                 <?php else: ?>
                     <a href="<?= e($url) ?>" class="acc-shot acc-shot-file" target="_blank" rel="noopener"><i class="far fa-file-alt"></i></a>
                 <?php endif; ?>
                 <figcaption>
-                    <strong><?= e($d['document_name']) ?></strong>
+                    <strong><?= e(document_label($d)) ?></strong>
                     <small class="ap-muted"><?= e(date('M d, Y', strtotime($d['uploaded_at']))) ?></small>
                     <a href="<?= e(document_url((int)$d['id'], true, '')) ?>" download class="ap-link-btn acc-small"><i class="fas fa-download"></i> Download</a>
                 </figcaption>

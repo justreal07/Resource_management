@@ -106,9 +106,19 @@ function review_page_run(): void
     $next = $pos !== false && $pos < count($queue) - 1 ? $queue[$pos + 1] : null;
     $canDecide = $pending && decision_can($user, $typeId);
 
+    // The reviewer's mark on each photo (Looks right / Not readable / Wrong person or document): its columns first, so the query has them
+    $canMark = $canDecide && document_review_ensure($pdo);
+    if ($canDecide) document_role_ensure($pdo);
     $docStmt = $pdo->prepare('SELECT * FROM applicant_documents WHERE applicant_id = ? ORDER BY id');
     $docStmt->execute([$id]);
     $documents = $docStmt->fetchAll(PDO::FETCH_ASSOC);
+    // By requirement, then by person (the patient's ID, then the claimant's), so the photos open in the order of the office's checklist
+    $programInfo = get_program_by_type($typeId);
+    if ($programInfo) $documents = documents_sort($documents, $programInfo);
+    // An online application: which requirement (and person) has photos and how they were marked. A walk-in has papers instead.
+    $checklist = $programInfo && $app['account_id'] !== null && $documents
+        ? document_checklist(document_slots($programInfo['key'], $programInfo, $app), $documents) : [];
+    $papers = !$documents ? document_paper_items($app) : [];
 
     ['who' => $who, 'what' => $what] = ui_record_cards($app);
     $typeInfo = ui_types()[$typeId];
@@ -123,6 +133,7 @@ function review_page_run(): void
     ]);
     ?>
 <div class="review" data-review
+     data-token="<?= ui_e(decision_csrf_token()) ?>" data-mark-url="../Main_dashboard/document_review"<?= $canMark ? ' data-can-mark' : '' ?>
      data-prev="<?= $prev !== null ? ui_e(ui_review_url($prev)) : '' ?>"
      data-next="<?= $next !== null ? ui_e(ui_review_url($next)) : '' ?>">
 
@@ -139,13 +150,44 @@ function review_page_run(): void
         ?>
         <div class="review-docs-head">
             <h2 id="reviewDocsTitle">Photos</h2>
-            <p class="muted" data-doc-title><?= $photos ? ui_e($photos[0]['document_name']) : '' ?></p>
+            <p class="muted" data-doc-title><?= $photos ? ui_e(document_label($photos[0], $app)) : '' ?></p>
             <?php /* What the applicant's device said about each photo (clarity check); only the one on show is visible (js/admin_review.js) */ ?>
             <?php foreach ($photos as $i => $d): $badge = ui_photo_quality_badge($d); ?>
                 <?php if ($badge !== ''): ?><span class="review-quality" data-quality-for="<?= $i ?>"<?= $i === 0 ? '' : ' hidden' ?>><?= $badge ?></span><?php endif; ?>
             <?php endforeach; ?>
             <?php if (count($photos) > 1): ?><p class="muted" data-doc-count>1 of <?= count($photos) ?></p><?php endif; ?>
         </div>
+
+        <?php
+        // The required documents, one line per upload box (per person where a requirement covers two): has it a photo, and what you said about it.
+        // A line opens its first photo. js/admin_review.js keeps the marks and the summary up to date as you mark photos.
+        $stateWords = ['missing' => 'No photo', 'problem' => 'Problem marked', 'ok' => 'Looks right', 'unchecked' => 'Not checked yet'];
+        if ($checklist):
+            $photoAt = [];
+            foreach ($photos as $i => $p) $photoAt[(int)$p['id']] = $i;
+        ?>
+            <p class="review-checklist-sum muted" data-check-sum role="status" aria-live="polite"></p>
+            <ul class="review-checklist" aria-label="Required documents" data-checklist>
+                <?php foreach ($checklist as $row):
+                    $slot = $row['slot'];
+                    $jump = null;
+                    foreach ($row['doc_ids'] as $did) if (isset($photoAt[$did])) { $jump = $photoAt[$did]; break; }
+                    $title = $slot['title'] . ($slot['who'] !== '' ? ' - ' . $slot['who'] : '');
+                ?>
+                    <li class="check-<?= ui_e($row['state']) ?>" data-check data-state="<?= ui_e($row['state']) ?>"
+                        data-docs="<?= ui_e(implode(',', $row['doc_ids'])) ?>" data-title="<?= ui_e($title) ?>">
+                        <button type="button" class="check-item"<?= $jump !== null ? ' data-jump="' . $jump . '"' : ' disabled' ?> title="<?= ui_e($title) ?>">
+                            <span class="check-mark" aria-hidden="true"></span>
+                            <span class="check-name"><?= ui_e($slot['name']) ?></span>
+                            <?php if ($slot['person'] !== ''): ?><span class="badge badge-neutral doc-person"><?= ui_e($slot['person']) ?></span><?php endif; ?>
+                            <span class="visually-hidden" data-check-state><?= ui_e(': ' . $stateWords[$row['state']] . ($row['earlier'] ? ' (earlier photo, not marked for a person)' : '')) ?></span>
+                        </button>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+        <?php elseif ($papers): ?>
+            <?= ui_paper_checklist($papers) ?>
+        <?php endif; ?>
 
         <?php if ($photos): ?>
             <div class="review-stage" data-stage tabindex="0" role="group"
@@ -166,23 +208,45 @@ function review_page_run(): void
                 <a class="btn btn-secondary btn-sm" data-doc-open href="#" target="_blank" rel="noopener"><?= ui_icon('file') ?>Open<span class="visually-hidden"> in a new tab</span></a>
                 <a class="btn btn-secondary btn-sm" data-doc-download href="#"><?= ui_icon('download') ?>Save<span class="visually-hidden"> the photo</span></a>
             </div>
+            <?php if ($canMark || count($photos) > 1): ?>
+                <div class="review-mark" role="group" aria-label="Your check of this photo">
+                    <?php if ($canMark): ?>
+                        <span class="review-mark-label muted">This photo:</span>
+                        <?php foreach (DOCUMENT_REVIEW_STATES as $key => $label): ?>
+                            <button type="button" class="btn btn-secondary btn-sm review-mark-btn" data-mark="<?= ui_e($key) ?>" aria-pressed="false"><?= ui_icon($key === 'ok' ? 'check-circle' : 'alert') ?><?= ui_e($label) ?></button>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                    <?php if (count($photos) > 1): ?>
+                        <button type="button" class="btn btn-secondary btn-sm review-compare-btn" data-compare-open><?= ui_icon('file') ?>Compare</button>
+                    <?php endif; ?>
+                    <span class="review-mark-msg muted" data-mark-msg role="status" aria-live="polite"></span>
+                </div>
+            <?php endif; ?>
             <ul class="review-thumbs" aria-label="Photos of this application">
                 <?php foreach ($photos as $i => $d): $q = photo_quality_info($d); $warned = $q['state'] === 'warn'; ?>
                     <li>
+                        <?php $mark = (string)($d['review_status'] ?? ''); $mark = isset(DOCUMENT_REVIEW_STATES[$mark]) ? $mark : ''; ?>
                         <button type="button" class="review-thumb" data-doc
+                                data-id="<?= (int)$d['id'] ?>"
+                                data-review="<?= ui_e($mark) ?>"
+                                data-role="<?= ui_e((string)($d['person_role'] ?? '')) ?>"
+                                data-req="<?= ui_e((string)$d['document_name']) ?>"
                                 data-src="<?= ui_e(document_url((int)$d['id'])) ?>"
                                 data-download="<?= ui_e(document_url((int)$d['id'], true)) ?>"
-                                data-name="<?= ui_e($d['document_name']) ?>"
+                                data-name="<?= ui_e(document_label($d, $app)) ?>"
                                 <?= $warned ? 'data-quality-text="' . ui_e($q['text']) . '"' : '' ?>
                                 aria-pressed="<?= $i === 0 ? 'true' : 'false' ?>"
-                                aria-label="<?= ui_e($d['document_name']) ?>, photo <?= $i + 1 ?> of <?= count($photos) ?><?= $warned ? ', ' . ui_e(mb_strtolower($q['text'])) : '' ?>">
+                                aria-label="<?= ui_e(document_label($d, $app)) ?>, photo <?= $i + 1 ?> of <?= count($photos) ?><?= $mark !== '' ? ', ' . ui_e(mb_strtolower(DOCUMENT_REVIEW_STATES[$mark])) : '' ?><?= $warned ? ', ' . ui_e(mb_strtolower($q['text'])) : '' ?>">
                             <img src="<?= ui_e(document_url((int)$d['id'])) ?>" alt="" loading="lazy" decoding="async">
-                            <span><?= ui_e($d['document_name']) ?></span>
+                            <span><?= ui_e(document_label($d, $app)) ?></span>
+                            <em class="review-thumb-mark" aria-hidden="true"></em>
                             <?php if ($warned): ?><em class="review-thumb-flag" title="<?= ui_e($q['title']) ?>" aria-hidden="true"><?= ui_icon('alert') ?></em><?php endif; ?>
                         </button>
                     </li>
                 <?php endforeach; ?>
             </ul>
+        <?php elseif ($papers): ?>
+            <?php /* a walk-in: the list of papers above is all there is to look at */ ?>
         <?php else: ?>
             <?= ui_state('inbox', 'No photos to look at', $documents ? 'The files sent with this application are not photos.' : 'No documents were uploaded with this application (walk-ins are checked on paper).') ?>
         <?php endif; ?>
@@ -190,7 +254,7 @@ function review_page_run(): void
         <?php if ($others): ?>
             <ul class="review-files" aria-label="Other files">
                 <?php foreach ($others as $d): ?>
-                    <li><?= ui_icon('file') ?><span><?= ui_e($d['document_name']) ?></span>
+                    <li><?= ui_icon('file') ?><span><?= ui_e(document_label($d, $app)) ?></span>
                         <?= $d['_missing'] ? '<span class="badge badge-danger">' . ui_icon('alert') . 'File missing</span>'
                             : '<a href="' . ui_e(document_url((int)$d['id'], true)) . '">Save the file</a>' ?></li>
                 <?php endforeach; ?>
@@ -249,6 +313,28 @@ function review_page_run(): void
         <p class="visually-hidden" role="status" aria-live="polite" data-review-status></p>
     </footer>
 </div>
+
+<?php if (count($photos) > 1): ?>
+<?php /* Two photos side by side (js/admin_review.js): e.g. the claimant's ID next to the claimant's barangay certificate, to see the name and address agree */ ?>
+<dialog id="compareDialog" class="modal modal-compare" aria-labelledby="compareTitle">
+    <div class="modal-header"><h2 id="compareTitle">Compare two photos</h2>
+        <button type="button" class="icon-btn" data-dialog-close><?= ui_icon('x') ?><span class="visually-hidden">Close</span></button></div>
+    <div class="modal-body">
+        <div class="compare-grid">
+            <?php foreach ([0, 1] as $pane): ?>
+                <section class="compare-pane" data-compare-pane>
+                    <label class="compare-pick">Photo <?= $pane + 1 ?>
+                        <select data-compare-select></select></label>
+                    <a class="compare-frame" data-compare-link href="#" target="_blank" rel="noopener" title="Open this photo in a new tab">
+                        <img data-compare-img alt="" decoding="async"></a>
+                </section>
+            <?php endforeach; ?>
+        </div>
+        <p class="field-help">Click a photo to open it in a new tab. Look at the name and address on each one: do they agree with each other and with the application?</p>
+    </div>
+    <div class="modal-footer"><span class="modal-footer-space"></span><button type="button" class="btn btn-primary" data-dialog-close>Close</button></div>
+</dialog>
+<?php endif; ?>
 
 <dialog id="shortcutsDialog" class="modal modal-sm" aria-labelledby="shortcutsTitle">
     <div class="modal-header"><h2 id="shortcutsTitle">Keyboard keys</h2>

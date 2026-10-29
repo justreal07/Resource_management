@@ -545,8 +545,7 @@ function admin_layout_end(array $opts = []): void
         $opts['scripts'] = array_merge($opts['scripts'] ?? [], ['../js/admin_dashboard.js']);
         $opts['config'] = array_merge([
             'viewUrl'   => '../Main_dashboard/view_applicant?applicant_id=',
-            'documents' => [1 => array_keys(get_program('medical')['documents']), 2 => array_keys(get_program('burial')['documents']),
-                            3 => array_keys(get_program('opd')['documents'])],
+            'documents' => walkin_documents_config(),   // the papers to tick for each program (one per person where a requirement covers two)
         ], $opts['config'] ?? []);
     }
     $config = array_merge([

@@ -15,6 +15,20 @@
         });
     });
 
+    /* ---------- Register: fields only an Admin account has (the email) show only for it ---------- */
+    document.querySelectorAll('input[name="role"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            document.querySelectorAll('[data-role-only]').forEach(function (box) {
+                const on = box.dataset.roleOnly === radio.value;
+                box.hidden = !on;
+                box.querySelectorAll('input').forEach(function (input) {
+                    input.disabled = !on;       // a disabled box is not posted, and is not "required" while hidden
+                    input.required = on;
+                });
+            });
+        });
+    });
+
     /* ---------- Show / hide password ---------- */
     document.querySelectorAll('[data-toggle-password]').forEach(function (btn) {
         btn.addEventListener('click', function () {

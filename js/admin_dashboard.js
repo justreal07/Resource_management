@@ -143,8 +143,9 @@
 
     const TEMPLATES = { 1: 'medicalTemplate', 2: 'burialTemplate', 3: 'opdTemplate' };
     const FORM_TYPES = { 1: 'medical', 2: 'burial', 3: 'opd' };
-    // The paper documents of each program: the same list the online upload step asks for
-    // (user/assistance_config.php, passed in by dashboard.php)
+    // The papers to tick for each program: {programId: {other: boxes, self: boxes (Medical, the patient applies)}}, a box being
+    // {key, name, person}: the same requirements the online upload step asks for, one per person where a requirement covers
+    // two (includes/document_slots.php, walkin_documents_config())
     const DOCUMENTS = cfg.documents || {};
     // Fields that mean the same in all three forms carry over when the type changes.
     // Not petitioner_name / relationship: they are the claimant (Medical), the deceased (Burial)
@@ -331,7 +332,7 @@
     });
     fieldsBox.addEventListener('change', (e) => {
         if (e.target.matches('select[data-choice-select]')) syncChoice(e.target, true);
-        if (e.target.name === 'applying_for') syncApplyingFor();
+        if (e.target.name === 'applying_for') { syncApplyingFor(); renderPapers(fieldsBox.dataset.typeId); }
         if (e.target.type === 'date') renderEchoes();
     });
 
@@ -344,20 +345,64 @@
         fieldsBox.dataset.typeId = typeId;
         syncFields();
 
-        // A reminder checklist only: nothing here is uploaded or saved
+        renderPapers(typeId);
+    }
+
+    /* ---------- The papers received: saved with the application, and every one is required ---------- */
+    const docsError = $('modalDocumentsError');
+    const papersShown = () => Array.prototype.slice.call(docsList.querySelectorAll('input[type="checkbox"]'));
+
+    // Medical: when the patient applies there is one person, so one paper per requirement; otherwise the patient's and the claimant's
+    function renderPapers(typeId) {
+        const set = DOCUMENTS[typeId] || {};
+        const picked = fieldsBox.querySelector('input[name="applying_for"]:checked');
+        const boxes = (picked && picked.value === 'self' && set.self) ? set.self : (set.other || []);
+        const ticked = {};
+        papersShown().forEach((b) => { if (b.checked) ticked[b.value] = true; });   // keep what was ticked when the list changes
         docsList.innerHTML = '';
-        (DOCUMENTS[typeId] || []).forEach((doc, i) => {
+        docsError.hidden = true;
+        boxes.forEach((doc, i) => {
             const li = document.createElement('li');
             const box = document.createElement('input');
             box.type = 'checkbox';
             box.id = 'docCheck' + i;
+            box.name = 'paper_received[]';
+            box.value = doc.key;
+            box.setAttribute('form', 'modalApplicantForm');   // the list sits outside the <form>, but is sent with it
+            box.checked = !!ticked[doc.key];
             const label = document.createElement('label');
             label.htmlFor = box.id;
-            label.textContent = doc;
+            label.textContent = doc.name;
+            if (doc.person) {
+                const who = document.createElement('span');
+                who.className = 'badge badge-neutral doc-person';
+                who.textContent = doc.person;
+                label.append(' ', who);
+            }
             li.append(box, label);
             docsList.appendChild(li);
         });
     }
+
+    // Every paper must be ticked: the message sits under the list
+    function papersMissing() {
+        const boxes = papersShown();
+        const left = boxes.filter((b) => !b.checked).length;
+        if (!boxes.length || !left) {
+            docsError.hidden = true;
+            return false;
+        }
+        docsError.textContent = left === 1 ? 'Tick the paper you have not ticked yet. All the papers are required.'
+            : 'Tick every paper the applicant handed in (' + left + ' not ticked yet). All the papers are required.';
+        docsError.hidden = false;
+        return true;
+    }
+    docsList.addEventListener('change', () => { dirty = true; if (!docsError.hidden) papersMissing(); });
+    $('modalDocumentsAll').addEventListener('click', () => {
+        papersShown().forEach((b) => { b.checked = true; });
+        dirty = true;
+        docsError.hidden = true;
+    });
 
     function resetForm(keepChoices) {
         form.reset();
@@ -518,6 +563,10 @@
             count++;
             if (!first) first = f;
         });
+        if (papersMissing()) {
+            count++;
+            if (!first) first = papersShown().find((b) => !b.checked);
+        }
         if (first) {
             showAlert(count === 1 ? 'Please fix the highlighted field below.' : 'Please fix the ' + count + ' highlighted fields below.');
             first.focus();
@@ -531,6 +580,12 @@
         let first = null;
         Object.keys(errors).forEach((name) => {
             if (name === 'person') return;   // about the person (e.g. already recorded as deceased): shown at the top
+            if (name === 'paper_received') {   // the checklist of papers: the message sits under the list
+                docsError.textContent = errors[name];
+                docsError.hidden = false;
+                if (!first) first = papersShown().find((b) => !b.checked) || null;
+                return;
+            }
             const f = form.querySelector('[name="' + name + '"]');
             if (!f) return;
             UI.showFieldError(f, errors[name]);

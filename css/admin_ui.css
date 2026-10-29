@@ -1394,6 +1394,7 @@ td .field-error { margin-top: 4px; }
    as that page says it is, so there is no empty space in it; as tall as the screen at most, then the page scrolls inside. */
 .modal-page { width: min(940px, calc(100vw - 24px)); overflow: hidden; }
 .modal-page-narrow { width: min(660px, calc(100vw - 24px)); }
+.modal-page-record { width: min(1080px, calc(100vw - 24px)); }
 .modal-page .modal-header { align-items: center; padding: 4px 6px 4px 20px; }
 .modal-page .modal-header h2 { font-size: var(--fs-md); }
 .page-modal-body { position: relative; min-height: 0; }
@@ -1422,6 +1423,21 @@ body.is-embedded { background: var(--c-surface); }
 .embed { min-width: 0; }
 .embed > .alert { margin: 12px 20px 0; }
 .embed-pane { display: grid; gap: 14px; padding: 18px 20px 20px; }
+/* An application's information in the window (the lists' View button): roomier than the settings window, nothing crowded.
+   The window is the one box; the sections inside it are flat, separated by a thin line, and the two columns line up at the top. */
+.embed-record { gap: 28px; padding: 26px 32px 32px; }
+.embed-record .back-link { display: none; }                               /* the window has its own Close */
+.embed-record .panel { padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.embed-record .record-head { gap: 16px; }
+.embed-record .record-title h2 { font-size: var(--fs-xl); }
+.embed-record .record-facts { gap: 18px 32px; margin-top: 4px; padding-top: 20px; }
+.embed-record .record-cols { gap: 28px 48px; }
+.embed-record .record-col { gap: 28px; }
+.embed-record .detail-card { padding-top: 20px; border-top: 1px solid var(--c-border); }
+.embed-record .detail-card h3 { margin-bottom: 14px; }
+.embed-record .detail-list > div { padding-block: 10px; }
+.embed-record > .panel[aria-labelledby="docsTitle"] { padding-top: 22px; border-top: 1px solid var(--c-border); }
+.embed-record .page-actions { margin: 0; }
 /* A picture or a form on the left, the details on the right (Admin settings > Profile, My account) */
 .split { display: grid; grid-template-columns: minmax(0, 270px) minmax(0, 1fr); gap: 18px 28px; align-items: start; }
 .split-side .avatar-box { margin: 0; padding: 0; border: 0; }
@@ -1877,6 +1893,100 @@ kbd {
 .review-thumb span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .review-thumb:hover { border-color: var(--c-border-strong); }
 .review-thumb[aria-pressed="true"] { border-color: var(--c-primary); background: var(--c-primary-soft); }
+/* Whose photo it is (Patient / Claimant / Deceased person): a quiet tag next to the document's name */
+.doc-person { white-space: nowrap; }
+.doc-person .icon { width: 12px; height: 12px; }
+.doc-person-name { font-size: var(--fs-sm); }
+
+/* The required documents of an application: one line each (per person where a requirement covers two). A line opens its first photo. */
+.review-checklist-sum { font-size: var(--fs-sm); }
+.review-checklist-sum.has-problem { color: var(--c-pending-text); font-weight: 600; }
+.review-checklist { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 12px; max-height: 132px; overflow-y: auto; }
+.check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 28px;
+    padding: 2px 6px;
+    color: var(--c-text);
+    font: inherit;
+    font-size: var(--fs-sm);
+    text-align: left;
+    background: none;
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+.check-item:hover:not(:disabled) { background: var(--c-surface-2); }
+.check-item:disabled { cursor: default; }
+.check-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.check-mark {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    border: 2px solid var(--c-border-strong);
+    border-radius: 50%;
+}
+/* Colour only where it means something: a problem or a missing document; "looks right" is the calm green mark */
+.check-ok .check-mark { color: var(--c-approved-text); background: var(--c-approved-bg); border-color: var(--c-approved-border); }
+.check-ok .check-mark::before { content: "\2713"; }
+.check-problem .check-mark, .check-missing .check-mark { color: var(--c-pending-text); background: var(--c-pending-bg); border-color: var(--c-pending-border); }
+.check-problem .check-mark::before, .check-missing .check-mark::before { content: "!"; }
+.check-missing .check-name { color: var(--c-text-muted); }
+
+/* What you said about the photo on show, and the thumbnails' small marks */
+.review-mark { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.review-mark-label { font-size: var(--fs-sm); }
+.review-mark-btn[aria-pressed="true"] { color: var(--c-primary); background: var(--c-primary-soft); border-color: var(--c-primary); font-weight: 600; }
+.review-mark-msg { font-size: var(--fs-sm); }
+.review-compare-btn { margin-left: auto; }
+.review-thumb-mark {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: none;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    font-style: normal;
+    font-weight: 700;
+    border: 1px solid transparent;
+    border-radius: 50%;
+}
+.review-thumb[data-review="ok"] .review-thumb-mark { display: grid; color: var(--c-approved-text); background: var(--c-approved-bg); border-color: var(--c-approved-border); }
+.review-thumb[data-review="ok"] .review-thumb-mark::before { content: "\2713"; }
+.review-thumb[data-review="unclear"] .review-thumb-mark, .review-thumb[data-review="wrong"] .review-thumb-mark { display: grid; color: var(--c-pending-text); background: var(--c-pending-bg); border-color: var(--c-pending-border); }
+.review-thumb[data-review="unclear"] .review-thumb-mark::before, .review-thumb[data-review="wrong"] .review-thumb-mark::before { content: "!"; }
+.review-doc-warning { margin: 0; padding: 8px 10px; color: var(--c-pending-text); background: var(--c-pending-bg); border: 1px solid var(--c-pending-border); border-radius: var(--radius-sm); font-size: var(--fs-sm); }
+.review-doc-warning[hidden] { display: none; }
+
+/* Compare two photos */
+.modal-compare { width: min(1180px, calc(100vw - 24px)); }
+.compare-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.compare-pane { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.compare-pick { display: grid; gap: 4px; font-size: var(--fs-sm); font-weight: 600; }
+.compare-pick select { width: 100%; font: inherit; }
+.compare-frame { display: grid; place-items: center; height: min(62vh, 640px); overflow: auto; background: var(--c-surface-2); border: 1px solid var(--c-border); border-radius: var(--radius-sm); }
+.compare-frame img { max-width: 100%; max-height: 100%; object-fit: contain; background: #fff; }
+@media (max-width: 800px) { .compare-grid { grid-template-columns: minmax(0, 1fr); } .compare-frame { height: 40vh; } }
+
+/* A walk-in has no photos: the papers the office received */
+.paper-note { font-size: var(--fs-sm); }
+.paper-list { display: grid; gap: 6px; font-size: var(--fs-sm); }
+.paper-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.paper-list .icon { flex: none; width: 16px; height: 16px; }
+.paper-list .is-received .icon { color: var(--c-approved-text); }
+.paper-list .is-missing .icon { color: var(--c-pending-text); }
+.doc-checklist-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.doc-checklist li label { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+
 .review-files { display: grid; gap: 6px; font-size: var(--fs-sm); }
 .review-files li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 

@@ -62,6 +62,12 @@ $ASSISTANCE_PROGRAMS = [
             'LETTER OF INTENT'                                             => 'Photo of your signed letter of intent.',
             'MSWD CASE STUDY'                                              => 'Photo of every page of the case study.',
         ],
+        // A requirement that is about more than one person gets one upload box per person (includes/document_slots.php),
+        // so the office knows whose ID / certificate each photo is. "For myself" has one person, so one box.
+        'document_people' => [
+            'PHOTOCOPY OF VALID ID (PATIENT & CLAIMANT) WITH 3 SIGNATURES' => ['patient', 'claimant'],
+            'BRGY. INDIGENCY / RESIDENCY (PATIENT & CLAIMANT)'             => ['patient', 'claimant'],
+        ],
         // Fields re-filled from the user's last application of this same program.
         // Ages are not: they go out of date. The claimant's age comes from their birthdate (get_form_prefill()).
         'remember'  => ['petitioner_name', 'relationship', 'beneficiary_birthdate'],
@@ -84,6 +90,11 @@ $ASSISTANCE_PROGRAMS = [
             'DEATH CERTIFICATE AND FUNERAL CONTRACT (CERTIFIED TRUE COPY)' => 'The whole death certificate and the funeral contract must be visible and readable.',
             'LETTER OF INTENT'                                        => 'Photo of your signed letter of intent.',
             'MSWD CASE STUDY'                                         => 'Photo of every page of the case study.',
+        ],
+        // The board says "PATIENT & CLAIMANT" for the barangay certificate: for Burial the "patient" is the deceased person.
+        'document_people' => [
+            'PHOTOCOPY OF VALID ID (CLAIMANT) WITH 3 SIGNATURES' => ['claimant'],
+            'BRGY. INDIGENCY / RESIDENCY (PATIENT & CLAIMANT)'   => ['deceased', 'claimant'],
         ],
         'remember'  => [],   // the claimant's age comes from their birthdate (get_form_prefill())
     ],

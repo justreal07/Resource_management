@@ -9,6 +9,7 @@
 require_once __DIR__ . '/documents.php';
 require_once __DIR__ . '/avatar.php';   // profile pictures of admin and staff   // document_url() / document_file_path(): the submitted-documents list
 require_once __DIR__ . '/photo_quality.php';   // photo_quality_info(): what the applicant's device said about each photo
+require_once __DIR__ . '/document_slots.php';  // whose photo each one is (patient / claimant / deceased), and the order they are listed in
 require_once __DIR__ . '/budget.php';          // the budget panel, and the budget note in the Approve dialog
 
 /* ============================================================
@@ -610,7 +611,10 @@ function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPag
         $html = '<a class="btn btn-secondary btn-sm" href="' . ui_e(ui_review_url((int)$row['id'])) . '">'
             . ui_icon('search') . 'Review<span class="visually-hidden"> ' . ui_e($name) . ', Ref #' . (int)$row['id'] . '</span></a>';
     } else {
-        $html = '<a class="btn btn-secondary btn-sm" href="' . ui_e(ui_type_url($typeId, 'view', ['id' => (int)$row['id']])) . '">'
+        // View opens the record in a window over the list (js/admin_pagemodal.js); Ctrl / Shift / middle click still opens the full page
+        $viewUrl = ui_type_url($typeId, 'view', ['id' => (int)$row['id']]);
+        $html = '<a class="btn btn-secondary btn-sm" href="' . ui_e($viewUrl) . '" data-page-modal="' . ui_e($viewUrl)
+            . '" data-modal-title="' . ui_e('Application record · Ref #' . (int)$row['id']) . '" data-modal-size="record">'
             . ui_icon('file') . 'View<span class="visually-hidden"> ' . ui_e($name) . ', Ref #' . (int)$row['id'] . '</span></a>';
     }
     if ($withEdit) {
@@ -1214,6 +1218,39 @@ function ui_document_link(array $doc): array
  * "Clear", or "Warned: blurry, too dark" (they chose to send it anyway). Nothing for a photo that was not
  * checked (sent before the check existed). Only a hint: the office still looks at the photo.
  */
+/**
+ * Whose photo it is, for the office: a quiet "Patient" / "Claimant" / "Deceased person" tag and that person's name
+ * ('' for an older photo that names nobody, or a requirement about nobody in particular). $a: the application row (for the names).
+ */
+function ui_document_person(array $doc, array $a): string
+{
+    $label = document_person_label($doc['person_role'] ?? null);
+    if ($label === '') return '';
+    $program = get_program_by_type((int)($a['assistance_type_id'] ?? 0));
+    $name = $program ? document_person_name($program['key'], (string)$doc['person_role'], $a) : '';
+    return '<span class="badge badge-neutral doc-person">' . ui_icon('user') . ui_e($label) . '</span>'
+        . ($name !== '' ? ' <span class="muted doc-person-name">' . ui_e($name) . '</span>' : '');
+}
+
+/**
+ * A walk-in's papers (document_paper_items()): what the office received on paper, one line each, with whose it is.
+ * Shown where an online application shows its photos, and on the review page's left side.
+ */
+function ui_paper_checklist(array $items): string
+{
+    $got = count(array_filter($items, function ($i) { return $i['received']; }));
+    $html = '<p class="muted paper-note">Walk-in: no photos. The office received ' . $got . ' of ' . count($items) . ' papers on paper.</p><ul class="paper-list">';
+    foreach ($items as $i) {
+        $html .= '<li class="' . ($i['received'] ? 'is-received' : 'is-missing') . '">'
+            . ui_icon($i['received'] ? 'check-circle' : 'alert')
+            . '<span class="paper-name">' . ui_e($i['name']) . '</span>'
+            . ($i['person'] !== '' ? ' <span class="badge badge-neutral doc-person">' . ui_e($i['person']) . '</span>'
+                . ($i['who'] !== '' ? ' <span class="muted doc-person-name">' . ui_e($i['who']) . '</span>' : '') : '')
+            . '<span class="visually-hidden">' . ($i['received'] ? ' received' : ' not received') . '</span></li>';
+    }
+    return $html . '</ul>';
+}
+
 function ui_photo_quality_badge(array $doc): string
 {
     $q = photo_quality_info($doc);
@@ -1460,7 +1497,9 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
                 : 'Applicant, online')
             : '')
         . ui_detail('Contact number', $a['contact_number'] ?? '')
-        . ui_detail('Documents', count($documents) === 1 ? '1 uploaded' : count($documents) . ' uploaded')
+        . ui_detail('Documents', !$documents && ($paperItems = document_paper_items($a))
+            ? count(array_filter($paperItems, function ($i) { return $i['received']; })) . ' of ' . count($paperItems) . ' papers received'
+            : (count($documents) === 1 ? '1 uploaded' : count($documents) . ' uploaded'))
         . ($has('edited_at') ? ui_detail('Edited by applicant', ui_date($a['edited_at'], 'M j, Y, g:i A')) : '')
         . '</dl></div>';
 
@@ -1473,18 +1512,23 @@ function ui_applicant_record(array $a, array $documents, string $backHref, strin
 
     // Documents
     $html .= '<section class="panel" aria-labelledby="docsTitle"><div class="panel-head"><h3 id="docsTitle">Submitted documents</h3></div>';   // (the count is in the facts above)
-    if (!$documents) {
+    if (!$documents && ($papers = document_paper_items($a))) {
+        $html .= ui_paper_checklist($papers);   // a walk-in: no photos, the papers the office received
+    } elseif (!$documents) {
         $html .= ui_state('inbox', 'No documents uploaded', 'Documents the applicant uploads online appear here.');
     } else {
         $html .= '<div class="table-wrap"><table class="data-table"><thead><tr><th scope="col">Document</th><th scope="col">Uploaded</th><th scope="col"><span class="visually-hidden">Action</span></th></tr></thead><tbody>';
-        foreach ($documents as $doc) {
+        $program = get_program_by_type($type);
+        // By requirement, then by person, so the patient's ID and the claimant's ID sit next to each other
+        foreach ($program ? documents_sort($documents, $program) : $documents as $doc) {
             [$url, $exists] = ui_document_link($doc);
             $html .= '<tr><td class="cell-main" data-label="Document"><strong class="row-name">' . ui_e($doc['document_name']) . '</strong>'
+                . ui_document_person($doc, $a)
                 . ($exists ? '' : '<span class="badge badge-danger">' . ui_icon('alert') . 'File missing</span>')
                 . ui_photo_quality_badge($doc) . '</td>'
                 . '<td data-label="Uploaded">' . ui_e(ui_date($doc['uploaded_at'], 'M j, Y, g:i A')) . '</td>'
                 . '<td class="cell-action">' . ($exists
-                    ? '<a class="btn btn-secondary btn-sm" href="' . ui_e($url) . '" target="_blank" rel="noopener">' . ui_icon('file') . 'Open<span class="visually-hidden"> ' . ui_e($doc['document_name']) . ' (opens in a new tab)</span></a>'
+                    ? '<a class="btn btn-secondary btn-sm" href="' . ui_e($url) . '" target="_blank" rel="noopener">' . ui_icon('file') . 'Open<span class="visually-hidden"> ' . ui_e(document_label($doc)) . ' (opens in a new tab)</span></a>'
                     : '<span class="muted">Not available</span>') . '</td></tr>';
         }
         $html .= '</tbody></table></div>';

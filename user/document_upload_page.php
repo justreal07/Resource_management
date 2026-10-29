@@ -8,6 +8,7 @@ require_once '../config.php';
 require_once 'assistance_config.php';
 require_once 'apply_layout.php';
 require_once __DIR__ . '/../includes/privacy.php';
+require_once __DIR__ . '/../includes/document_slots.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['applicant'])) {
@@ -26,6 +27,9 @@ if (!$form_data) {
 
 $upload_errors = $_SESSION['upload_errors'] ?? [];
 unset($_SESSION['upload_errors']);
+
+// One box per requirement, or per person where a requirement covers two (the patient's ID and the claimant's ID, ...)
+$slots = document_slots($form_key, $program, $form_data);
 
 $applicant_name = trim($form_data['first_name'] . ' ' . $form_data['middle_name'] . ' ' . $form_data['last_name']);
 $address = implode(', ', array_filter([
@@ -85,19 +89,22 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
         <div class="ap-upload-head">
             <h2>Required documents</h2>
             <div class="ap-progress" aria-live="polite">
-                <div class="ap-progress-text"><span>Photos added</span><span id="progressText">0 of <?= count($program['documents']) ?></span></div>
+                <div class="ap-progress-text"><span>Photos added</span><span id="progressText">0 of <?= count($slots) ?></span></div>
                 <div class="ap-progress-bar"><span id="progressBar"></span></div>
             </div>
         </div>
 
         <ol class="ap-docs">
-            <?php $i = 0; foreach ($program['documents'] as $doc_name => $hint): ?>
+            <?php foreach ($slots as $i => $slot): $doc_name = $slot['title']; ?>
             <li class="ap-doc" data-doc>
                 <div class="ap-doc-head">
-                    <span class="ap-doc-num"><?= $i + 1 ?></span>
+                    <span class="ap-doc-num"><?= e($slot['number']) ?></span>
                     <div class="ap-doc-title">
-                        <h3><?= e($doc_name) ?></h3>
-                        <?php if ($hint): ?><p><?= e($hint) ?></p><?php endif; ?>
+                        <h3><?= e($slot['name']) ?></h3>
+                        <?php if ($slot['person'] !== ''): ?>
+                            <p class="ap-doc-person"><i class="fas fa-user" aria-hidden="true"></i> <strong><?= e($slot['person']) ?><?= $slot['who'] !== '' ? ':' : '' ?></strong> <?= e($slot['who']) ?></p>
+                        <?php endif; ?>
+                        <?php if ($slot['hint']): ?><p><?= e($slot['hint']) ?></p><?php endif; ?>
                     </div>
                     <span class="ap-status" data-status><i class="far fa-clock"></i> Needed</span>
                 </div>
@@ -127,7 +134,7 @@ apply_page_start($program['name'] . ' – Upload Photos', $program, 2);
                 <div class="ap-quality-notes" data-notes aria-live="polite"></div>
                 <p class="ap-doc-error" data-error role="alert"></p>
             </li>
-            <?php $i++; endforeach; ?>
+            <?php endforeach; ?>
         </ol>
 
         <?php /* Required on every application (Data Privacy Act): checked again by submit_assistance.php */ ?>

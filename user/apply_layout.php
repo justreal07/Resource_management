@@ -5,6 +5,7 @@
  * Used by the 3 forms, the 3 *doc.php pages and submission_confirmation.php.
  */
 require_once __DIR__ . '/portal_ui.php';
+require_once __DIR__ . '/../includes/document_slots.php';   // document_person_label(): "a photo for each person" on the form's sidebar
 
 function e($value): string {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
@@ -299,7 +300,8 @@ function render_form_sidebar(array $program): void {
             <p class="ap-muted">You'll upload a clear <strong>photo</strong> of each document in the next step.</p>
             <ul class="ap-checklist">
                 <?php foreach ($program['documents'] as $doc => $hint): ?>
-                    <li><i class="far fa-image"></i> <?= e($doc) ?></li>
+                    <li><i class="far fa-image"></i> <?= e($doc) ?><?php if (!empty($program['document_people'][$doc])): ?>
+                        <small class="ap-muted">(a separate photo for each person: <?= e(implode(', ', array_map('document_person_label', $program['document_people'][$doc]))) ?>)</small><?php endif; ?></li>
                 <?php endforeach; ?>
             </ul>
         </div>

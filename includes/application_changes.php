@@ -24,6 +24,7 @@ require_once __DIR__ . '/application_decision.php';      // decision_release_per
 require_once __DIR__ . '/admin_security.php';            // activity_log()
 require_once __DIR__ . '/documents.php';                 // document_file_path()
 require_once __DIR__ . '/photo_quality.php';             // photo_quality_ensure() / photo_quality_parse()
+require_once __DIR__ . '/document_slots.php';            // document_slots(): one upload box per person, document_insert()
 require_once __DIR__ . '/../user/account_helpers.php';   // flash(), csrf_valid(), and assistance_config.php
 require_once __DIR__ . '/../user/person_rules.php';      // the person rules, name matching, locks
 
@@ -359,24 +360,26 @@ function application_edit_save(PDO $pdo, array $app, string $formKey, array $val
    ============================================================ */
 
 /**
- * Reads and checks the photos sent for the program's requirements ($_FILES['documents'][<requirement number>][], with the clarity
- * note of each in $_POST['quality'][<requirement number>][]). Shared by the first submission (user/submit_assistance.php) and the
- * documents page (user/edit_documents.php), so the two accept exactly the same photos: real JPG/PNG/WEBP content only, up to
- * PHOTOS_PER_DOCUMENT per requirement and PHOTO_MAX_BYTES each.
+ * Reads and checks the photos sent for the upload boxes ($_FILES['documents'][<box number>][], with the clarity note of each in
+ * $_POST['quality'][<box number>][]; the boxes are document_slots(): one per requirement, or one per person where a requirement
+ * covers two). Shared by the first submission (user/submit_assistance.php) and the documents page (user/edit_documents.php), so
+ * the two accept exactly the same photos: real JPG/PNG/WEBP content only, up to PHOTOS_PER_DOCUMENT per box and PHOTO_MAX_BYTES each.
  *
- * @param bool $requireEach true: every requirement must have a photo ("Please add a photo of: ..."), as when first filing
+ * @param array $slots document_slots() of this application
+ * @param bool $requireEach true: every box must have a photo ("Please add a photo of: ..."), as when first filing
  * @return array{photos: array, errors: string[], counts: array<string,int>}
- *         photos: ['doc_name', 'tmp', 'ext', 'quality'] per accepted photo; counts: photos sent per requirement name
+ *         photos: ['doc_name', 'role', 'tmp', 'ext', 'quality'] per accepted photo; counts: photos sent per box (slot key)
  *         (an unreadable one still counts as sent, so it isn't also reported as missing)
  */
-function application_read_uploads(array $program, bool $requireEach): array
+function application_read_uploads(array $slots, bool $requireEach): array
 {
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $errors = [];
     $photos = [];
     $counts = [];
 
-    foreach (array_keys($program['documents']) as $i => $doc_name) {
+    foreach ($slots as $i => $slot) {
+        $doc_name = $slot['title'];   // what the applicant reads in a message: the requirement, and whose box when it has two
         $names = $_FILES['documents']['name'][$i] ?? [];
         $count = 0;
 
@@ -413,10 +416,10 @@ function application_read_uploads(array $program, bool $requireEach): array
 
             // quality[<document>][] comes in the same order as the photos of that document (js/apply-upload.js);
             // it is only a hint for the office, so a missing or odd value just means "not checked"
-            $photos[] = ['doc_name' => $doc_name, 'tmp' => $tmp, 'ext' => PHOTO_ALLOWED_TYPES[$mime],
+            $photos[] = ['doc_name' => $slot['name'], 'role' => $slot['role'], 'tmp' => $tmp, 'ext' => PHOTO_ALLOWED_TYPES[$mime],
                          'quality' => photo_quality_parse($_POST['quality'][$i][$n] ?? null)];
         }
-        $counts[$doc_name] = $count;
+        $counts[$slot['key']] = $count;
 
         if ($requireEach && $count === 0) {
             $errors[] = "Please add a photo of: $doc_name.";
@@ -425,16 +428,29 @@ function application_read_uploads(array $program, bool $requireEach): array
     return ['photos' => $photos, 'errors' => $errors, 'counts' => $counts];
 }
 
-/** An application's documents grouped by requirement: [requirement name => rows], plus 'other' for names no longer on the list. */
-function application_documents_grouped(PDO $pdo, int $applicationId, array $program): array
+/**
+ * An application's documents by upload box. Returns
+ *   'slots'  => [slot key => rows]        photos saved for that requirement and person
+ *   'legacy' => [requirement name => rows] photos of a requirement that names no person (sent before each person had a box):
+ *                                          they still count for that requirement, so nobody is asked to send them again
+ *   'other'  => rows                       names no longer on the list, or a person that this application no longer has
+ *
+ * @param array $slots document_slots() of this application
+ */
+function application_documents_grouped(PDO $pdo, int $applicationId, array $slots): array
 {
     $stmt = $pdo->prepare('SELECT * FROM applicant_documents WHERE applicant_id = ? ORDER BY id');
     $stmt->execute([$applicationId]);
-    $grouped = array_fill_keys(array_keys($program['documents']), []);
-    $grouped['other'] = [];
+    $grouped = ['slots' => array_fill_keys(array_column($slots, 'key'), []), 'legacy' => [], 'other' => []];
+    $multi = [];   // requirements that have a box per person
+    foreach ($slots as $s) if ($s['role'] !== null) $multi[$s['name']] = true;
     foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $doc) {
-        if (isset($grouped[$doc['document_name']]) && $doc['document_name'] !== 'other') {
-            $grouped[$doc['document_name']][] = $doc;
+        $role = ($doc['person_role'] ?? '') !== '' ? $doc['person_role'] : null;
+        $key = document_slot_key((string)$doc['document_name'], $role);
+        if (isset($grouped['slots'][$key])) {
+            $grouped['slots'][$key][] = $doc;
+        } elseif ($role === null && isset($multi[$doc['document_name']])) {
+            $grouped['legacy'][$doc['document_name']][] = $doc;
         } else {
             $grouped['other'][] = $doc;
         }
@@ -468,6 +484,8 @@ function application_documents_save(PDO $pdo, array $app, array $program, array 
     $upload_dir = __DIR__ . '/../documents/';
     if (!is_dir($upload_dir)) mkdir($upload_dir, 0755, true);
     $with_quality = photo_quality_ensure($pdo);   // before the transaction: ALTER TABLE would end it
+    $with_role = document_role_ensure($pdo);
+    $slots = document_slots(application_form_key($app), $program, $app);
     $saved_files = [];
     $old_files = [];
 
@@ -488,9 +506,11 @@ function application_documents_save(PDO $pdo, array $app, array $program, array 
         }
 
         // What each requirement will hold afterwards
-        $grouped = application_documents_grouped($pdo, $id, $program);
+        $grouped = application_documents_grouped($pdo, $id, $slots);
         $mine = [];
-        foreach ($grouped as $name => $docs) foreach ($docs as $d) $mine[(int)$d['id']] = $d;
+        foreach ($grouped['slots'] as $docs) foreach ($docs as $d) $mine[(int)$d['id']] = $d;
+        foreach ($grouped['legacy'] as $docs) foreach ($docs as $d) $mine[(int)$d['id']] = $d;
+        foreach ($grouped['other'] as $d) $mine[(int)$d['id']] = $d;
         foreach ($removeIds as $docId) {
             if (!isset($mine[$docId])) {   // not a photo of this application: never delete it
                 $pdo->rollBack();
@@ -498,23 +518,23 @@ function application_documents_save(PDO $pdo, array $app, array $program, array 
             }
         }
         $added = [];
-        foreach ($photos as $p) $added[$p['doc_name']] = ($added[$p['doc_name']] ?? 0) + 1;
-        foreach (array_keys($program['documents']) as $name) {
-            $kept = count(array_filter($grouped[$name], function ($d) use ($removeIds) { return !in_array((int)$d['id'], $removeIds, true); }));
-            $total = $kept + ($added[$name] ?? 0);
-            if ($total < 1) {
+        foreach ($photos as $p) $added[document_slot_key($p['doc_name'], $p['role'] ?? null)] = ($added[document_slot_key($p['doc_name'], $p['role'] ?? null)] ?? 0) + 1;
+        $notRemoved = function ($d) use ($removeIds) { return !in_array((int)$d['id'], $removeIds, true); };
+        foreach ($slots as $slot) {
+            $kept = count(array_filter($grouped['slots'][$slot['key']], $notRemoved));
+            $total = $kept + ($added[$slot['key']] ?? 0);
+            // Photos of this requirement from before each person had a box (not marked for anybody) still count for it
+            $keptEarlier = count(array_filter($grouped['legacy'][$slot['name']] ?? [], $notRemoved));
+            if ($total < 1 && $keptEarlier < 1) {
                 $pdo->rollBack();
-                return $result(false, 'missing', 'Every requirement needs at least one photo. "' . $name . '" would have none: add a photo of it, or keep the one you have.');
+                return $result(false, 'missing', 'Every requirement needs at least one photo. "' . $slot['title'] . '" would have none: add a photo of it, or keep the one you have.');
             }
             if ($total > PHOTOS_PER_DOCUMENT) {
                 $pdo->rollBack();
-                return $result(false, 'toomany', '"' . $name . '" can have up to ' . PHOTOS_PER_DOCUMENT . ' photos. Remove one before you add another.');
+                return $result(false, 'toomany', '"' . $slot['title'] . '" can have up to ' . PHOTOS_PER_DOCUMENT . ' photos. Remove one before you add another.');
             }
         }
 
-        $insert = $pdo->prepare($with_quality
-            ? 'INSERT INTO applicant_documents (applicant_id, document_name, file_path, quality_flags, quality_metrics) VALUES (?, ?, ?, ?, ?)'
-            : 'INSERT INTO applicant_documents (applicant_id, document_name, file_path) VALUES (?, ?, ?)');
         foreach ($photos as $photo) {
             $clean = preg_replace('/[^a-zA-Z0-9]/', '_', $photo['doc_name']);
             $filename = uniqid() . bin2hex(random_bytes(3)) . '_' . $clean . '.' . $photo['ext'];
@@ -522,9 +542,7 @@ function application_documents_save(PDO $pdo, array $app, array $program, array 
                 throw new RuntimeException('Could not save the photo for ' . $photo['doc_name']);
             }
             $saved_files[] = $upload_dir . $filename;
-            $insert->execute($with_quality
-                ? [$id, $photo['doc_name'], $filename, $photo['quality']['flags'], $photo['quality']['metrics']]
-                : [$id, $photo['doc_name'], $filename]);
+            document_insert($pdo, $id, $photo, $filename, $with_quality, $with_role);
         }
         if ($removeIds) {
             foreach ($removeIds as $docId) {
