@@ -6,7 +6,7 @@
 
 /* ============================================
    PAGE + CARD
-   A navy band behind the top of the card, like the dashboard's top bar, then the off-white page.
+   The office palette runs from dark navy through purple to burgundy behind a white card.
 ============================================ */
 .login-page {
     min-height: 100vh;
@@ -14,18 +14,18 @@
     align-items: center;
     justify-content: center;
     padding: 32px 16px;
-    background: linear-gradient(var(--c-nav-bg) 0, var(--c-nav-bg) 38vh, var(--c-bg) 38vh);
+    background: radial-gradient(ellipse at 12% 18%, rgba(142, 131, 199, 0.22), transparent 48%), var(--brand-gradient);
 }
 
 .login-card {
     display: flex;
     width: 100%;
-    max-width: 940px;
+    max-width: 1000px;
     background: var(--c-surface);
     border: 1px solid var(--c-border);
-    border-top: 4px solid var(--c-accent);   /* the same red stripe as an action panel */
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-lg);
+    border-top: 0;
+    border-radius: 24px;
+    box-shadow: 0 28px 80px rgba(3, 9, 34, 0.35);
     overflow: hidden;
 }
 
@@ -43,13 +43,13 @@
     position: relative;
     isolation: isolate;
     overflow: hidden;
-    flex: 0 0 42%;
+    flex: 0 0 40%;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     gap: 28px;
     padding: 36px 32px;
-    background: var(--c-nav-bg);
+    background: linear-gradient(155deg, #081955 0%, #302354 64%, #780c1e 100%);
     color: var(--c-nav-text);
 }
 .login-side :focus-visible { outline-color: var(--c-focus-on-dark); }
@@ -74,6 +74,8 @@
     display: flex;
     align-items: center;
     gap: 12px;
+    justify-content: center;
+    text-align: center;
     padding-bottom: 20px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
@@ -126,22 +128,55 @@
 /* ============================================
    RIGHT PANEL (form)
 ============================================ */
-.login-main { flex: 1; min-width: 0; padding: 44px 48px; }
+.login-main {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    padding: 36px 44px;
+    background: linear-gradient(160deg, #ffffff 58%, #f3eef8 100%);
+}
+.login-main::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 6px;
+    background: var(--brand-gradient);
+}
 
 .mobile-brand {
-    display: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
     align-items: center;
-    gap: 12px;
-    padding-bottom: 20px;
+    gap: 14px;
     margin-bottom: 24px;
-    border-bottom: 1px solid var(--c-border);
 }
-.mobile-brand img { width: 46px; height: 46px; border-radius: 50%; object-fit: cover; }
+.mobile-brand img {
+    width: 112px;
+    height: 112px;
+    padding: 6px;
+    border: 1px solid #ddd5eb;
+    border-radius: 50%;
+    object-fit: contain;
+    background: #fff;
+    box-shadow: 0 0 0 8px #f2edf7, 0 12px 28px rgba(48, 35, 84, 0.16);
+}
 .mobile-brand strong { display: block; color: var(--c-heading); font-size: var(--fs-base); }
 .mobile-brand small { color: var(--c-text-muted); font-size: var(--fs-sm); }
 
-.login-title { margin-bottom: 4px; color: var(--c-heading); font-size: var(--fs-xl); font-weight: 700; line-height: 1.25; }
-.login-sub { margin-bottom: 24px; color: var(--c-text-muted); }
+.login-title { margin-bottom: 6px; color: var(--c-heading); font-size: 28px; font-weight: 700; line-height: 1.25; text-align: center; }
+.login-sub { margin-bottom: 24px; color: var(--c-text-muted); text-align: center; }
+.auth-form .btn-primary {
+    min-height: 46px;
+    background: var(--brand-gradient);
+    border-color: transparent;
+    box-shadow: 0 7px 18px rgba(48, 35, 84, 0.2);
+}
+.auth-form .btn-primary:hover { filter: brightness(1.12); }
+.auth-input input { background-color: #f7f5fa; border-radius: 10px; }
 .login-main .alert { margin-bottom: 20px; }
 
 .auth-form { display: grid; gap: 16px; }
@@ -228,9 +263,11 @@
 @media (max-width: 899.98px) {
     .login-side { display: none; }
     .mobile-brand { display: flex; }
+    .login-card { max-width: 520px; }
 }
 
 @media (max-width: 575.98px) {
     .login-page { align-items: flex-start; padding: 16px; }
     .login-main { padding: 28px 22px; }
+    .mobile-brand img { width: 96px; height: 96px; }
 }

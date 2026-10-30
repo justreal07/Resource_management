@@ -85,6 +85,13 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
         </div>
 
         <div class="hero-card auth-card">
+            <?php if ($active === 'login'): ?>
+            <div class="auth-office-brand">
+                <img src="../asset/ACCESS.jpg" alt="Community Affairs Office logo" width="112" height="112">
+                <strong>Community Affairs Office</strong>
+                <span>LGU General Mariano Alvarez</span>
+            </div>
+            <?php endif; ?>
     <?php
 }
 

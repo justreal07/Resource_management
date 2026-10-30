@@ -74,14 +74,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // A different email is not confirmed until its owner opens the link we send to it
             $emailChanged = strcasecmp((string)$p['email'], (string)($user['email'] ?? '')) !== 0;
-            $stmt = $pdo->prepare("UPDATE applicant_accounts SET firstname = ?, lastname = ?, username = ?, email = ?, phone = ?, sex = ?, birthdate = ?,
+            $saved = reset_account_transaction($pdo, false, $account_id, function (array $locked) use ($pdo, $user, $p, $emailChanged, $account_id) {
+                if ($locked['password'] !== $user['password'] || (string)$locked['email'] !== (string)$user['email']) return false;
+                $stmt = $pdo->prepare("UPDATE applicant_accounts SET firstname = ?, lastname = ?, username = ?, email = ?, phone = ?, sex = ?, birthdate = ?,
                                    house_no = ?, street = ?, barangay = ?, municipality = ?, province = ?"
                                    . ($emailChanged ? ", email_verified_at = NULL" : "") . " WHERE id = ?");
-            $stmt->execute([
-                $p['firstname'], $p['lastname'], $p['username'], $p['email'] ?: null, $p['phone'] ?: null, $p['sex'] ?: null, $p['birthdate'] ?: null,
-                $p['house_no'] ?: null, $p['street'] ?: null, $p['barangay'] ?: null, $p['municipality'] ?: null, $p['province'] ?: null,
-                $account_id,
-            ]);
+                $stmt->execute([
+                    $p['firstname'], $p['lastname'], $p['username'], $p['email'] ?: null, $p['phone'] ?: null, $p['sex'] ?: null, $p['birthdate'] ?: null,
+                    $p['house_no'] ?: null, $p['street'] ?: null, $p['barangay'] ?: null, $p['municipality'] ?: null, $p['province'] ?: null,
+                    $account_id,
+                ]);
+                if ($emailChanged) reset_tokens_revoke($pdo, false, $account_id);
+                return true;
+            });
+            if (!$saved) {
+                flash('error', 'Your account changed while this page was open. Reload and try again.');
+                header('Location: my_account#profile');
+                exit;
+            }
             $_SESSION['applicant']['firstname'] = $p['firstname'];
             $_SESSION['applicant']['lastname'] = $p['lastname'];
             $_SESSION['applicant']['username'] = $p['username'];
@@ -160,10 +170,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // must_change_password: set when the office gave a temporary password (includes/password_reset.php)
             $newHash = password_hash($new, PASSWORD_DEFAULT);
-            $pdo->prepare("UPDATE applicant_accounts SET password = ?, must_change_password = 0 WHERE id = ?")->execute([$newHash, $account_id]);
-            $_SESSION['applicant']['pwv'] = hash('sha256', $newHash);
-            session_regenerate_id(true);
-            flash('success', 'Your password was changed.');
+            $saved = reset_credentials_change($pdo, false, $account_id, function (array $locked) use ($pdo, $user, $newHash, $account_id) {
+                if ($locked['password'] !== $user['password']) return false;
+                $pdo->prepare("UPDATE applicant_accounts SET password = ?, must_change_password = 0 WHERE id = ?")->execute([$newHash, $account_id]);
+                return true;
+            });
+            if ($saved) {
+                $_SESSION['applicant']['pwv'] = hash('sha256', $newHash);
+                session_regenerate_id(true);
+                flash('success', 'Your password was changed.');
+            } else {
+                flash('error', 'Your password changed while this page was open. Reload and try again.');
+            }
         }
     }
 

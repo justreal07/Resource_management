@@ -4,10 +4,10 @@
    Light by default; a dark version (the "Dark theme" block below the tokens) follows the computer's setting or the top bar's moon button.
 
    Template colors (admin and staff):
-     #123B63 Deep Navy  sidebar, top bar, headings, main navigation
-     #1E5A8A Blue       buttons, icons, links, selected states, chart bars
-     #B83232 Red        important actions (Disapprove), alerts, highlights, Disapproved status
-     #F6F8FA Off-white  page background
+     #081955 Dark Navy sidebar and headings
+     #302354 Purple    top bar, buttons, icons, links, selected states, chart bars
+     #780C1E Burgundy  important actions (Disapprove), alerts, highlights, Disapproved status
+     #F7F5FA Off-white page background
      #FFFFFF White      cards, tables, forms, dialogs
    Pending (amber) and Approved (green) keep their own colors so a status is never confused with a brand color.
    ========================================================================== */
@@ -15,38 +15,42 @@
 /* ---------- Design tokens ---------- */
 :root {
     color-scheme: light;
+    --brand-navy: #081955;
+    --brand-purple: #302354;
+    --brand-burgundy: #780c1e;
+    --brand-gradient: linear-gradient(135deg, var(--brand-navy) 0%, var(--brand-purple) 52%, var(--brand-burgundy) 100%);
 
     /* Surfaces and text (all text pairs are 4.5:1 or better) */
-    --c-bg: #f6f8fa;                 /* Off-white: page background */
+    --c-bg: #f7f5fa;                 /* Off-white: page background */
     --c-surface: #ffffff;            /* White: cards, tables, forms, dialogs */
-    --c-surface-2: #f6f8fa;          /* inside white cards: table headers, filter bars */
+    --c-surface-2: #f7f5fa;          /* inside white cards: table headers, filter bars */
     --c-border: #dce3ea;
     --c-border-strong: #8792a2;      /* form field borders, 3:1 on white */
     --c-text: #1b2333;
     --c-text-muted: #4b5565;
-    --c-heading: #123b63;            /* Deep Navy: page and section headings, table headers */
+    --c-heading: var(--brand-navy);  /* page and section headings, table headers */
 
     /* Brand */
-    --c-primary: #1e5a8a;            /* Blue: buttons, icons, links, selected states (7.3:1 on white) */
-    --c-primary-hover: #174a73;
-    --c-primary-soft: #e8f0f7;
-    --c-accent: #b83232;             /* Red: important actions, alerts, highlights (5.9:1 on white) */
-    --c-accent-hover: #962828;
-    --c-nav-bg: #123b63;             /* Deep Navy: sidebar and top bar */
+    --c-primary: var(--brand-purple);
+    --c-primary-hover: var(--brand-navy);
+    --c-primary-soft: #eeeaf5;
+    --c-accent: var(--brand-burgundy);
+    --c-accent-hover: #5c0917;
+    --c-nav-bg: var(--brand-purple);
     --c-nav-text: #dce6f0;
     --c-nav-muted: #c3d3e3;          /* secondary text on navy (7:1) */
-    --c-nav-active: #1e5a8a;         /* selected menu item */
+    --c-nav-active: var(--brand-purple);
 
-    /* Sidebar: white, like the design's filter panel (the top bar stays navy) */
-    --c-side-bg: #ffffff;
-    --c-side-text: #26324d;
-    --c-side-muted: #56627a;
-    --c-side-hover: #eef2f9;
-    --c-side-active-bg: #123b63;     /* the box ticked for the page you are on */
-    --c-side-border: #dce3ea;
+    /* Navy sidebar stays dark in both themes. */
+    --c-side-bg: var(--brand-navy);
+    --c-side-text: #ffffff;
+    --c-side-muted: #cdcde1;
+    --c-side-hover: #20275d;
+    --c-side-active-bg: var(--brand-purple);
+    --c-side-border: #29376c;
 
     /* Focus ring: always visible, never removed */
-    --c-focus: #1e5a8a;
+    --c-focus: var(--brand-purple);
     --c-focus-on-dark: #ffffff;
 
     /* The label on a brand fill (primary / red buttons, badges): white in light mode, a dark ink on the lighter fills of dark mode */
@@ -56,24 +60,24 @@
     /* Status: text and tint pairs for badges (icon + label, never color alone) */
     --c-pending-bg: #fff4d6;   --c-pending-text: #7a4b00;   --c-pending-border: #e9c46a;
     --c-approved-bg: #e3f4e8;  --c-approved-text: #155c33;  --c-approved-border: #9fd3b0;
-    --c-danger-bg: #fbebeb;    --c-danger-text: #b83232;    --c-danger-border: #e8afaf;
+    --c-danger-bg: #f9e9ed;    --c-danger-text: #780c1e;    --c-danger-border: #d8a0ae;
     --c-deceased-bg: #eceef2;  --c-deceased-text: #374151;  --c-deceased-border: #b8bfcb;
-    --c-info-bg: #e8f0f7;      --c-info-text: #123b63;      --c-info-border: #b7cce0;
+    --c-info-bg: #eeeaf5;      --c-info-text: #302354;      --c-info-border: #cbc1df;
 
     /* Chart marks */
-    --viz-series: #1e5a8a;
-    --viz-series-hover: #123b63;
+    --viz-series: #302354;
+    --viz-series-hover: #081955;
     --viz-other: #a3abb8;
     --viz-grid: #e6e9ef;
     --viz-approved: #0ca30c;
     --viz-pending: #fab219;
     /* Heat map: one blue in five steps, light to dark (the reference sequential ramp, steps 100/200/350/500/650).
        The label on each step is ink or white, whichever clears 4.5:1 on it. */
-    --hm-1: #cde2fb; --hm-1-ink: #0b1b2b;
-    --hm-2: #9ec5f4; --hm-2-ink: #0b1b2b;
-    --hm-3: #5598e7; --hm-3-ink: #0b1b2b;
-    --hm-4: #256abf; --hm-4-ink: #ffffff;
-    --hm-5: #104281; --hm-5-ink: #ffffff;
+    --hm-1: #eeeaf5; --hm-1-ink: #081955;
+    --hm-2: #d6cce8; --hm-2-ink: #081955;
+    --hm-3: #aa98c9; --hm-3-ink: #081955;
+    --hm-4: #69518f; --hm-4-ink: #ffffff;
+    --hm-5: #302354; --hm-5-ink: #ffffff;
 
     /* Type scale (nothing below 14px) */
     /* Bahnschrift is the DIN-style font that comes with Windows 10/11 (the narrow, square type of the design), no web font needed;
@@ -100,7 +104,7 @@
     /* Glass (see the "Glass" block near the end): a see-through tint over a blur, only for what floats above the page.
        Tints stay 88% solid so text keeps 4.5:1 on any background behind them. */
     --glass-blur: 12px;
-    --glass-nav: rgba(18, 59, 99, 0.88);         /* the top bar */
+    --glass-nav: var(--brand-gradient);         /* navy → purple → burgundy header */
     --glass-surface: rgba(255, 255, 255, 0.88);  /* windows, notices, the review bar */
     --glass-edge: rgba(255, 255, 255, 0.65);     /* the light rim of a glass window */
     --glass-tip: rgba(27, 35, 51, 0.92);         /* small hover boxes */
@@ -116,52 +120,52 @@
 @media screen {
     :root[data-theme="dark"] {
         color-scheme: dark;
-        --c-bg: #0f151c;
-        --c-surface: #17202a;
-        --c-surface-2: #1e2935;
-        --c-border: #2c3a49;
-        --c-border-strong: #7f8fa1;
-        --c-text: #e7edf3;
-        --c-text-muted: #aab7c5;
-        --c-heading: #cfe3fb;
-        --c-primary: #7ab3f0;
-        --c-primary-hover: #9ec5f4;
-        --c-primary-soft: #1c3148;
-        --c-accent: #ef7f7f;
-        --c-accent-hover: #f39a9a;
-        --c-nav-bg: #0a2238;
+        --c-bg: #12101b;
+        --c-surface: #1c1829;
+        --c-surface-2: #262035;
+        --c-border: #40354f;
+        --c-border-strong: #91849e;
+        --c-text: #f0edf6;
+        --c-text-muted: #c1b8cd;
+        --c-heading: #e1d8f3;
+        --c-primary: #c5afe8;
+        --c-primary-hover: #e1d2f6;
+        --c-primary-soft: #342744;
+        --c-accent: #f09aaa;
+        --c-accent-hover: #f6b8c4;
+        --c-nav-bg: var(--brand-purple);
         --c-nav-text: #dce6f0;
         --c-nav-muted: #b4c6d9;
-        --c-nav-active: #1e5a8a;
-        --c-side-bg: #121b26;
-        --c-side-text: #dce6f0;
-        --c-side-muted: #aab7c5;
-        --c-side-hover: #1e2935;
-        --c-side-active-bg: #2b6cb0;
-        --c-side-border: #2c3a49;
-        --c-focus: #9ec5f4;
-        --c-on-primary: #06182b;
-        --c-on-accent: #2a0808;
+        --c-nav-active: var(--brand-purple);
+        --c-side-bg: var(--brand-navy);
+        --c-side-text: #ffffff;
+        --c-side-muted: #cdcde1;
+        --c-side-hover: #20275d;
+        --c-side-active-bg: var(--brand-purple);
+        --c-side-border: #29376c;
+        --c-focus: #d1bdf0;
+        --c-on-primary: #211332;
+        --c-on-accent: #300811;
         --c-pending-bg: #3a2f12;   --c-pending-text: #f3c969;   --c-pending-border: #6b5520;
         --c-approved-bg: #12301f;  --c-approved-text: #7dd4a0;  --c-approved-border: #2c6a45;
-        --c-danger-bg: #3b1a1a;    --c-danger-text: #f59a9a;    --c-danger-border: #7a3636;
+        --c-danger-bg: #3e1723;    --c-danger-text: #f4a8b8;    --c-danger-border: #894354;
         --c-deceased-bg: #252e39;  --c-deceased-text: #c5ced8;  --c-deceased-border: #46525f;
-        --c-info-bg: #17324b;      --c-info-text: #b1d2f5;      --c-info-border: #2f5679;
-        --viz-series: #3987e5;
-        --viz-series-hover: #7ab3f0;
+        --c-info-bg: #302343;      --c-info-text: #dbc8f2;      --c-info-border: #6d538d;
+        --viz-series: #b69bd9;
+        --viz-series-hover: #d7c3ef;
         --viz-other: #5f6b7a;
-        --viz-grid: #2a3644;
-        --hm-1: #184f95; --hm-1-ink: #ffffff;
-        --hm-2: #256abf; --hm-2-ink: #ffffff;
-        --hm-3: #3987e5; --hm-3-ink: #0b1b2b;
-        --hm-4: #6da7ec; --hm-4-ink: #0b1b2b;
-        --hm-5: #b7d3f6; --hm-5-ink: #0b1b2b;
+        --viz-grid: #3a3049;
+        --hm-1: #302354; --hm-1-ink: #ffffff;
+        --hm-2: #69518f; --hm-2-ink: #ffffff;
+        --hm-3: #aa98c9; --hm-3-ink: #081955;
+        --hm-4: #d6cce8; --hm-4-ink: #081955;
+        --hm-5: #eeeaf5; --hm-5-ink: #081955;
         --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.5);
         --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);   /* the ring keeps a dialog's edge visible on a dark page */
         --theme-moon-display: none;
         --theme-sun-display: inline-block;
-        --glass-nav: rgba(10, 34, 56, 0.88);
-        --glass-surface: rgba(23, 32, 42, 0.88);
+        --glass-nav: var(--brand-gradient);
+        --glass-surface: rgba(28, 24, 41, 0.88);
         --glass-edge: rgba(255, 255, 255, 0.14);
         --glass-tip: rgba(231, 237, 243, 0.92);
     }
@@ -169,52 +173,52 @@
 @media screen and (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
         color-scheme: dark;
-        --c-bg: #0f151c;
-        --c-surface: #17202a;
-        --c-surface-2: #1e2935;
-        --c-border: #2c3a49;
-        --c-border-strong: #7f8fa1;
-        --c-text: #e7edf3;
-        --c-text-muted: #aab7c5;
-        --c-heading: #cfe3fb;
-        --c-primary: #7ab3f0;
-        --c-primary-hover: #9ec5f4;
-        --c-primary-soft: #1c3148;
-        --c-accent: #ef7f7f;
-        --c-accent-hover: #f39a9a;
-        --c-nav-bg: #0a2238;
+        --c-bg: #12101b;
+        --c-surface: #1c1829;
+        --c-surface-2: #262035;
+        --c-border: #40354f;
+        --c-border-strong: #91849e;
+        --c-text: #f0edf6;
+        --c-text-muted: #c1b8cd;
+        --c-heading: #e1d8f3;
+        --c-primary: #c5afe8;
+        --c-primary-hover: #e1d2f6;
+        --c-primary-soft: #342744;
+        --c-accent: #f09aaa;
+        --c-accent-hover: #f6b8c4;
+        --c-nav-bg: var(--brand-purple);
         --c-nav-text: #dce6f0;
         --c-nav-muted: #b4c6d9;
-        --c-nav-active: #1e5a8a;
-        --c-side-bg: #121b26;
-        --c-side-text: #dce6f0;
-        --c-side-muted: #aab7c5;
-        --c-side-hover: #1e2935;
-        --c-side-active-bg: #2b6cb0;
-        --c-side-border: #2c3a49;
-        --c-focus: #9ec5f4;
-        --c-on-primary: #06182b;
-        --c-on-accent: #2a0808;
+        --c-nav-active: var(--brand-purple);
+        --c-side-bg: var(--brand-navy);
+        --c-side-text: #ffffff;
+        --c-side-muted: #cdcde1;
+        --c-side-hover: #20275d;
+        --c-side-active-bg: var(--brand-purple);
+        --c-side-border: #29376c;
+        --c-focus: #d1bdf0;
+        --c-on-primary: #211332;
+        --c-on-accent: #300811;
         --c-pending-bg: #3a2f12;   --c-pending-text: #f3c969;   --c-pending-border: #6b5520;
         --c-approved-bg: #12301f;  --c-approved-text: #7dd4a0;  --c-approved-border: #2c6a45;
-        --c-danger-bg: #3b1a1a;    --c-danger-text: #f59a9a;    --c-danger-border: #7a3636;
+        --c-danger-bg: #3e1723;    --c-danger-text: #f4a8b8;    --c-danger-border: #894354;
         --c-deceased-bg: #252e39;  --c-deceased-text: #c5ced8;  --c-deceased-border: #46525f;
-        --c-info-bg: #17324b;      --c-info-text: #b1d2f5;      --c-info-border: #2f5679;
-        --viz-series: #3987e5;
-        --viz-series-hover: #7ab3f0;
+        --c-info-bg: #302343;      --c-info-text: #dbc8f2;      --c-info-border: #6d538d;
+        --viz-series: #b69bd9;
+        --viz-series-hover: #d7c3ef;
         --viz-other: #5f6b7a;
-        --viz-grid: #2a3644;
-        --hm-1: #184f95; --hm-1-ink: #ffffff;
-        --hm-2: #256abf; --hm-2-ink: #ffffff;
-        --hm-3: #3987e5; --hm-3-ink: #0b1b2b;
-        --hm-4: #6da7ec; --hm-4-ink: #0b1b2b;
-        --hm-5: #b7d3f6; --hm-5-ink: #0b1b2b;
+        --viz-grid: #3a3049;
+        --hm-1: #302354; --hm-1-ink: #ffffff;
+        --hm-2: #69518f; --hm-2-ink: #ffffff;
+        --hm-3: #aa98c9; --hm-3-ink: #081955;
+        --hm-4: #d6cce8; --hm-4-ink: #081955;
+        --hm-5: #eeeaf5; --hm-5-ink: #081955;
         --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 3px rgba(0, 0, 0, 0.5);
         --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
         --theme-moon-display: none;
         --theme-sun-display: inline-block;
-        --glass-nav: rgba(10, 34, 56, 0.88);
-        --glass-surface: rgba(23, 32, 42, 0.88);
+        --glass-nav: var(--brand-gradient);
+        --glass-surface: rgba(28, 24, 41, 0.88);
         --glass-edge: rgba(255, 255, 255, 0.14);
         --glass-tip: rgba(231, 237, 243, 0.92);
     }
@@ -428,7 +432,7 @@ a:hover { color: var(--c-primary-hover); }
     gap: 12px;
     min-height: var(--topbar-h);
     padding: 8px 24px;
-    background: var(--c-nav-bg);
+    background: var(--brand-gradient);
     color: #fff;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12);
     box-shadow: 0 1px 3px rgba(16, 24, 40, 0.12);
@@ -2168,7 +2172,7 @@ kbd {
 }
 
 /* ---------- Sidebar and type, newer look ----------
-   A white sidebar laid out like the design's filter list: a capital heading with an icon and a rule, then each page with a small
+   A navy sidebar laid out like the design's filter list: a capital heading with an icon and a rule, then each page with a small
    square box in front (ticked and bold for the page you are on). Type: the narrow DIN-style face (Bahnschrift's width axis; other
    fonts ignore it) one step larger. Screen only: a printout keeps the plain look. Colours are tokens, so dark theme follows. */
 @media screen {
@@ -2177,23 +2181,23 @@ kbd {
     h1, h2, h3, .stat-value { font-variation-settings: "wdth" 85; }
 
     .sidebar { background: var(--c-side-bg); color: var(--c-side-text); border-right: 1px solid var(--c-side-border); }
-    .sidebar :focus-visible { outline-color: var(--c-focus); }
+    .sidebar :focus-visible { outline-color: var(--c-focus-on-dark); }
     .sidebar-brand { border-bottom-color: var(--c-side-border); }
     .sidebar-brand img { box-shadow: none; border: 1px solid var(--c-side-border); }
-    .sidebar-brand strong { color: var(--c-heading); text-transform: uppercase; letter-spacing: 0.05em; }
+    .sidebar-brand strong { color: var(--c-side-text); text-transform: uppercase; letter-spacing: 0.05em; }
     .sidebar-brand span { color: var(--c-side-muted); }
     .sidebar-user { border-top-color: var(--c-side-border); color: var(--c-side-muted); }
-    .sidebar-user strong { color: var(--c-heading); }
+    .sidebar-user strong { color: var(--c-side-text); }
 
     .sidebar-heading { display: flex; align-items: center; gap: 10px; padding: 4px 12px 12px; margin-bottom: 6px; color: var(--c-heading); font-size: var(--fs-md); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; border-bottom: 1px solid var(--c-side-border); }
     .nav-list { gap: 0; }
     .nav-list .nav-link { gap: 12px; padding: 8px 12px; font-weight: 500; background: none; color: var(--c-side-text); }
-    .nav-list .nav-link:hover { background: var(--c-side-hover); color: var(--c-heading); }
-    .nav-list .nav-link[aria-current="page"] { background: var(--c-side-hover); color: var(--c-heading); font-weight: 700; }   /* the page you are on: bold, on a light tint */
+    .nav-list .nav-link:hover { background: var(--c-side-hover); color: var(--c-side-text); }
+    .nav-list .nav-link[aria-current="page"] { background: var(--c-side-active-bg); color: var(--c-side-text); font-weight: 700; }   /* white text on purple marks the current page */
     .nav-list .nav-link[aria-current="page"]::before { display: none; }
-    /* The light/dark button in the menu keeps its icon and the old look (white text on navy would vanish on a white sidebar) */
+    /* The theme control follows the navy sidebar colors. */
     .sidebar-theme .nav-link { color: var(--c-side-text); }
-    .sidebar-theme .nav-link:hover { background: var(--c-side-hover); color: var(--c-heading); }
+    .sidebar-theme .nav-link:hover { background: var(--c-side-hover); color: var(--c-side-text); }
 }
 
 /* ---------- Calm look ----------
@@ -2203,13 +2207,16 @@ kbd {
 @media screen {
     /* Sidebar: the office, then the menu. The signed-in person is in the top bar already, and a menu needs no "Menu" label. */
     .sidebar { padding: 16px 12px; }
-    .sidebar-brand { gap: 8px; padding: 0 8px 16px; margin-bottom: 12px; }
-    .sidebar-brand img { width: 84px; height: 84px; }
-    .sidebar-brand strong { font-size: var(--fs-sm); }
+    .sidebar-brand { flex-shrink: 0; gap: 12px; padding: 0 8px 20px; margin-bottom: 14px; }
+    .sidebar-brand img { width: 112px; height: 112px; flex-shrink: 0; object-fit: contain; }
+    .sidebar-brand strong { font-size: 1.0625rem; line-height: 1.35; }
+    .sidebar-brand span { font-size: 1rem; }
     .sidebar-heading { display: none; }
-    .nav-list .nav-link { gap: 10px; min-height: 42px; padding: 8px 10px; border-radius: 8px; }
-    .nav-list .nav-link[aria-current="page"] { background: var(--c-primary-soft); }
+    .nav-list .nav-link { gap: 12px; min-height: 48px; padding: 10px; font-size: 1.125rem; line-height: 1.4; border-radius: 8px; }
+    .nav-list .nav-link .icon { width: 22px; height: 22px; }
+    .nav-list .nav-link[aria-current="page"] { background: var(--c-side-active-bg); }
     .nav-count { min-width: 22px; padding: 0 7px; }
+    .sidebar .nav-count { font-size: 1rem; }
     @media (min-width: 761px) { .sidebar-user { display: none; } }
 
     /* Top bar: the role as a plain line instead of a pill, and a Log out without a frame */
@@ -2369,7 +2376,7 @@ kbd {
     }
 }
 @media (prefers-reduced-transparency: reduce), (forced-colors: active) {
-    .topbar { background: var(--c-nav-bg); -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .topbar { background: var(--brand-gradient); -webkit-backdrop-filter: none; backdrop-filter: none; }
     .modal, .live-toast, .review-bar, .swal2-popup.swal-lgu, .swal2-popup.swal-lgu-toast { background: var(--c-surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
     .modal { border: 0; }
     .modal::backdrop, body:not(.swal2-toast-shown) .swal2-container { -webkit-backdrop-filter: none; backdrop-filter: none; }

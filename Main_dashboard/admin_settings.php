@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if (!$errors) {
             $oldUsername = $admin['username'];
-            if ($emailChanged && ($emailError = office_email_set($pdo, (int)$admin_id, $new_email)) !== null) {
+            if ($emailChanged && ($emailError = office_email_set($pdo, (int)$admin_id, $new_email, $admin['password'])) !== null) {
                 $errors[] = $emailError;
             } else {
                 $stmt = $pdo->prepare("UPDATE users SET full_name = ?, username = ? WHERE id = ?");
@@ -147,8 +147,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             // Update password
             $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-            $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
-            if ($stmt->execute([$hashed_password, $admin_id])) {
+            $saved = reset_credentials_change($pdo, true, (int)$admin_id, function (array $locked) use ($pdo, $admin, $hashed_password, $admin_id) {
+                if ($locked['password'] !== $admin['password']) return false;
+                $pdo->prepare("UPDATE users SET password = ? WHERE id = ?")->execute([$hashed_password, $admin_id]);
+                return true;
+            });
+            if ($saved) {
                 // Any other computer still signed in as this admin is signed out on its next page; this one stays signed in
                 $_SESSION['user']['pwv'] = account_password_mark($hashed_password);
                 $admin['password'] = $hashed_password;
@@ -156,7 +160,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 activity_log('password_changed', 'Own password changed.');
                 $success = "Password updated successfully!";
             } else {
-                $errors[] = "Failed to update password.";
+                $errors[] = "Your account changed while this page was open. Reload and try again.";
             }
         }
     }

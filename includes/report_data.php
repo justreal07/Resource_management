@@ -484,7 +484,7 @@ function report_claimant(array $a): array
 /**
  * Sex / age group / barangay of the people behind these approved applications.
  * Whose sex and age: the patient for Medical and OPD, the claimant for Burial (the form has no sex or age for the deceased).
- * The charts go on the page; the tables are for the Excel file only (each chart has its own "Show as table").
+ * Only the barangay chart goes on the page. The demographic tables are for the Excel file.
  *
  * @param string $whom   "patients", "claimants" ... for the chart subtitle
  * @return array{charts: string[], tables: array}
@@ -535,8 +535,6 @@ function report_who_parts(array $rows, string $whom, array $f): array
 
     $sub = report_sub($f, 'approved, by ' . $whom);
     $charts = [
-        ui_chart_card('Approved by sex', $sub, ui_bar_list($sexItems, $countFmt) . $twin($sexItems, 'Sex')),
-        ui_chart_card('Approved by age group', $sub, ui_bar_list($ageItems, $countFmt) . $twin($ageItems, 'Age group')),
         ui_chart_card('Approved by barangay', $sub . ' · the ten busiest', ui_bar_list($placeItems, $countFmt) . $twin($placeItems, 'Barangay')),
     ];
 

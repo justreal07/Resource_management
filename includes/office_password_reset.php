@@ -231,11 +231,16 @@ function office_email_notify_changed(string $oldEmail, string $name, string $new
  * Save a new email on an account. The email is NOT confirmed until its owner opens the emailed link, so it cannot be used to reset
  * the password before that. Returns an error message, or null when saved ($email is lower-case, '' = remove it).
  */
-function office_email_set(PDO $pdo, int $userId, string $email): ?string
+function office_email_set(PDO $pdo, int $userId, string $email, ?string $expectedPassword = null): ?string
 {
     if ($email !== '' && ($problem = office_email_problem($pdo, $email, $userId)) !== null) return $problem;
     try {
-        $pdo->prepare('UPDATE users SET email = ?, email_verified_at = NULL WHERE id = ?')->execute([$email !== '' ? $email : null, $userId]);
+        $saved = reset_credentials_change($pdo, true, $userId, function (array $account) use ($pdo, $email, $userId, $expectedPassword) {
+            if ($expectedPassword !== null && $account['password'] !== $expectedPassword) return false;
+            $pdo->prepare('UPDATE users SET email = ?, email_verified_at = NULL WHERE id = ?')->execute([$email !== '' ? $email : null, $userId]);
+            return true;
+        });
+        if (!$saved) return 'The account changed. Reload before saving.';
     } catch (PDOException $e) {
         return $e->getCode() === '23000'
             ? 'That email address is already used by another office account. Use a different one.'
@@ -249,17 +254,9 @@ function office_email_set(PDO $pdo, int $userId, string $email): ?string
    ============================================================ */
 
 /** Remember a new emailed link for this account (the older unused ones stop working). Returns the secret to put in the link. */
-function office_reset_issue(PDO $pdo, int $userId, string $ip): string
+function office_reset_issue(PDO $pdo, int $userId, string $ip, ?array $expected = null): string
 {
-    $secret = bin2hex(random_bytes(32));
-    $pdo->prepare('UPDATE user_password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL')->execute([$userId]);
-    $pdo->prepare('INSERT INTO user_password_resets (user_id, token_hash, created_at, expires_at, ip)
-                   VALUES (?, ?, NOW(), NOW() + INTERVAL ' . OFFICE_RESET_MINUTES . ' MINUTE, ?)')
-        ->execute([$userId, hash('sha256', $secret), $ip !== '' ? $ip : null]);
-    if (mt_rand(1, 20) === 1) {
-        $pdo->exec('DELETE FROM user_password_resets WHERE created_at < NOW() - INTERVAL 7 DAY');   // keep the table small
-    }
-    return $secret;
+    return reset_token_issue($pdo, true, $userId, $ip, OFFICE_RESET_MINUTES, $expected);
 }
 
 /** The account an emailed link belongs to, if the link is still good (not used, not expired, account still on). Otherwise null. */
@@ -279,26 +276,9 @@ function office_reset_lookup(PDO $pdo, string $secret): ?array
  */
 function office_reset_complete(PDO $pdo, string $secret, string $newPassword, string $ip): bool
 {
-    $hash = hash('sha256', $secret);
-    $pdo->beginTransaction();
-    try {
-        $stmt = $pdo->prepare('SELECT r.id, r.user_id, u.username FROM user_password_resets r JOIN users u ON u.id = r.user_id
-                               WHERE r.token_hash = ? AND r.used_at IS NULL AND r.expires_at > NOW() AND u.is_active = 1 AND u.role = \'admin\' FOR UPDATE');
-        $stmt->execute([$hash]);
-        $link = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$link) {
-            $pdo->rollBack();
-            return false;
-        }
-        $pdo->prepare('UPDATE users SET password = ? WHERE id = ?')->execute([password_hash($newPassword, PASSWORD_DEFAULT), $link['user_id']]);
-        $pdo->prepare('UPDATE user_password_resets SET used_at = NOW() WHERE user_id = ? AND used_at IS NULL')->execute([$link['user_id']]);
-        $pdo->commit();
-    } catch (Throwable $e) {
-        if ($pdo->inTransaction()) $pdo->rollBack();
-        throw $e;
-    }
-    // The wrong-password wait (if there was one) is lifted: the person has just proved they own the account
-    login_clear_failures($pdo, (string)$link['username'], $ip);
+    $account = office_reset_lookup($pdo, $secret);
+    if (!$account || !reset_token_complete($pdo, true, $secret, $newPassword)) return false;
+    login_clear_failures($pdo, (string)$account['username'], $ip);
     return true;
 }
 
@@ -325,7 +305,7 @@ function office_reset_request(PDO $pdo, string $identifier, string $ip): void
     $stmt->execute([$ip]);
     if ((int)$stmt->fetchColumn() >= OFFICE_RESET_PER_IP) return;
 
-    $stmt = $pdo->prepare('SELECT id, username, full_name, role, email, email_verified_at, is_active FROM users
+    $stmt = $pdo->prepare('SELECT id, username, full_name, role, email, password, email_verified_at, is_active FROM users
                            WHERE username = ? OR email = ? ORDER BY (username = ?) DESC LIMIT 1');
     $stmt->execute([$identifier, mb_strtolower($identifier), $identifier]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -337,7 +317,8 @@ function office_reset_request(PDO $pdo, string $identifier, string $ip): void
     if ((int)$stmt->fetchColumn() >= OFFICE_RESET_PER_ACCOUNT) return;
 
     $name = office_display_name($user);
-    $secret = office_reset_issue($pdo, (int)$user['id'], $ip);
+    $secret = office_reset_issue($pdo, (int)$user['id'], $ip, $user);
+    if ($secret === '') return;
     [$subject, $text, $html] = office_reset_email_link($name, $base . '/login/reset_password?token=' . $secret, $ip);
     $sent = mail_send($user['email'], $name, $subject, $text, $html);
     activity_log($sent ? 'password_reset_sent' : 'password_reset_failed',

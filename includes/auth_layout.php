@@ -44,8 +44,8 @@ function auth_page_start(string $title): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= auth_e($title) ?> · LGU Assistance Records</title>
-    <link rel="stylesheet" href="../css/admin_ui.css">
-    <link rel="stylesheet" href="../css/admin_login.css">
+    <link rel="stylesheet" href="../css/admin_ui.css?v=<?= (int)@filemtime(__DIR__ . '/../css/admin_ui.css') ?>">
+    <link rel="stylesheet" href="../css/admin_login.css?v=<?= (int)@filemtime(__DIR__ . '/../css/admin_login.css') ?>">
 </head>
 <body>
 
@@ -88,7 +88,6 @@ function auth_side(string $lead, string $extraHtml = ''): void
         <aside class="login-side">
             <div>
                 <div class="side-brand">
-                    <img src="../asset/ACCESS.jpg" alt="Community Affairs Office logo" width="48" height="48">
                     <div>
                         <strong>Community Affairs Office</strong>
                         <span>Assistance Records</span>
@@ -126,11 +125,11 @@ function auth_side(string $lead, string $extraHtml = ''): void
 <?php
 }
 
-/** The office name and logo at the top of the form on small screens (the navy panel is hidden there). */
+/** Centered office identity above every sign-in form, including small screens. */
 function auth_mobile_brand(): string
 {
     return '<div class="mobile-brand">'
-        . '<img src="../asset/ACCESS.jpg" alt="Community Affairs Office logo" width="46" height="46">'
+        . '<img src="../asset/ACCESS.jpg" alt="Community Affairs Office logo" width="112" height="112">'
         . '<div><strong>Community Affairs Office</strong><small>LGU General Mariano Alvarez</small></div></div>';
 }
 
