@@ -33,8 +33,9 @@ $preparedBy = trim((string)($sessionUser['name'] ?? '')) !== '' ? $sessionUser['
 $model = report_build($pdo, $f, true);   // hideAmounts
 
 admin_layout_start(['title' => 'Reports', 'section' => 'aid_reports']);
-echo ui_page_head('Reports', 'Totals and lists to open in Excel. No amounts: see the record of an application for what was given.',
-    '<a class="btn btn-secondary" href="../reports/export?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>');
+echo ui_page_head('Reports', 'Totals and lists to open in Excel, or an official PDF copy. No amounts: see the record of an application for what was given.',
+    '<a class="btn btn-secondary" href="../reports/export?' . ui_e(report_query($f)) . '">' . ui_icon('download') . 'Download Excel</a>'
+    . '<a class="btn btn-primary" href="../reports/export_pdf?' . ui_e(report_query($f)) . '">' . ui_icon('file') . 'Download PDF</a>');
 ?>
 <form class="panel report-filters" method="GET" action="aid_staff_report" data-busy id="reportFilters">
     <input type="hidden" name="report" value="<?= ui_e($f['report']) ?>">

@@ -315,6 +315,7 @@ function activity_actions(): array
         'email_settings_changed'  => ['Changed the sending email',  'settings',  'pending'],
         'export_csv'              => ['Exported a list',            'exports',   'neutral'],
         'export_report'           => ['Downloaded a report',        'exports',   'neutral'],
+        'report_checked'          => ['Checked a report PDF',       'exports',   'neutral'],
         'budget_start'            => ['Set the budget',             'budget',    'approved'],
         'budget_add'              => ['Added to the budget',        'budget',    'approved'],
         'budget_reduce'           => ['Reduced the budget',         'budget',    'pending'],

@@ -596,6 +596,32 @@ CREATE TABLE `reports` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `report_pdfs` (every report PDF made, for "Check a report": includes/pdf_report.php)
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `report_pdfs` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `reference` varchar(30) DEFAULT NULL COMMENT 'GMA-RPT-<year>-<number>, printed on every page',
+  `report` varchar(20) NOT NULL,
+  `title` varchar(100) NOT NULL,
+  `period_label` varchar(150) NOT NULL,
+  `sha256` char(64) DEFAULT NULL COMMENT 'Fingerprint of the exact PDF that was handed out; a changed file no longer matches',
+  `file_size` int(10) unsigned DEFAULT NULL,
+  `pages` smallint(5) unsigned DEFAULT NULL,
+  `generated_by` int(11) DEFAULT NULL COMMENT 'users.id; no foreign key, so the row stays when the account is removed',
+  `generated_name` varchar(100) DEFAULT NULL,
+  `generated_role` varchar(10) DEFAULT NULL,
+  `generated_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_report_pdf_reference` (`reference`),
+  KEY `idx_report_pdf_hash` (`sha256`),
+  KEY `idx_report_pdf_at` (`generated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `users`
 
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
