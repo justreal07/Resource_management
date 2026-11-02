@@ -8,6 +8,16 @@
  */
 
 // ---- Photo upload rules (documents must be PHOTOS only) ----
+const MEDICAL_REAPPLY_MONTHS = 3;
+
+/** Shared with the eligibility calculation, portal FAQ and chat assistant. Approval starts the wait, not payment. */
+function medical_reapply_policy_text(): string {
+    return 'One application per patient may be pending at a time. You may apply again ' . MEDICAL_REAPPLY_MONTHS
+        . ' calendar months after the previous Medical approval, without separate reapplication permission.'
+        . ' Applying earlier requires a dated, one-use exception approved by an administrator.'
+        . ' Every new application still needs review and approval. The payment date does not start or reset the waiting period.';
+}
+
 const PHOTO_MAX_BYTES      = 10 * 1024 * 1024;   // 10 MB per photo (browser shrinks big photos before upload)
 const PHOTOS_PER_DOCUMENT  = 3;                   // max photos per requirement (e.g. front & back of an ID)
 const PHOTO_ALLOWED_TYPES  = [                    // detected MIME type => saved file extension
@@ -51,7 +61,7 @@ $ASSISTANCE_PROGRAMS = [
         'icon'      => 'fa-briefcase-medical',
         'tone'      => 'red',
         // How often: shown on the forms, My Account and to the chat assistant. Follows person_rules.php.
-        'frequency' => 'Three months after the same patient\'s last approval; an admin may allow an earlier application',
+        'frequency' => MEDICAL_REAPPLY_MONTHS . ' calendar months after the same patient\'s last approval; an admin may allow an earlier application',
         'cooldown_days' => 0,      // Patient-level waiting period and early exceptions are checked in person_rules.php.
         // Document name => short hint shown under it. Names are in UPPER CASE on purpose, matching the office's
         // official requirements board; keep them that way if this list changes again.

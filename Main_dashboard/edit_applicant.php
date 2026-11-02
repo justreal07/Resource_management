@@ -26,7 +26,7 @@ $id = intval($_GET['id']);
 // Where to go after saving or Cancel. Only a page of this system is accepted (e.g. ../medical/Mpending.php or
 // ../staff/Mpending.php), so a link can't send the user to another website.
 $redirect = isset($_GET['redirect']) && is_string($_GET['redirect'])
-    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/|staff/)?[A-Za-z_]+(\.php)?(\?[A-Za-z0-9_=&.\-]*)?$#', $_GET['redirect'])
+    && preg_match('#^(\.\./)?(Main_dashboard/|medical/|burial/|opd/|staff/)?[A-Za-z_]+(\.php)?(\?(?:[A-Za-z0-9_=&.\-]|%[A-Fa-f0-9]{2})*)?$#', $_GET['redirect'])
     ? $_GET['redirect'] : $fallbackPage;
 
 // Fetch applicant data
@@ -259,6 +259,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors += application_claimant_errors($formKey, $values, (string)$applicant['created_at']);
     }
     $postedVersion = is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : '';
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) $errors['form'] = $problem;
     if ($postedVersion === '' || $postedVersion !== (string)$applicant['updated_at']) {
         $errors['form'] = 'This record changed since you opened the form. Reload it and review the latest details before saving.';
     }

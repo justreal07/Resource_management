@@ -92,6 +92,7 @@ function application_clean_reason($raw): ?string
 function application_withdraw(PDO $pdo, int $applicationId, int $accountId, $reason = null): array
 {
     $result = function (bool $ok, string $code, string $message): array { return ['ok' => $ok, 'code' => $code, 'message' => $message]; };
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) return $result(false, 'setup', $problem);
     $reason = application_clean_reason($reason);
 
     $peek = application_owned($pdo, $applicationId, $accountId);
@@ -243,6 +244,7 @@ function application_edit_labels(): array
 function application_edit_save(PDO $pdo, array $app, string $formKey, array $values, array $opts = []): array
 {
     $result = function (bool $ok, string $code, string $message, array $extra = []) { return ['ok' => $ok, 'code' => $code, 'message' => $message] + $extra; };
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) return $result(false, 'setup', $problem);
     $id = (int)$app['id'];
     $accountId = (int)$app['account_id'];
     $version = (string)($opts['version'] ?? '');

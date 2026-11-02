@@ -519,13 +519,12 @@ $programs = [
                 <details class="faq-item">
                     <summary>How often can I apply?</summary>
                     <div class="faq-answer">
-                        <?php /* Follows the rules in person_rules.php (there are no fixed waiting periods) */ ?>
                         <ul>
-                            <li><strong>Medical Assistance</strong> — one application per patient at a time. To apply again for a patient who already received Medical Assistance, the office must approve it first.</li>
+                            <li><strong>Medical Assistance</strong> — <?php echo htmlspecialchars(medical_reapply_policy_text(), ENT_QUOTES, 'UTF-8'); ?></li>
                             <li><strong>Burial Assistance</strong> — one application per deceased person.</li>
                             <li><strong>OPD Scheduling</strong> — request a schedule for every check-up your doctor gives you (one request per patient for each check-up date).</li>
                         </ul>
-                        If an application is declined, you may apply again right away.
+                        Declined applications do not count as active applications. You may apply again when the patient meets the eligibility rules, including any wait from an earlier Medical approval.
                     </div>
                 </details>
                 <details class="faq-item">
@@ -538,7 +537,7 @@ $programs = [
                     <summary>How will I know if my application is approved?</summary>
                     <div class="faq-answer">
                         Log in and check your <strong>dashboard</strong> or the <strong>notification bell</strong> at the top of the page, and also check your email for updates.
-                        Your application will show as <em>Pending</em>, <em>Approved</em> or <em>Declined</em>. If it is declined, you may apply again right away.
+                        Your application will show as <em>Pending</em>, <em>Approved</em> or <em>Declined</em>. A declined application does not count as active; a previous Medical approval can still require a waiting period before another application.
                     </div>
                 </details>
                 <details class="faq-item">

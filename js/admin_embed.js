@@ -52,6 +52,13 @@
 
     if (host && document.querySelector('[data-embed-refresh]')) host.refreshOnClose();
 
+    // Open the payment form in the same window when the application is already embedded.
+    document.addEventListener('click', (event) => {
+        const link = event.target.closest('[data-page-modal]');
+        if (!host || !link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        if (host.open(link.dataset.pageModal, { title: link.dataset.modalTitle, size: link.dataset.modalSize })) event.preventDefault();
+    });
+
     window.addEventListener('load', () => {
         const first = document.querySelector('[data-embed-focus]');
         if (first) first.focus({ preventScroll: true });

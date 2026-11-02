@@ -7,7 +7,7 @@
  * family members, and OPD requests follow the doctor's schedule. The real rules are
  * about the PERSON an application is for, so they run once the form is filled in
  * (person_rules.php, checkPersonConflict):
- * - Medical Assistance (type 1): applying again for the same patient needs an admin's permission
+ * - Medical Assistance (type 1): three calendar months after approval, or a dated admin exception for an earlier application
  * - Burial Assistance (type 2): one application per deceased person
  * - OPD (type 3): no limit on how many check-ups, but one request per patient per check-up date
  */

@@ -358,6 +358,7 @@ function ui_withdrawn_count(int $typeId): ?int
 /** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Declined, Withdrawn. */
 function ui_type_tabs(int $typeId, string $current, array $counts = []): string
 {
+    require_once __DIR__ . '/program_list.php';
     $labels = ['overview' => 'Overview', 'all' => 'All applications', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Declined', 'withdrawn' => 'Withdrawn'];
     // How many the applicants withdrew: the count on that tab (the other tabs are not counted here)
     if (!isset($counts['withdrawn'])) {
@@ -390,8 +391,9 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
         $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
             . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
     }
+    $exportFilters = array_intersect_key(program_list_filters($_GET, $current), array_flip(['name', 'q', 'source']));
     return $nameBar . '<div class="tabs-bar">' . $tabsHtml . '<div class="tabs-tools">' . $walkIn
-        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus])) . '">'
+        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus] + $exportFilters)) . '">'
         . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
         . '</div></div>';
 }
@@ -1358,7 +1360,12 @@ function ui_record_cards(array $a): array
             $payment = assistance_release_for($GLOBALS['pdo'], (int)$a['id']);
             $app[] = ui_detail('Payment', $payment
                 ? 'Recorded ' . ui_date($payment['released_on']) . ' · ' . ui_peso($payment['amount']) . ' · Ref ' . $payment['receipt_ref']
-                : 'No payment recorded');
+                : 'No payment recorded — verify existing receipts before making a payment');
+            if (!$payment && (float)($a['amount'] ?? 0) > 0 && ($_SESSION['user']['role'] ?? '') === 'admin') {
+                $app[] = '<div class="detail-row"><dt>Payment action</dt><dd><a class="btn btn-primary btn-sm" href="../Main_dashboard/release_assistance?id='
+                    . (int)$a['id'] . '" data-page-modal="../Main_dashboard/release_assistance?id=' . (int)$a['id']
+                    . '" data-modal-title="Record actual payment" data-modal-size="narrow">Record actual payment</a></dd></div>';
+            }
         }
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date
         // Approval details typed when approving, the same ones the approval email gave
@@ -1692,7 +1699,7 @@ function ui_status_update_form(array $row, string $typeName, string $backHref): 
    ============================================================ */
 
 /** Withdrawn applications (the applicant took them back while waiting), newest first, with the reason they gave, if any. */
-function ui_withdrawn_log(array $rows, bool $showType): string
+function ui_withdrawn_log(array $rows, bool $showType, array $options = []): string
 {
     $columns = [
         ['label' => 'Applicant', 'type' => 'person', 'link' => function ($r) { return ui_type_url((int)$r['assistance_type_id'], 'view', ['id' => (int)$r['id']]); }],
@@ -1703,14 +1710,14 @@ function ui_withdrawn_log(array $rows, bool $showType): string
     $columns[] = ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'];
     $columns[] = ['label' => 'Withdrawn', 'type' => 'datetime', 'key' => 'withdrawn_at'];
     $columns[] = ['label' => 'Reason given', 'type' => 'text', 'value' => function ($r) { return trim((string)($r['withdrawal_reason'] ?? '')) !== '' ? $r['withdrawal_reason'] : 'No reason given'; }, 'class' => 'cell-clip'];
-    return ui_table($rows, $columns, [
+    return ui_table($rows, $columns, array_replace([
         'empty' => ['No withdrawn applications', 'Applications the applicants take back while they are waiting are listed here for the record.'],
         'search' => 'Name, Ref # or reason',
-    ]);
+    ], $options));
 }
 
 /** Disapproved applications, newest first, with who disapproved them and why. */
-function ui_disapproved_log(array $rows, bool $showType): string
+function ui_disapproved_log(array $rows, bool $showType, array $options = []): string
 {
     $columns = [
         ['label' => 'Applicant', 'type' => 'person', 'link' => function ($r) { return ui_type_url((int)$r['assistance_type_id'], 'view', ['id' => (int)$r['id']]); }],
@@ -1722,8 +1729,8 @@ function ui_disapproved_log(array $rows, bool $showType): string
     $columns[] = ['label' => 'Declined', 'type' => 'datetime', 'key' => 'disapproved_at'];
     $columns[] = ['label' => 'By', 'type' => 'text', 'key' => 'disapproved_by_name'];
     $columns[] = ['label' => 'Reason', 'type' => 'text', 'key' => 'disapproval_remarks', 'class' => 'cell-clip'];
-    return ui_table($rows, $columns, [
+    return ui_table($rows, $columns, array_replace([
         'empty' => ['No declined applications', 'Applications that are declined are listed here for the record.'],
         'search' => 'Name, Ref # or reason',
-    ]);
+    ], $options));
 }

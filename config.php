@@ -91,11 +91,9 @@ schema_checkup_reason_ready($pdo);
 schema_application_changes_ready($pdo);
 // Medical & Burial staff (role `aid_staff`) and applicant.encoded_by (once; see includes/schema.php)
 schema_aid_staff_ready($pdo);
-// Additive only: historic ages and permissions are preserved for office review.
-if (empty($_SESSION['claimant_reapply_schema_v1'])) {
-    schema_claimant_reapply_ready($pdo);
-    $_SESSION['claimant_reapply_schema_v1'] = true;
-}
+// A failed upgrade must not take down sign-in or unrelated pages. Application operations
+// check the required columns themselves and stop safely until the update is available.
+schema_claimant_reapply_ready($pdo);
 
 define('ASSISTANCE_DB_NAME', $dbname);
 define('ASSISTANCE_DB_HOST', $host);

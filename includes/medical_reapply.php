@@ -1,12 +1,13 @@
 <?php
 require_once __DIR__ . '/../user/assistance_config.php';
+require_once __DIR__ . '/schema.php';
 
 /** Three calendar months, clamped to the final day of the target month (Jan 31 -> Apr 30). */
 function medical_three_months_after(string $date): string
 {
     if (!is_ymd($date)) throw new DomainException('A verified approval date is required.');
     $start = new DateTimeImmutable($date);
-    $month = $start->modify('first day of this month')->modify('+3 months');
+    $month = $start->modify('first day of this month')->modify('+' . MEDICAL_REAPPLY_MONTHS . ' months');
     return $month->setDate((int)$month->format('Y'), (int)$month->format('m'),
         min((int)$start->format('d'), (int)$month->format('t')))->format('Y-m-d');
 }
@@ -46,6 +47,10 @@ function medical_reapply_status(PDO $pdo, array $ids, ?string $today = null): ar
     $today = $today ?? date('Y-m-d');
     $result = ['eligible' => false, 'eligible_from' => null, 'default_eligible_from' => null,
         'grant_id' => null, 'previous' => null, 'message' => ''];
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) {
+        $result['message'] = $problem;
+        return $result;
+    }
     if (!$ids) return array_replace($result, ['eligible' => true]);
     $in = implode(',', array_fill(0, count($ids), '?'));
     $dead = $pdo->prepare("SELECT COUNT(*) FROM beneficiaries WHERE id IN ($in) AND is_deceased = 1");

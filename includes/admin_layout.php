@@ -485,6 +485,9 @@ function admin_layout_start(array $page): void
                 </div>
             <?php endif; ?>
 
+            <?php if ($role === 'admin' && !schema_claimant_reapply_installed($GLOBALS['pdo'])): ?>
+                <div class="alert alert-warning" role="alert"><div class="alert-body"><strong>Application update needed.</strong> Applications cannot be submitted, edited or decided until the database update is completed. Ask the system administrator to install the person-registry and claimant/reapplication migrations.</div></div>
+            <?php endif; ?>
             <?php if ($role === 'admin' && !decision_person_rules_installed($GLOBALS['pdo'])): ?>
                 <div class="alert alert-warning" role="status"><?= ui_icon('alert', 'alert-icon') ?>
                     <div class="alert-body"><strong>Database update needed.</strong> Medical and Burial applications are accepted, but the person checks are off

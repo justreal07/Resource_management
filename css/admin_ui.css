@@ -1062,6 +1062,21 @@ a.row-link { font-weight: 600; text-underline-offset: 3px; }
 .amount-box:has([aria-invalid="true"]) { border-color: var(--c-danger-text); box-shadow: inset 0 0 0 1px var(--c-danger-text); }
 td .field-error { margin-top: 4px; }
 
+.program-list-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 12px;
+}
+.program-list-filters .field { margin: 0; }
+.program-list-filters .field-search { flex: 1 1 240px; }
+.program-list-filters .field-search input { width: 100%; }
+.program-list-filters select { width: auto; }
+.pagination .page-list { align-items: center; }
+.pagination .page-of { padding: 8px; }
+.program-pagination .page-list { display: flex; }
+.program-pagination .page-of { display: inline; }
+
 .pagination {
     display: flex;
     flex-wrap: wrap;
@@ -1348,6 +1363,19 @@ td .field-error { margin-top: 4px; }
 .print-head, .print-sign { display: none; }
 
 /* ---------- Modals (native <dialog>) ---------- */
+.payment-summary { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; padding: 16px 20px; background: var(--c-surface-2); border-bottom: 1px solid var(--c-border); }
+.payment-summary h2 { margin: 4px 0; font-size: var(--fs-lg); overflow-wrap: anywhere; }
+.payment-summary p { margin: 0; color: var(--c-text-muted); }
+.payment-reference, .payment-amount span { font-size: var(--fs-sm); color: var(--c-text-muted); }
+.payment-amount { display: grid; gap: 4px; }
+.payment-amount strong { font-size: var(--fs-lg); color: var(--c-text); }
+.payment-content { display: grid; gap: 12px; padding: 16px 20px; }
+.payment-content p { margin: 0; }
+.payment-schedule { display: flex; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--c-border); }
+.payment-schedule > .icon { color: var(--c-primary); flex-shrink: 0; }
+.payment-schedule strong { font-size: var(--fs-sm); }
+.payment-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--c-border); background: var(--c-surface-2); }
+@media (max-width: 480px) { .payment-summary, .payment-content { padding: 16px; } .payment-actions .btn { flex: 1 1 auto; } }
 .modal {
     width: min(760px, calc(100vw - 24px));
     max-height: calc(100vh - 24px);

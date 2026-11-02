@@ -63,14 +63,15 @@ echo ui_page_head('Budget', 'The yearly budget for Medical and Burial assistance
     <div class="panel-head panel-head-row">
         <div>
             <h2 id="budgetTitle">Budget <?= $year ?></h2>
-            <p class="panel-sub">Used = the amounts of approved applications, counted by the day they were approved. OPD gives no money, so it has no budget.</p>
+            <p class="panel-sub">Approval reserves funds; only a recorded payment counts as paid. Available for new approvals = budget minus all approved commitments. OPD gives no money, so it has no budget.</p>
         </div>
         <?= ui_year_form((string)$year, 'budget') ?>
     </div>
     <ul class="budget-list budget-list-page">
         <?php foreach ($statuses as $s): ?><?= ui_budget_item($s, $canChange) ?><?php endforeach; ?>
     </ul>
-    <p class="panel-note">At <?= BUDGET_WARN_PERCENT ?>% used, an approval tells the admin how much is left. An approval that would go over the budget needs a written reason (kept below); the budget is a limit the office sets, not a wall, because medical and burial aid is often urgent.</p>
+    <p class="panel-note">Payment totals here belong to the approval's budget year, even when paid in a later year. A scheduled claim date does not record a payment. For older approvals, verify receipts before paying: no payment recorded does not prove the applicant was never paid.</p>
+    <p class="panel-note">At <?= BUDGET_WARN_PERCENT ?>% committed, an approval tells the admin how much is left. An approval that would go over the budget needs a written reason (kept below); the budget is a limit the office sets, not a wall, because medical and burial aid is often urgent.</p>
 </section>
 
 <?php if ($canChange): ?>

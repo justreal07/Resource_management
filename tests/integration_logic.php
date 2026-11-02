@@ -7,7 +7,9 @@ if (!$name || !preg_match('/^lgu_logic_test_[a-z0-9_]+$/', $name)) {
 session_save_path(sys_get_temp_dir());
 session_start();
 date_default_timezone_set('Asia/Singapore');
-$pdo = new PDO('mysql:host=localhost;dbname=' . $name . ';charset=utf8mb4', 'root', '',
+$testHost = getenv('LGU_TEST_HOST') ?: 'localhost';
+putenv('DB_HOST=' . $testHost);
+$pdo = new PDO('mysql:host=' . $testHost . ';dbname=' . $name . ';charset=utf8mb4', 'root', '',
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 $GLOBALS['pdo'] = $pdo;
 require_once __DIR__ . '/../includes/application_decision.php';

@@ -6,7 +6,9 @@ if (!$name || !preg_match('/^lgu_logic_test_[a-z0-9_]+$/', $name)) throw new Run
 session_save_path(sys_get_temp_dir());
 session_start();
 date_default_timezone_set('Asia/Singapore');
-$pdo = new PDO('mysql:host=localhost;dbname=' . $name . ';charset=utf8mb4', 'root', '', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$testHost = getenv('LGU_TEST_HOST') ?: 'localhost';
+putenv('DB_HOST=' . $testHost);
+$pdo = new PDO('mysql:host=' . $testHost . ';dbname=' . $name . ';charset=utf8mb4', 'root', '', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 require_once __DIR__ . '/../user/person_rules.php';
 require_once __DIR__ . '/../includes/application_changes.php';
 function expect($ok, string $why): void { if (!$ok) throw new RuntimeException($why); }
@@ -36,8 +38,8 @@ $pdo->exec("INSERT INTO users(id,username,password,role,full_name) VALUES(1,'tes
 $_SESSION['user'] = ['id'=>1,'role'=>'admin','username'=>'test_admin'];
 $pdo->exec("INSERT INTO beneficiaries(id,full_name,birthdate) VALUES(1,'Test Patient','1990-01-01')");
 $pdo->exec("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,beneficiary_birthdate,
-    claimant_birthdate,claimant_age,petitioner_name,relationship,created_at,approved_at,approved_by)
-    VALUES(1,1,'Approved','Test','Patient',1,'1990-01-01','1980-01-01',46,'Adult Parent','Mother','2026-10-01 09:00:00','2026-10-27 09:00:00',1)");
+    claimant_birthdate,claimant_age,petitioner_name,relationship,created_at,approved_at,approved_by,barangay,municipality,province)
+    VALUES(1,1,'Approved','Test','Patient',1,'1990-01-01','1980-01-01',46,'Adult Parent','Mother','2026-10-01 09:00:00','2026-10-27 09:00:00',1,'San Jose','General Mariano Alvarez','Cavite')");
 expect(medical_reapply_default($pdo, 1) === '2027-01-27', 'Default not based on approval without payment');
 $pdo->exec("INSERT INTO assistance_releases(application_id,assistance_type_id,amount,released_on,receipt_ref,recorded_by)
     VALUES(1,1,1000,'2026-11-07','TEST',1)");
@@ -74,8 +76,8 @@ $pdo->exec("INSERT INTO medical_reapply_decisions(beneficiary_id,based_on_applic
     VALUES(1,1,1,1,'Legacy permission with no start date')");
 expect(!medical_reapply_status($pdo,[1],'2027-01-26')['eligible'], 'Undated legacy permission bypassed scheduling');
 expect(medical_reapply_status($pdo,[1],'2027-01-27')['eligible'], 'Legacy permission blocked normal eligibility');
-$pdo->exec("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,beneficiary_birthdate,created_at)
-    VALUES(2,1,'Pending','Test','Patient',1,'1990-01-01','2027-01-01 09:00:00')");
+$pdo->exec("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,beneficiary_birthdate,created_at,barangay,municipality,province)
+    VALUES(2,1,'Pending','Test','Patient',1,'1990-01-01','2027-01-01 09:00:00','San Jose','General Mariano Alvarez','Cavite')");
 $pdo->exec("INSERT INTO medical_reapply_decisions(beneficiary_id,based_on_application_id,reapply_allowed,decided_by,remarks,
     eligible_from,default_eligible_from)
     VALUES(1,1,1,1,'Verified exception consumed by the second application','2027-01-01','2027-01-27')");
@@ -85,15 +87,15 @@ expect(medical_approval_wait_problem($pdo, $nextApplication, '2026-12-31') !== n
 expect(medical_approval_wait_problem($pdo, $nextApplication, '2027-01-01') === null, 'Consumed exception was ignored at approval');
 expect(!medical_reapply_status($pdo,[1],'2027-01-27')['eligible'], 'Pending repeat application allowed another submission');
 $pdo->exec("UPDATE applicant SET status='Disapproved' WHERE id=2");
-$pdo->exec("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,created_at,approved_at,approved_by)
-    VALUES(3,1,'Approved','Test','Patient',1,'2026-09-01 09:00:00','2026-11-27 09:00:00',1)");
+$pdo->exec("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,created_at,approved_at,approved_by,barangay,municipality,province)
+    VALUES(3,1,'Approved','Test','Patient',1,'2026-09-01 09:00:00','2026-11-27 09:00:00',1,'San Jose','General Mariano Alvarez','Cavite')");
 expect(medical_reapply_status($pdo,[1],'2027-01-27')['default_eligible_from'] === '2027-02-27', 'Earlier filing hid a more recent approval');
 expect((int)person_last_application($pdo,[1],1)['id'] === 3, 'Admin permission selected the wrong latest approval');
 expect(medical_approval_wait_problem($pdo, $nextApplication, '2027-01-27') !== null, 'Approval check ignored the most recent approval');
 $normal = submit_with_person_rules($pdo, 'medical', array_replace($adult, ['_application_date'=>'2027-02-27']), null,
     function ($personId) use ($pdo) {
-        $pdo->prepare("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,created_at)
-            VALUES(4,1,'Pending','Test','Patient',?,'2027-02-27 09:00:00')")->execute([$personId]);
+        $pdo->prepare("INSERT INTO applicant(id,assistance_type_id,status,first_name,last_name,beneficiary_id,created_at,barangay,municipality,province)
+            VALUES(4,1,'Pending','Test','Patient',?,'2027-02-27 09:00:00','San Jose','General Mariano Alvarez','Cavite')")->execute([$personId]);
         return 4;
     });
 expect($normal['ok'], 'Final submission required a grant after three months');

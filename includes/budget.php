@@ -142,13 +142,15 @@ function budget_replay(array $rows): array
  * state: none (no budget set) | ok | warn (BUDGET_WARN_PERCENT or more used) | over.
  * Any database problem gives state "none" everywhere, so nothing is blocked by it.
  *
- * @return array<int, array{type: int, year: int, budget: ?float, used: float, remaining: ?float, percent: float, state: string}>
+ * used remains the approved commitment for existing approval checks. paid/reserved are null when unavailable.
+ * Payments are attributed to the approval year here, independently of their actual payment date.
+ * @return array<int, array{type: int, year: int, budget: ?float, used: float, paid: ?float, reserved: ?float, remaining: ?float, percent: float, state: string}>
  */
 function budget_statuses(PDO $pdo, int $year, bool $strict = false): array
 {
     $out = [];
     foreach (budget_types() as $id) {
-        $out[$id] = ['type' => $id, 'year' => $year, 'budget' => null, 'used' => 0.0, 'remaining' => null, 'percent' => 0.0, 'state' => 'none'];
+        $out[$id] = ['type' => $id, 'year' => $year, 'budget' => null, 'used' => 0.0, 'paid' => null, 'reserved' => null, 'remaining' => null, 'percent' => 0.0, 'state' => 'none'];
     }
     try {
         $entries = $pdo->prepare('SELECT assistance_type_id, kind, amount FROM budget_entries WHERE budget_year = ? ORDER BY id ASC');
@@ -166,9 +168,28 @@ function budget_statuses(PDO $pdo, int $year, bool $strict = false): array
         if ($strict) throw $e;
         return $out;
     }
+    // Payment information is supplementary: a missing payment register must never change approval limits.
+    $payments = null;
+    try {
+        $stmt = $pdo->prepare("SELECT a.assistance_type_id, SUM(a.amount) AS committed, COALESCE(SUM(r.amount), 0) AS paid
+            FROM applicant a LEFT JOIN assistance_releases r ON r.application_id = a.id
+            WHERE a.status = 'Approved' AND a.assistance_type_id IN (1, 2)
+              AND COALESCE(a.approved_at, a.created_at) >= ? AND COALESCE(a.approved_at, a.created_at) < ?
+            GROUP BY a.assistance_type_id");
+        $stmt->execute([$year . '-01-01 00:00:00', ($year + 1) . '-01-01 00:00:00']);
+        $payments = $stmt->fetchAll(PDO::FETCH_UNIQUE | PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('budget payment summary: ' . $e->getMessage());
+    }
     foreach (budget_types() as $id) {
         $spent = round((float)($used[$id] ?? 0), 2);
         $out[$id]['used'] = $spent;
+        $paid = round((float)($payments[$id]['paid'] ?? 0), 2);
+        // Do not show misleading totals if an amount changed between the two reads, or old records disagree.
+        $paymentReady = $payments !== null && abs((float)($payments[$id]['committed'] ?? 0) - $spent) < 0.005
+            && $paid >= 0 && $paid <= $spent + 0.004;
+        $out[$id]['paid'] = $paymentReady ? $paid : null;
+        $out[$id]['reserved'] = $paymentReady ? round($spent - $paid, 2) : null;
         if (!isset($budgets[$id])) continue;   // never set, or removed
         $budget = round((float)$budgets[$id], 2);
         $out[$id]['budget'] = $budget;
@@ -248,7 +269,7 @@ function budget_state_text(array $s): string
 {
     switch ($s['state']) {
         case 'over': return 'Over budget by ' . ui_peso(abs((float)$s['remaining']));
-        case 'warn': return 'Almost used (' . rtrim(rtrim(number_format($s['percent'], 1), '0'), '.') . '% used)';
+        case 'warn': return 'Almost fully committed (' . rtrim(rtrim(number_format($s['percent'], 1), '0'), '.') . '% committed)';
         case 'ok':   return 'Within budget';
         default:     return 'No budget set';
     }
@@ -440,10 +461,14 @@ function ui_budget_item(array $s, bool $actions = false): string
     if ($s['budget'] === null) {
         $html .= '<p class="budget-figures">' . ui_peso($s['used']) . ' approved in ' . $s['year'] . '. No budget has been set for ' . $s['year'] . ' yet.</p>';
     } else {
-        $html .= '<div class="budget-bar" role="img" aria-label="' . ui_e(rtrim(rtrim(number_format($s['percent'], 1), '0'), '.') . '% of the budget is used') . '"><span style="width:' . $width . '%"></span></div>'
+        $html .= '<div class="budget-bar" role="img" aria-label="' . ui_e(rtrim(rtrim(number_format($s['percent'], 1), '0'), '.') . '% of the budget is committed') . '"><span style="width:' . $width . '%"></span></div>'
             . '<p class="budget-figures"><strong>' . ui_peso($s['used']) . '</strong> approved of <strong>' . ui_peso($s['budget']) . '</strong> · '
-            . ($s['remaining'] >= 0 ? '<strong>' . ui_peso($s['remaining']) . '</strong> left' : '<strong>' . ui_peso(-$s['remaining']) . '</strong> over') . '</p>';
+            . ($s['remaining'] >= 0 ? '<strong>' . ui_peso($s['remaining']) . '</strong> available for new approvals' : '<strong>' . ui_peso(-$s['remaining']) . '</strong> over') . '</p>';
     }
+    $html .= isset($s['paid'], $s['reserved'])
+        ? '<p class="budget-figures">Reserved / no payment recorded: <strong>' . ui_peso($s['reserved'])
+            . '</strong> · Actually paid: <strong>' . ui_peso($s['paid']) . '</strong></p>'
+        : '<p class="budget-figures">Payment totals unavailable. Approved commitments and approval limits are unchanged.</p>';
     if ($actions) {
         $button = function (string $action, string $label, string $icon, string $class) use ($s, $name): string {
             return '<button type="button" class="btn ' . $class . ' btn-sm" data-budget-action="' . $action . '" data-budget-type="' . (int)$s['type'] . '">'
@@ -469,7 +494,7 @@ function ui_budget_panel(PDO $pdo, ?int $onlyType = null): string
     }
     return '<section class="panel budget-panel" aria-labelledby="budgetPanelTitle' . (int)$onlyType . '">'
         . '<div class="panel-head panel-head-row"><div><h2 id="budgetPanelTitle' . (int)$onlyType . '">Budget ' . $year . '</h2>'
-        . '<p class="panel-sub">Approved amounts against the budget the office set</p></div>'
+        . '<p class="panel-sub">Approved commitments, reserved funds and recorded payments</p></div>'
         . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/budget">' . ui_icon('wallet') . 'Manage budget</a></div>'
         . '<ul class="budget-list">' . $items . '</ul></section>';
 }
@@ -488,7 +513,7 @@ function ui_budget_note(PDO $pdo, int $typeId, string $idPrefix): string
         $text = 'No ' . $year . ' ' . $short . ' budget is set, so there is no limit to check. An administrator sets it on the Budget page.';
     } else {
         $text = $year . ' ' . $short . ' budget: ' . ($s['remaining'] >= 0 ? ui_peso($s['remaining']) . ' left of ' . ui_peso($s['budget'])
-            : ui_peso(-$s['remaining']) . ' over ' . ui_peso($s['budget'])) . ' (' . rtrim(rtrim(number_format($s['percent'], 1), '0'), '.') . '% used).';
+            : ui_peso(-$s['remaining']) . ' over ' . ui_peso($s['budget'])) . ' (' . rtrim(rtrim(number_format($s['percent'], 1), '0'), '.') . '% committed).';
     }
     return '<div class="budget-note state-' . $s['state'] . '" data-budget data-budget-year="' . $year . '" data-budget-name="' . ui_e($short) . '"'
         . ' data-budget-total="' . ($s['budget'] === null ? '' : $s['budget']) . '" data-budget-used="' . $s['used'] . '" data-budget-warn="' . BUDGET_WARN_PERCENT . '" role="status">'

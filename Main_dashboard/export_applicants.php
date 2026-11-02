@@ -10,6 +10,7 @@
  * Nothing is changed in the database; the download is written to the activity log.
  */
 require_once '../config.php';
+require_once '../includes/program_list.php';
 require_once '../includes/application_decision.php';
 require_once '../includes/admin_security.php';
 require_once '../includes/admin_components.php';
@@ -112,14 +113,8 @@ if ($user['role'] === 'aid_staff') {
 }
 
 try {
-    $where = 'a.assistance_type_id = ?';
-    $params = [$typeId];
-    if ($status === 'all') {
-        $where .= ' AND ' . ui_active_sql('a');
-    } else {
-        $where .= ' AND a.status = ?';
-        $params[] = $status;
-    }
+    $listPage = ['all' => 'all', 'Pending' => 'pending', 'Approved' => 'approved', 'Disapproved' => 'disapproved', 'Withdrawn' => 'withdrawn'][$status];
+    [$where, $params] = program_list_where($typeId, $listPage, program_list_filters($_GET, $listPage));
     $stmt = $pdo->prepare("SELECT a.* FROM applicant a WHERE $where ORDER BY a.created_at DESC, a.id DESC");
     $stmt->execute($params);
 } catch (PDOException $e) {

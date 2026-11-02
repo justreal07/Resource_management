@@ -424,11 +424,11 @@
             if (amount > 0) {
                 text.textContent = over
                     ? 'This approval is ' + budgetMoney(after - total) + ' over the ' + label + ' (' + budgetMoney(Math.max(0, total - used)) + ' left). Give a reason to approve it anyway.'
-                    : 'After this approval: ' + budgetMoney(total - after) + ' left of ' + budgetMoney(total) + ' (' + shown + '% used).';
+                    : 'After this approval: ' + budgetMoney(total - after) + ' left of ' + budgetMoney(total) + ' (' + shown + '% committed).';
             } else {
                 text.textContent = label.charAt(0).toUpperCase() + label.slice(1) + ': '
                     + (used > total ? budgetMoney(used - total) + ' over ' : budgetMoney(total - used) + ' left of ') + budgetMoney(total)
-                    + ' (' + (Math.round((total > 0 ? used / total * 100 : 0) * 10) / 10) + '% used).';
+                    + ' (' + (Math.round((total > 0 ? used / total * 100 : 0) * 10) / 10) + '% committed).';
             }
         }
         box.className = 'budget-note state-' + state;

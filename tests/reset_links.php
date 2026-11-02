@@ -4,7 +4,9 @@ if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 $name = getenv('LGU_TEST_DB');
 if (!$name || !preg_match('/^lgu_logic_test_[a-z0-9_]+$/', $name)) throw new RuntimeException('Use a disposable lgu_logic_test_* database.');
 $_SESSION = [];
-$pdo = new PDO('mysql:host=localhost;dbname=' . $name . ';charset=utf8mb4', 'root', '',
+$testHost = getenv('LGU_TEST_HOST') ?: 'localhost';
+putenv('DB_HOST=' . $testHost);
+$pdo = new PDO('mysql:host=' . $testHost . ';dbname=' . $name . ';charset=utf8mb4', 'root', '',
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_EMULATE_PREPARES => false]);
 require_once __DIR__ . '/../includes/office_password_reset.php';
 $checks = 0;

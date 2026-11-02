@@ -167,6 +167,7 @@ function person_names_equal(array $a, array $b): bool
  */
 function checkPersonConflict(PDO $pdo, string $formKey, array $data, ?int $accountId): array
 {
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) return person_result('person', $problem);
     $office = $accountId === null;
     $ageErrors = application_claimant_errors($formKey, $data, $office ? (string)($data['_application_date'] ?? '') : '');
     if ($ageErrors) {
@@ -416,6 +417,7 @@ function person_unlock(PDO $pdo, string $lock): void
  */
 function decideMedicalReapply(PDO $pdo, int $adminUserId, int $medicalApplicationId, bool $allow, string $remarks, ?string $validUntil = null, ?string $eligibleFrom = null, ?int $expectedDecisionId = null): int
 {
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) throw new DomainException($problem);
     $stmt = $pdo->prepare('SELECT role FROM users WHERE id = ? AND is_active = 1');
     $stmt->execute([$adminUserId]);
     if ($stmt->fetchColumn() !== 'admin') {
@@ -611,10 +613,11 @@ function person_clash_ref(PDO $pdo, array $beneficiaryIds): string
  * Is this patient already on the schedule for this check-up day? A Pending or Approved OPD request for the same check-up date
  * with the same patient: the names match (case, accents, "Dela Cruz" = "Delacruz", a left-out middle name) and, when both requests
  * have a birthdate, the birthdates are the same (two patients with one name but different birthdates are different people).
- * A Disapproved request is discarded and doesn't count. Never throws.
+ * A Disapproved request is discarded and doesn't count. A failed database check throws.
  *
  * @param ?int $excludeId an application to leave out (the one an admin is editing)
  * @return ?array the earlier request: id, account_id, status, plus 'checkup_date'; null when there is none
+ * @throws PDOException if the schedule cannot be checked (never treat a failed check as an empty schedule)
  */
 function opd_find_duplicate(PDO $pdo, array $data, ?int $excludeId = null): ?array
 {
@@ -624,23 +627,19 @@ function opd_find_duplicate(PDO $pdo, array $data, ?int $excludeId = null): ?arr
         return null;   // the form's own checks report a missing date or name
     }
     $birth = person_text($data, 'beneficiary_birthdate');
-    try {
-        $withBirth = person_rules_installed($pdo);   // beneficiary_birthdate comes with migration_person_rules.sql
-        $stmt = $pdo->prepare('SELECT id, account_id, status, first_name, middle_name, last_name' . ($withBirth ? ', beneficiary_birthdate' : '') . "
-                               FROM applicant
-                               WHERE assistance_type_id = 3 AND checkup_date = ? AND status IN ('Pending', 'Approved') AND id <> ?
-                               ORDER BY status = 'Pending' DESC, id");
-        $stmt->execute([$day, (int)$excludeId]);
-        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $other = person_name_parts(implode(' ', [$row['first_name'], (string)$row['middle_name'], $row['last_name']]));
-            if (!person_names_equal($words, $other) && !person_names_match($words, $other)) continue;
-            $otherBirth = (string)($row['beneficiary_birthdate'] ?? '');
-            if (is_ymd($birth) && is_ymd($otherBirth) && $birth !== $otherBirth) continue;
-            $row['checkup_date'] = $day;
-            return $row;
-        }
-    } catch (PDOException $e) {
-        error_log('opd_find_duplicate: ' . $e->getMessage());
+    $withBirth = person_rules_installed($pdo);   // beneficiary_birthdate comes with migration_person_rules.sql
+    $stmt = $pdo->prepare('SELECT id, account_id, status, first_name, middle_name, last_name' . ($withBirth ? ', beneficiary_birthdate' : '') . "
+                           FROM applicant
+                           WHERE assistance_type_id = 3 AND checkup_date = ? AND status IN ('Pending', 'Approved') AND id <> ?
+                           ORDER BY status = 'Pending' DESC, id");
+    $stmt->execute([$day, (int)$excludeId]);
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+        $other = person_name_parts(implode(' ', [$row['first_name'], (string)$row['middle_name'], $row['last_name']]));
+        if (!person_names_equal($words, $other) && !person_names_match($words, $other)) continue;
+        $otherBirth = (string)($row['beneficiary_birthdate'] ?? '');
+        if (is_ymd($birth) && is_ymd($otherBirth) && $birth !== $otherBirth) continue;
+        $row['checkup_date'] = $day;
+        return $row;
     }
     return null;
 }
@@ -651,7 +650,12 @@ function opd_find_duplicate(PDO $pdo, array $data, ?int $excludeId = null): ?arr
  */
 function opd_duplicate_result(PDO $pdo, array $data, ?int $accountId, ?int $excludeId = null): array
 {
-    $dup = opd_find_duplicate($pdo, $data, $excludeId);
+    try {
+        $dup = opd_find_duplicate($pdo, $data, $excludeId);
+    } catch (Throwable $e) {
+        error_log('opd_find_duplicate: ' . $e->getMessage());
+        return person_result('checkup_date', 'We could not check the OPD schedule right now. Nothing was saved. Please try again in a few minutes.');
+    }
     if ($dup === null) {
         return person_result();
     }

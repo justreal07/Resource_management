@@ -124,7 +124,7 @@ function apply_page_start(string $title, array $program, int $step, ?array $edit
     <link rel="stylesheet" href="<?= e(portal_asset('../css/apply.css')) ?>">
     <?php portal_head(); ?>
 </head>
-<body>
+<body<?= !$edit && $step === 3 ? ' class="ap-page-confirmation"' : '' ?>>
 
 <header class="ap-header">
     <div class="ap-container ap-header-inner">

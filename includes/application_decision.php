@@ -374,6 +374,9 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
     if ($user === null) {
         return decision_result(false, 'auth', 'Your sign-in has ended. Please sign in again, then try once more.');
     }
+    if (($problem = schema_claimant_reapply_problem($pdo)) !== null) {
+        return decision_result(false, 'setup', $problem);
+    }
 
     $amount = null;
     if ($decision === 'approve') {

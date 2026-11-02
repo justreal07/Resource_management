@@ -157,23 +157,91 @@ function schema_aid_staff_ready(PDO $pdo): void
     }
 }
 
-/**
- * Make sure these columns exist in a table, adding the missing ones.
- *
- * @param string   $table   a table of this system (letters, digits and underscores only: it is written into the statement)
- * @param string[] $columns column name => definition, e.g. 'phone' => 'VARCHAR(20) NULL'
- * @throws PDOException     when a column has to be added and the database refuses
- */
-function schema_claimant_reapply_ready(PDO $pdo): void
+/** Columns needed to validate adult claimants and dated Medical exceptions. */
+function schema_claimant_reapply_columns(): array
 {
-    schema_add_columns($pdo, 'applicant', ['claimant_birthdate' => 'DATE NULL']);
-    schema_add_columns($pdo, 'medical_reapply_decisions', [
-        'eligible_from' => 'DATE NULL',
-        'default_eligible_from' => 'DATE NULL',
-        'previous_eligible_from' => 'DATE NULL',
-    ]);
+    return [
+        'applicant' => ['claimant_birthdate' => 'DATE NULL'],
+        'medical_reapply_decisions' => [
+            'eligible_from' => 'DATE NULL',
+            'default_eligible_from' => 'DATE NULL',
+            'previous_eligible_from' => 'DATE NULL',
+        ],
+    ];
 }
 
+/** Read only: safe to use inside a save transaction, even if the startup update failed. */
+function schema_claimant_reapply_installed(PDO $pdo): bool
+{
+    try {
+        $rows = $pdo->query("SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE() AND (
+                (TABLE_NAME = 'applicant' AND COLUMN_NAME = 'claimant_birthdate') OR
+                (TABLE_NAME = 'medical_reapply_decisions' AND COLUMN_NAME IN ('eligible_from', 'default_eligible_from', 'previous_eligible_from'))
+            )")->fetchAll(PDO::FETCH_ASSOC);
+        $have = [];
+        foreach ($rows as $row) $have[strtolower($row['TABLE_NAME'] . '.' . $row['COLUMN_NAME'])] = true;
+        foreach (schema_claimant_reapply_columns() as $table => $columns) {
+            foreach ($columns as $column => $_) if (!isset($have[$table . '.' . $column])) return false;
+        }
+        return true;
+    } catch (Throwable $e) {
+        error_log('schema_claimant_reapply_installed: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/** A form can report this without exposing SQL or allowing an unchecked application to be saved. */
+function schema_claimant_reapply_problem(PDO $pdo): ?string
+{
+    return schema_claimant_reapply_installed($pdo) ? null
+        : 'Applications are temporarily unavailable while the office updates the system. Nothing was saved. Please contact the office or try again later.';
+}
+
+/**
+ * Attempt the additive update once the older person-registry tables exist. Keep failures
+ * local to the affected features, retry later, and serialize concurrent first requests.
+ */
+function schema_claimant_reapply_ready(PDO $pdo): bool
+{
+    $locked = false;
+    try {
+        // Check before the retry delay: a manual repair must take effect immediately.
+        if (schema_claimant_reapply_installed($pdo)) {
+            $_SESSION['claimant_reapply_schema_v1'] = true;
+            unset($_SESSION['claimant_reapply_schema_failed_at']);
+            return true;
+        }
+        unset($_SESSION['claimant_reapply_schema_v1']);
+        if ($pdo->inTransaction() || (isset($_SESSION['claimant_reapply_schema_failed_at'])
+            && time() - (int)$_SESSION['claimant_reapply_schema_failed_at'] < 600)) return false;
+
+        $locked = (int)$pdo->query("SELECT GET_LOCK('lgu_schema_claimant_reapply', 10)")->fetchColumn() === 1;
+        if (!$locked) return false;
+        foreach (schema_claimant_reapply_columns() as $table => $columns) {
+            schema_add_columns($pdo, $table, $columns);
+        }
+        $_SESSION['claimant_reapply_schema_v1'] = true;
+        unset($_SESSION['claimant_reapply_schema_failed_at']);
+        return true;
+    } catch (Throwable $e) {
+        error_log('schema_claimant_reapply_ready: ' . $e->getMessage());
+        unset($_SESSION['claimant_reapply_schema_v1']);
+        $_SESSION['claimant_reapply_schema_failed_at'] = time();
+        return false;
+    } finally {
+        if ($locked) {
+            try { $pdo->query("SELECT RELEASE_LOCK('lgu_schema_claimant_reapply')"); }
+            catch (Throwable $e) { error_log('schema_claimant_reapply unlock: ' . $e->getMessage()); }
+        }
+    }
+}
+
+/**
+ * Make sure these columns exist in a table, adding the missing ones.
+ * Never use inside a transaction: ALTER TABLE commits it in MySQL.
+ * @throws PDOException when a column cannot be added
+ */
 function schema_add_columns(PDO $pdo, string $table, array $columns): void
 {
     if (!preg_match('/^\w+$/', $table)) {

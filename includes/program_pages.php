@@ -18,6 +18,8 @@
  * program_texts() and program_columns(): to change a heading or add a column, change it there.
  */
 
+require_once __DIR__ . '/program_list.php';
+
 /** The words of each program's pages. (Medical, Burial and OPD call the same thing "applications" or "requests".) */
 function program_texts(int $typeId): array
 {
@@ -145,46 +147,54 @@ function program_columns(int $typeId, string $page): array
            $address, $contact]));
 }
 
-/** The rows of a list (the name search bar, ?name=, is applied here). */
-function program_rows(int $typeId, string $page): array
+/** One form searches the whole list and starts at page one whenever filters change. */
+function program_list_controls(int $typeId, string $page, array $result): string
 {
-    global $pdo;
-    $parts = 'a.house_no, a.street, a.barangay, a.municipality, a.province';   // joined by ui_address(): CONCAT() in SQL gave no address when a part was empty
-    if ($page === 'all') {
-        // OPD by check-up date; a request without one goes last (MySQL sorts an empty date first otherwise)
-        $order = $typeId === 3 ? 'a.checkup_date IS NULL, a.checkup_date ASC, a.created_at DESC' : 'a.created_at DESC';
-        $stmt = $pdo->prepare("SELECT a.*, at.name as assistance_type FROM applicant a
-                               LEFT JOIN assistance_types at ON a.assistance_type_id = at.id
-                               WHERE a.assistance_type_id = ? AND a.status NOT IN ('Disapproved', 'Withdrawn')
-                               ORDER BY $order");
-    } elseif ($page === 'pending') {
-        // The account's email is where the approval email goes (the Approve dialog shows it; NULL account = walk-in);
-        // the check-up date is the OPD trip day; encoded_by is who keyed in a walk-in (NULL for an online application)
-        $source = ui_source_query();
-        $sourceSql = $source === 'online' ? ' AND a.account_id IS NOT NULL' : ($source === 'walkin' ? ' AND a.account_id IS NULL' : '');
-        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at, a.status, a.updated_at, a.edited_at, a.edit_count,
-                                      " . ($typeId === 2 ? 'a.petitioner_name,' : '') . ($typeId === 3 ? 'a.checkup_date,' : '') . "
-                                      a.account_id, acc.email AS account_email,
-                                      COALESCE(NULLIF(TRIM(u.full_name), ''), u.username) AS encoded_by_name
-                               FROM applicant a
-                               LEFT JOIN applicant_accounts acc ON acc.id = a.account_id
-                               LEFT JOIN users u ON u.id = a.encoded_by
-                               WHERE a.assistance_type_id = ? AND a.status = 'Pending'$sourceSql
-                               ORDER BY a.created_at DESC");
-    } else {
-        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, $parts, a.contact_number, a.created_at,
-                                      " . ($typeId === 2 ? 'a.petitioner_name,' : '') . ($typeId !== 3 ? 'a.approved_at, a.amount,' : '') . "
-                                      a.status
-                               FROM applicant a
-                               WHERE a.assistance_type_id = ? AND a.status = 'Approved'
-                               ORDER BY a.created_at DESC");
+    $f = $result['filters'];
+    $path = program_file($typeId, $page);
+    $html = '<form class="table-tools program-list-filters" method="GET" action="' . ui_e($path) . '" role="search" data-busy>';
+    if ($f['name'] !== '') $html .= '<input type="hidden" name="name" value="' . ui_e($f['name']) . '">';
+    $html .= '<div class="field field-search"><label for="programSearch">Search all applications in this list</label>'
+        . '<input type="search" id="programSearch" name="q" maxlength="100" value="' . ui_e($f['q']) . '" placeholder="Name, Ref #, barangay or contact"></div>';
+    if ($page === 'pending') {
+        $html .= '<div class="field"><label for="programSource">Source</label><select name="source" id="programSource">';
+        foreach (['' => 'All sources', 'online' => 'Online', 'walkin' => 'Walk-in'] as $value => $label) {
+            $html .= '<option value="' . $value . '"' . ($f['source'] === $value ? ' selected' : '') . '>' . $label . '</option>';
+        }
+        $html .= '</select></div>';
     }
-    $stmt->execute([$typeId]);
-    return ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));
+    $html .= '<div class="field"><label for="programPerPage">Per page</label><select name="per" id="programPerPage">';
+    foreach ([10, 25, 50] as $per) $html .= '<option value="' . $per . '"' . ($f['per'] === $per ? ' selected' : '') . '>' . $per . '</option>';
+    $html .= '</select></div><button type="submit" class="btn btn-secondary btn-sm">Search</button>';
+    if ($f['name'] !== '' || $f['q'] !== '' || $f['source'] !== '') {
+        $html .= '<a class="btn btn-link btn-sm" href="' . ui_e(program_list_url($path, ['per' => $f['per']])) . '">Clear filters</a>';
+    }
+    return $html . '</form>';
+}
+
+/** Counts and navigation use all matching rows, not just the current page. */
+function program_list_pagination(int $typeId, string $page, array $result): string
+{
+    $f = $result['filters'];
+    $path = program_file($typeId, $page);
+    $html = '<nav class="pagination program-pagination" aria-label="Pages of applications"><span class="table-count">Showing '
+        . number_format($result['first']) . '–' . number_format($result['last']) . ' of ' . number_format($result['total']) . '</span>';
+    if ($result['pages'] > 1) {
+        $html .= '<div class="page-list">';
+        $html .= $f['page'] > 1
+            ? '<a class="page-step" rel="prev" href="' . ui_e(program_list_url($path, $f, ['page' => $f['page'] - 1])) . '">Previous</a>'
+            : '<span class="page-step is-disabled" aria-disabled="true">Previous</span>';
+        $html .= '<span class="page-of">Page ' . $f['page'] . ' of ' . $result['pages'] . '</span>';
+        $html .= $f['page'] < $result['pages']
+            ? '<a class="page-step" rel="next" href="' . ui_e(program_list_url($path, $f, ['page' => $f['page'] + 1])) . '">Next</a>'
+            : '<span class="page-step is-disabled" aria-disabled="true">Next</span>';
+        $html .= '</div>';
+    }
+    return $html . '</nav>';
 }
 
 /** The declined list: shown for the record only; they don't count anywhere else and each applicant may apply again. */
-function program_declined_body(int $typeId): string
+function program_declined_body(int $typeId, array $result): string
 {
     global $pdo;
     $t = program_texts($typeId);
@@ -195,41 +205,28 @@ function program_declined_body(int $typeId): string
     if (!decision_schema_ready($pdo)) {
         return ui_state('alert', 'The database update hasn\'t been installed yet', 'Run database/migrations/migration_disapprove.sql in phpMyAdmin, then open this page again.', '', 'state-error');
     }
-    try {
-        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.created_at,
-                                      a.disapproved_at, a.disapproval_remarks,
-                                      COALESCE(NULLIF(TRIM(u.full_name), ''), u.username) AS disapproved_by_name
-                               FROM applicant a LEFT JOIN users u ON u.id = a.disapproved_by
-                               WHERE a.status = 'Disapproved' AND a.assistance_type_id = ?
-                               ORDER BY a.disapproved_at DESC, a.id DESC");
-        $stmt->execute([$typeId]);
-        $rows = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
-    } catch (PDOException $e) {
-        error_log('program_declined_body(' . $typeId . '): ' . $e->getMessage());
-        return ui_load_error('the declined list', program_file($typeId, 'disapproved'));
+    $options = ['search' => false];
+    if (!$result['rows'] && ($result['filters']['q'] !== '' || $result['filters']['name'] !== '')) {
+        $options['empty'] = ['No applications match these filters', 'Change the search or clear the filters to see other applications.'];
     }
-    return '<section class="panel" aria-label="' . ui_e($t['declined_head']) . '">' . ui_disapproved_log($rows, false) . '</section>';
+    return '<section class="panel" aria-label="' . ui_e($t['declined_head']) . '">' . program_list_controls($typeId, 'disapproved', $result)
+        . ui_disapproved_log($result['rows'], false, $options) . program_list_pagination($typeId, 'disapproved', $result) . '</section>';
 }
 
 /** The withdrawn list: the applicant took the application back while it was waiting. For the record only, like the declined one. */
-function program_withdrawn_body(int $typeId): string
+function program_withdrawn_body(int $typeId, array $result): string
 {
     global $pdo;
     $t = program_texts($typeId);
     if (!staff_can_view(decision_user(), $typeId)) {
         return ui_state('lock', 'Sign in to see this list', $t['declined_who']);
     }
-    try {
-        $stmt = $pdo->prepare("SELECT a.id, a.first_name, a.middle_name, a.last_name, a.assistance_type_id, a.created_at, a.withdrawn_at, a.withdrawal_reason
-                               FROM applicant a WHERE a.status = 'Withdrawn' AND a.assistance_type_id = ?
-                               ORDER BY a.withdrawn_at DESC, a.id DESC");
-        $stmt->execute([$typeId]);
-        $rows = ui_filter_by_name($stmt->fetchAll(PDO::FETCH_ASSOC));   // the name search bar (?name=)
-    } catch (PDOException $e) {
-        error_log('program_withdrawn_body(' . $typeId . '): ' . $e->getMessage());
-        return ui_load_error('the withdrawn list', program_file($typeId, 'withdrawn'));
+    $options = ['search' => false];
+    if (!$result['rows'] && ($result['filters']['q'] !== '' || $result['filters']['name'] !== '')) {
+        $options['empty'] = ['No applications match these filters', 'Change the search or clear the filters to see other applications.'];
     }
-    return '<section class="panel" aria-label="' . ui_e($t['withdrawn_head']) . '">' . ui_withdrawn_log($rows, false) . '</section>';
+    return '<section class="panel" aria-label="' . ui_e($t['withdrawn_head']) . '">' . program_list_controls($typeId, 'withdrawn', $result)
+        . ui_withdrawn_log($result['rows'], false, $options) . program_list_pagination($typeId, 'withdrawn', $result) . '</section>';
 }
 
 /** One list page: $page = all | pending | approved | disapproved | withdrawn. */
@@ -245,48 +242,60 @@ function program_list_page(int $typeId, string $page): void
         $head = [$t[$key === 'disapproved' ? 'declined_head' : $key . '_head'], $t[$key . '_sub'] ?? 'Most recently declined first, with the reason given. Each applicant may apply again.'];
     }
 
-    // The rows are read before the page starts, as before: a failing query shows the error page, not half a page
-    $rows = in_array($page, ['disapproved', 'withdrawn'], true) ? [] : program_rows($typeId, $page);
+    $result = null;
+    try {
+        $result = program_list_load($GLOBALS['pdo'], $typeId, $page, $_GET);
+        if ($result['filters']['name'] !== '') $GLOBALS['ui_name_filter'] = ['q' => $result['filters']['name'], 'found' => $result['total']];
+    } catch (Throwable $e) {
+        error_log('program_list_page(' . $typeId . ', ' . $page . '): ' . $e->getMessage());
+    }
 
     admin_layout_start(['title' => $t['title'], 'section' => program_section($typeId, $page)]);
     echo ui_type_tabs($typeId, $key);
+    if ($result === null) {
+        echo ui_load_error('the applications', program_file($typeId, $page));
+        admin_layout_end();
+        return;
+    }
+    $rows = $result['rows'];
     // The tab you are on already says which list this is: only Declined and Withdrawn keep their one-line explanation, under the tabs
     if (in_array($page, ['disapproved', 'withdrawn'], true)) echo '<p class="page-intro">' . ui_e($head[1]) . '</p>';
     if ($page === 'disapproved' || $page === 'withdrawn') {
-        echo $page === 'withdrawn' ? program_withdrawn_body($typeId) : program_declined_body($typeId);
+        echo $page === 'withdrawn' ? program_withdrawn_body($typeId, $result) : program_declined_body($typeId, $result);
         admin_layout_end();
         return;
     }
 
     $label = $page === 'all' ? $t['all_label'] : $head[0];
-    $options = ['empty' => $t[$page . '_empty']];
-    // The Source filter shares the line with "Search this list"; with no rows there is no search line, so it stands alone (it must stay reachable to clear a filter)
-    if ($page === 'pending') {
-        if ($rows) $options['tools_extra'] = ui_source_filter(); else echo ui_source_filter();
+    $options = ['empty' => $t[$page . '_empty'], 'search' => false];
+    if (!$rows && ($result['filters']['q'] !== '' || $result['filters']['name'] !== '' || $result['filters']['source'] !== '')) {
+        $options['empty'] = ['No applications match these filters', 'Change the search or clear the filters to see other applications.'];
     }
     if ($page === 'pending' || $page === 'approved') {
         $review = $page === 'pending';
+        $returnUrl = program_list_url(ui_type_url($typeId, $page), $result['filters']);
         $options['actions'] = $staff
-            ? function ($row) use ($typeId, $page, $review) {
+            ? function ($row) use ($typeId, $page, $review, $returnUrl) {
                 $user = decision_user();
                 // Medical & Burial staff may fix their own mistake in a Pending application (edit_applicant.php,
                 // which checks the same two things again: their program, still Pending); never on Approved, and
                 // never for OPD staff. A button nobody can use here is left off, not shown disabled.
                 $canEdit = $page === 'pending' && $user !== null && $user['role'] === 'aid_staff';
-                $html = ui_row_links($typeId, $row, $canEdit, $canEdit ? ui_type_url($typeId, 'pending') : '', $review);
+                $html = ui_row_links($typeId, $row, $canEdit, $canEdit ? $returnUrl : '', $review);
                 // Update (status and remarks) is only for a role that may actually decide this program (OPD staff; never
                 // Medical & Burial staff, who only encode and view): decision_save_update_form() enforces the same check.
                 if (decision_can($user, $typeId)) $html .= ui_staff_update_link($typeId, $row);
                 return $html;
               }
-            : function ($row) use ($typeId, $page, $review) { return ui_row_links($typeId, $row, true, ui_type_url($typeId, $page), $review); };
+            : function ($row) use ($typeId, $review, $returnUrl) { return ui_row_links($typeId, $row, true, $returnUrl, $review); };
     }
-    echo '<section class="panel" aria-label="' . ui_e($label) . '">' . ui_table($rows, program_columns($typeId, $page), $options);
+    echo '<section class="panel" aria-label="' . ui_e($label) . '">' . program_list_controls($typeId, $page, $result)
+        . ui_table($rows, program_columns($typeId, $page), $options);
     if ($page === 'approved' && $t['gives_money'] && $rows) {
-        $totalGiven = round(array_sum(array_column($rows, 'amount')), 2);
-        echo '<p class="panel-note"><strong>Total given:</strong> ' . ui_e(ui_peso($totalGiven, $totalGiven === floor($totalGiven) ? 0 : 2)) . '</p>';
+        $totalGiven = round($result['amount_total'], 2);
+        echo '<p class="panel-note"><strong>Total approved amount (all matching applications):</strong> ' . ui_e(ui_peso($totalGiven, $totalGiven === floor($totalGiven) ? 0 : 2)) . '</p>';
     }
-    echo '</section>';
+    echo program_list_pagination($typeId, $page, $result) . '</section>';
     admin_layout_end();
 }
 
