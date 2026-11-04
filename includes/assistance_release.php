@@ -32,6 +32,23 @@ function assistance_release_for(PDO $pdo, int $applicationId): ?array
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
+/** Payment dates for the displayed applications, in one query. Null means the register could not be read. */
+function assistance_release_dates(PDO $pdo, array $applicationIds): ?array
+{
+    $ids = array_values(array_unique(array_filter(array_map('intval', $applicationIds), function ($id) { return $id > 0; })));
+    if (!$ids) return [];
+    if (!assistance_release_ensure($pdo)) return null;
+    try {
+        $stmt = $pdo->prepare('SELECT application_id, released_on FROM assistance_releases WHERE application_id IN ('
+            . implode(',', array_fill(0, count($ids), '?')) . ')');
+        $stmt->execute($ids);
+        return $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    } catch (Throwable $e) {
+        error_log('assistance_release_dates: ' . $e->getMessage());
+        return null;
+    }
+}
+
 /** Lock the application so a simultaneous amount correction cannot change the payment being recorded. */
 function assistance_release_record(PDO $pdo, int $applicationId, ?array $user, string $date, string $receipt): array
 {

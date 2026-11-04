@@ -289,7 +289,24 @@ function program_list_page(int $typeId, string $page): void
               }
             : function ($row) use ($typeId, $review, $returnUrl) { return ui_row_links($typeId, $row, true, $returnUrl, $review); };
     }
-    echo '<section class="panel" aria-label="' . ui_e($label) . '">' . program_list_controls($typeId, $page, $result)
+    $showPaymentActions = $page === 'approved' && $t['gives_money'] && (decision_user()['role'] ?? '') === 'admin';
+    if ($showPaymentActions) {
+        require_once __DIR__ . '/assistance_release.php';
+        $paymentDates = assistance_release_dates($GLOBALS['pdo'], array_column($rows, 'id'));
+        $rowLinks = $options['actions'];
+        $options['actions'] = function ($row) use ($rowLinks, $paymentDates) {
+            $html = $rowLinks($row);
+            if ($paymentDates === null) {
+                return $html . '<span class="badge badge-pending payment-list-status">Payment unavailable</span>';
+            }
+            if (isset($paymentDates[(int)$row['id']])) {
+                return $html . '<span class="badge badge-approved payment-list-status" title="Recorded on '
+                    . ui_e(ui_date($paymentDates[(int)$row['id']])) . '">' . ui_icon('check-circle') . 'Payment recorded</span>';
+            }
+            return $html . ui_record_payment_link($row);
+        };
+    }
+    echo '<section class="panel' . ($showPaymentActions ? ' program-payment-list' : '') . '" aria-label="' . ui_e($label) . '">' . program_list_controls($typeId, $page, $result)
         . ui_table($rows, program_columns($typeId, $page), $options);
     if ($page === 'approved' && $t['gives_money'] && $rows) {
         $totalGiven = round($result['amount_total'], 2);

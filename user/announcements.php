@@ -151,9 +151,11 @@ $h = 'ann_e';
     <section class="ann-hero">
         <div class="container ann-hero-inner">
             <div>
+                <a class="ann-breadcrumb" href="landingpage">Home</a><span class="ann-breadcrumb-current"> / Announcements</span>
                 <h1 class="ann-heading">Announcements</h1>
-                <p class="ann-lead">News and schedules from the Municipal Hall.</p>
+                <p class="ann-lead">Stay informed about assistance programs, schedules, and municipal advisories.</p>
             </div>
+            <span class="ann-hero-icon" aria-hidden="true"><?= ann_icon('bullhorn') ?></span>
         </div>
     </section>
 <?php endif; ?>
@@ -195,20 +197,40 @@ $h = 'ann_e';
         <!-- THE FEED -->
         <?php /* Plain links, not a <select>+submit: works with JavaScript off, needs no "Show" button,
                  and the colour of each chip previews the category's own badge colour (ann-cat-*). */ ?>
+        <div class="ann-board">
+        <aside class="ann-sidebar" aria-labelledby="annCategoriesTitle">
+        <div class="ann-sidebar-head">
+            <h2 id="annCategoriesTitle">Browse by category</h2>
+            <p>Find the updates that matter to you.</p>
+        </div>
         <nav class="ann-cat-filters" aria-label="Filter by category">
             <a class="ann-cat-chip<?= $category === '' ? ' is-active' : '' ?>" href="announcements"<?= $category === '' ? ' aria-current="page"' : '' ?>>
-                <?= ann_icon('star') ?>All
+                <?= ann_icon('file') ?><span>All announcements</span>
             </a>
             <?php foreach ($cats as $key => [$label, $icon]): ?>
                 <a class="ann-cat-chip ann-cat-<?= $h($key) ?><?= $category === $key ? ' is-active' : '' ?>"
                    href="<?= $h($query(['category' => $key])) ?>"<?= $category === $key ? ' aria-current="page"' : '' ?>>
-                    <?= ann_icon($icon) ?><?= $h($label) ?>
+                    <?= ann_icon($icon) ?><span><?= $h($label) ?></span>
                 </a>
             <?php endforeach; ?>
         </nav>
+        <div class="ann-sidebar-help">
+            <?= ann_icon('info') ?>
+            <div><strong>Have a question?</strong><p>Send a message through our feedback page.</p>
+                <a href="feedback">Go to feedback <?= ann_icon('arrow') ?></a></div>
+        </div>
+        </aside>
+        <section class="ann-updates" aria-labelledby="annUpdatesTitle">
+        <div class="ann-updates-head">
+            <div><span class="ann-section-label">Municipal bulletin</span>
+                <h2 id="annUpdatesTitle"><?= $category !== '' ? $h($cats[$category][0]) : 'Latest updates' ?></h2></div>
+            <?php if ($ready && !$failed): ?>
+                <span class="ann-total"><?= number_format($total) ?> <?= $total === 1 ? 'announcement' : 'announcements' ?></span>
+            <?php endif; ?>
+        </div>
 
         <?php if (!$ready): ?>
-            <div class="ann-state" role="status"><?= ann_icon('info') ?>
+            <div class="ann-state" role="status"><?= ann_icon('bullhorn') ?>
                 <h2>No announcements yet</h2>
                 <p>Please check again soon. For questions, call the office at (046) 123-4567.</p></div>
         <?php elseif ($failed): ?>
@@ -217,13 +239,15 @@ $h = 'ann_e';
                 <p>There was a problem on our side. Please try again in a moment.</p>
                 <a class="ann-btn" href="<?= $h($query()) ?>"><i class="fas fa-rotate-right" aria-hidden="true"></i> Try again</a></div>
         <?php elseif (!$rows && !$filtered): ?>
-            <div class="ann-state" role="status"><?= ann_icon('info') ?>
-                <h2>No announcements yet</h2>
-                <p>News and schedules from the Municipal Hall will appear here. Please check again soon.</p></div>
+            <div class="ann-state" role="status"><?= ann_icon('bullhorn') ?>
+                <span class="ann-section-label">You're all caught up</span>
+                <h3>No announcements yet</h3>
+                <p>New schedules, program updates, and advisories will appear here when published. Please check back soon.</p>
+                <a class="ann-btn ann-btn-ghost" href="landingpage">Back to home <?= ann_icon('arrow') ?></a></div>
         <?php elseif (!$rows): ?>
             <div class="ann-state" role="status"><?= ann_icon('info') ?>
                 <h2>No announcements in this category</h2>
-                <p>Choose another category, or "All categories".</p>
+                <p>There are no current updates here. Browse all announcements or choose another category.</p>
                 <a class="ann-btn ann-btn-ghost" href="announcements">Show all announcements</a></div>
         <?php else: ?>
             <p class="ann-result" role="status" data-ann-count data-total="<?= $total ?>">
@@ -241,6 +265,8 @@ $h = 'ann_e';
                 </div>
             <?php endif; ?>
         <?php endif; ?>
+        </section>
+        </div>
 <?php endif; ?>
     </div>
 </main>

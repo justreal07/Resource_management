@@ -390,6 +390,109 @@
 .ann-single .ann-card-title { font-size: clamp(1.4rem, 2.6vw, 1.9rem); }
 .ann-back { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--ann-navy); font-weight: 700; }
 
+/* Public bulletin layout. Keep these overrides scoped: admin editor previews share the cards. */
+.ann-page { --header-h: 86px; min-height: 100svh; display: flex; flex-direction: column; }
+.ann-page > .ann-main { flex: 1; padding: 0 0 40px; }
+.ann-page .container { max-width: 1240px; }
+.ann-page .ann-header { position: static; }
+.ann-page .ann-header-inner { gap: 12px 24px; }
+.ann-page .ann-header .brand { gap: 12px; flex: 0 1 auto; }
+.ann-page .ann-header .brand-logos img { width: 58px; height: 58px; }
+.ann-page .ann-header .brand-logos img + img { margin-left: -18px; }
+.ann-page .ann-header .brand-text strong { font-size: 1.1em; }
+.ann-page .ann-header .brand-text small { font-size: .74em; }
+.ann-page .ann-nav { gap: 6px; font-size: .85em; }
+.ann-page .ann-nav .btn { min-height: 44px; padding: 8px 16px; font-size: inherit; }
+.ann-page .ann-nav > a:not(.btn) { padding: 0 10px; }
+.ann-page .ann-hero { margin-bottom: 28px; }
+.ann-page .ann-hero-inner { justify-content: space-between; padding-top: 26px; padding-bottom: 30px; }
+.ann-page .ann-hero-inner > div { min-width: 0; }
+.ann-page .ann-heading, .ann-page .ann-lead { overflow-wrap: anywhere; }
+.ann-breadcrumb, .ann-breadcrumb-current { color: #d2daf3; font-size: .8rem; }
+.ann-breadcrumb { text-decoration: none; }
+.ann-breadcrumb:hover { text-decoration: underline; color: #fff; }
+.ann-page .ann-heading { margin-top: 12px; font-size: clamp(1.75rem, 3vw, 2.25rem); }
+.ann-page .ann-lead { font-size: .95rem; }
+.ann-page .ann-hero-icon { width: 80px; height: 80px; border-radius: 24px; }
+.ann-board { display: grid; grid-template-columns: 255px minmax(0, 1fr); align-items: start; gap: 28px; }
+.ann-sidebar { background: #fff; border: 1px solid var(--ann-line); border-radius: 16px; overflow: hidden; }
+.ann-sidebar-head { padding: 20px 18px 14px; }
+.ann-sidebar-head h2 { margin: 0 0 6px; font-size: .95rem; }
+.ann-sidebar-head p { margin: 0; font-size: .8rem; color: var(--ann-muted); line-height: 1.5; }
+.ann-page .ann-cat-filters { display: grid; justify-content: stretch; gap: 5px; padding: 0 10px 14px; margin: 0; }
+.ann-page .ann-cat-chip { min-height: 46px; padding: 10px 12px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--ann-body); font-size: .85rem; font-weight: 600; line-height: 1.4; box-shadow: none; gap: 10px; }
+.ann-page .ann-cat-chip .ann-icon { width: 18px; height: 18px; }
+.ann-page .ann-cat-chip:hover { background: #f1f4fb; transform: none; box-shadow: none; }
+.ann-page .ann-cat-chip.is-active { background: #e8eefb; color: var(--ann-navy); border-color: #c9d6f2; box-shadow: inset 3px 0 var(--ann-navy); }
+.ann-page .ann-cat-chip:first-child.is-active { background: var(--ann-navy); color: #fff; box-shadow: none; }
+.ann-sidebar-help { display: flex; align-items: start; gap: 10px; border-top: 1px solid var(--ann-line); background: #f9fafe; padding: 18px; font-size: .8rem; }
+.ann-sidebar-help > .ann-icon { margin-top: 3px; color: var(--ann-navy); }
+.ann-sidebar-help strong { color: var(--ann-ink); }
+.ann-sidebar-help p { margin: 5px 0 10px; line-height: 1.5; }
+.ann-sidebar-help a { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; font-weight: 700; text-decoration: none; }
+.ann-updates { min-width: 0; }
+.ann-updates-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin: 0 0 20px; }
+.ann-section-label { display: block; color: var(--ann-muted); font-size: .7rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.ann-updates-head h2 { margin: 6px 0 0; font-size: 1.35rem; line-height: 1.35; }
+.ann-total { padding: 5px 10px; border: 1px solid var(--ann-line); border-radius: 7px; background: #fff; color: var(--ann-muted); font-size: .78rem; font-weight: 600; }
+.ann-page .ann-result { text-align: left; font-size: .8rem; font-weight: 400; }
+.ann-page .ann-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.ann-page .ann-grid > .ann-card { box-shadow: 0 3px 12px rgba(10, 36, 114, .04); }
+.ann-page .ann-grid .ann-card-body { padding: 20px; gap: 12px; }
+.ann-page .ann-grid .ann-card-title { font-size: 1.1rem; line-height: 1.45; }
+.ann-page .ann-grid .ann-card-preview { font-size: .9rem; line-height: 1.65; }
+.ann-page .ann-grid .ann-badge { font-size: .7rem; padding: 3px 8px; white-space: normal; }
+.ann-page .ann-grid .ann-card-date { font-size: .75rem; flex-wrap: wrap; }
+.ann-page .ann-grid .ann-read { align-self: stretch; justify-content: space-between; font-size: .85rem; padding: 14px 0 0; border: 0; border-top: 1px solid var(--ann-line); border-radius: 0; }
+.ann-page .ann-grid .ann-read:hover { background: transparent; color: var(--ann-navy-dark); text-decoration: underline; }
+.ann-page .ann-updates .ann-state { min-height: 355px; align-content: center; padding: 32px 24px; gap: 12px; border-style: solid; box-shadow: 0 4px 20px rgba(10, 36, 114, .03); }
+.ann-page .ann-state > .ann-icon { box-sizing: content-box; width: 30px; height: 30px; padding: 20px; margin-bottom: 8px; background: #eef2fb; border-radius: 22px; color: var(--ann-navy); }
+.ann-page .ann-state h3 { margin: 0; font-size: 1.25rem; }
+.ann-page .ann-state p { font-size: .9rem; max-width: 420px; }
+.ann-page .ann-state .ann-btn { margin-top: 8px; font-size: .85rem; }
+.ann-page .ann-state .ann-btn .ann-icon { width: 1em; height: 1em; color: inherit; }
+.ann-page .ann-footer .footer-bottom { margin-top: 0; }
+@media (max-width: 1000px) {
+    .ann-page .ann-header-inner { justify-content: center; }
+    .ann-page .ann-header .brand { margin-right: auto; }
+    .ann-board { grid-template-columns: 225px minmax(0, 1fr); gap: 20px; }
+    .ann-page .ann-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+    .ann-page .container { padding-left: 20px; padding-right: 20px; }
+    .ann-board { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .ann-sidebar-head { padding: 16px 16px 12px; }
+    .ann-sidebar-head p, .ann-sidebar-help { display: none; }
+    .ann-page .ann-cat-filters { display: flex; flex-wrap: wrap; justify-content: flex-start; padding: 0 12px 14px; gap: 6px; }
+    .ann-page .ann-cat-chip { min-height: 44px; border-color: var(--ann-line); padding: 8px 10px; font-size: .78rem; }
+    .ann-page .ann-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ann-page .ann-hero-icon { width: 60px; height: 60px; border-radius: 18px; }
+    .ann-page .ann-hero-inner { gap: 16px; }
+    .ann-page .ann-updates .ann-state { min-height: 300px; }
+}
+@media (max-width: 540px) {
+    .ann-page .container { padding-left: 16px; padding-right: 16px; }
+    .ann-page .ann-header .brand-logos img { width: 46px; height: 46px; }
+    .ann-page .ann-header .brand-text strong { font-size: .95em; }
+    .ann-page .ann-header-inner { padding-top: 12px; padding-bottom: 12px; gap: 12px; }
+    .ann-page .ann-nav { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); width: 100%; gap: 6px; font-size: .75em; }
+    .ann-page .ann-nav > a { grid-column: span 2; justify-content: center; }
+    .ann-page .ann-nav > .btn { grid-column: span 3; }
+    .ann-page .ann-nav > a:not(.btn) { padding: 0 4px; }
+    .ann-page .ann-nav .btn { padding: 8px 12px; }
+    .ann-page .ann-cat-filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ann-page .ann-cat-chip { overflow-wrap: anywhere; }
+    .ann-page .ann-cat-chip:first-child { grid-column: 1 / -1; }
+    .ann-page .ann-hero-icon { display: none; }
+    .ann-page .ann-grid { grid-template-columns: minmax(0, 1fr); }
+    .ann-page .ann-updates-head { margin-bottom: 16px; }
+    .ann-page .ann-updates .ann-state { padding: 28px 18px; }
+}
+@media (max-width: 380px) {
+    .ann-page .ann-heading { font-size: 1.4rem; }
+    .ann-page .ann-cat-filters { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ============================================
    ADMIN EDITOR (Main_dashboard/announcements.php?new=1 / ?id=)
 ============================================ */

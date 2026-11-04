@@ -13,14 +13,22 @@ if (!$app || !in_array((int)$app['assistance_type_id'], [1, 2], true)) { http_re
 $back = ui_type_url((int)$app['assistance_type_id'], 'view', ['id' => $id]);
 $embedded = ui_embed_requested();
 $self = 'release_assistance?id=' . $id . ($embedded ? '&embed=1' : '');
+$scheduled = (string)($app['claim_date'] ?? '');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $result = decision_csrf_ok()
-        ? assistance_release_record($pdo, $id, $user, (string)($_POST['released_on'] ?? ''), (string)($_POST['receipt_ref'] ?? ''))
-        : ['ok' => false, 'message' => 'This form expired. Reload and try again.'];
+    if (!decision_csrf_ok()) {
+        $result = ['ok' => false, 'message' => 'This form expired. Reload and try again.'];
+    } elseif ($scheduled === '') {
+        $result = ['ok' => false, 'message' => 'This application has no claim date set during approval. Payment cannot be recorded.'];
+    } elseif ($scheduled > date('Y-m-d')) {
+        $result = ['ok' => false, 'message' => 'Payment can be recorded on or after ' . ui_date($scheduled, 'F j, Y') . ', once the release is confirmed.'];
+    } else {
+        // The approval already sets the claim date; ignore any separate date posted by the browser.
+        $result = assistance_release_record($pdo, $id, $user, $scheduled, (string)($_POST['receipt_ref'] ?? ''));
+    }
     $_SESSION[$result['ok'] ? 'success_message' : 'error_message'] = $result['message'];
     if (!$result['ok']) {
-        $_SESSION['payment_form_values'] = ['id'=>$id, 'date'=>(string)($_POST['released_on'] ?? ''), 'reference'=>(string)($_POST['receipt_ref'] ?? '')];
+        $_SESSION['payment_form_values'] = ['id'=>$id, 'reference'=>(string)($_POST['receipt_ref'] ?? '')];
     } else {
         unset($_SESSION['payment_form_values']);
     }
@@ -30,10 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $release = assistance_release_for($pdo, $id);
 $old = $_SESSION['payment_form_values'] ?? [];
 unset($_SESSION['payment_form_values']);
-$date = (int)($old['id'] ?? 0) === $id ? $old['date'] : (string)($app['claim_date'] ?? '');
 $reference = (int)($old['id'] ?? 0) === $id ? $old['reference'] : '';
-$scheduled = (string)($app['claim_date'] ?? '');
-$earliest = substr((string)($app['approved_at'] ?? $app['created_at']), 0, 10);
 admin_layout_start(['title'=>'Record payment', 'section'=>ui_types()[(int)$app['assistance_type_id']]['key'], 'embed_ok'=>true]);
 ?>
 <section class="payment-entry<?= $embedded ? ' is-embedded' : ' panel form-card' ?>">
@@ -56,11 +61,7 @@ admin_layout_start(['title'=>'Record payment', 'section'=>ui_types()[(int)$app['
             <?= decision_csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">
             <div class="payment-content">
                 <div class="payment-schedule"><?= ui_icon('clock') ?><div><strong>Scheduled claim date</strong><p><?= $scheduled !== '' ? ui_e(ui_date($scheduled, 'F j, Y')) : 'No date was scheduled' ?></p></div></div>
-                <div class="field">
-                    <label for="releasedOn">Actual payment date</label>
-                    <input id="releasedOn" name="released_on" type="date" value="<?= ui_e($date) ?>" min="<?= ui_e($earliest) ?>" max="<?= date('Y-m-d') ?>" aria-describedby="paymentDateHelp" required>
-                    <p class="field-help" id="paymentDateHelp">Uses the scheduled claim date. Adjust it to the day payment actually occurred. Future dates are not allowed.</p>
-                </div>
+                <p class="field-help">The claim date set during approval is used as the payment date.</p>
                 <div class="field"><label for="receiptRef">Receipt or disbursement reference</label><input type="text" id="receiptRef" name="receipt_ref" value="<?= ui_e($reference) ?>" maxlength="100" placeholder="Enter the transfer or receipt reference" required></div>
                 <p class="field-help">Record only after a confirmed transfer or cash release. Verify older receipts before recording payment.</p>
             </div>

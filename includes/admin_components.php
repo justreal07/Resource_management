@@ -628,6 +628,18 @@ function ui_row_links(int $typeId, array $row, bool $withEdit, string $returnPag
     return $html;
 }
 
+/** Shared payment action for the record and Approved lists; callers first check that no payment is recorded. */
+function ui_record_payment_link(array $row): string
+{
+    if (($_SESSION['user']['role'] ?? '') !== 'admin' || ($row['status'] ?? '') !== 'Approved'
+        || !in_array((int)($row['assistance_type_id'] ?? 0), [1, 2], true) || (float)($row['amount'] ?? 0) <= 0) return '';
+    $id = (int)$row['id'];
+    $url = '../Main_dashboard/release_assistance?id=' . $id;
+    return '<a class="btn btn-primary btn-sm payment-record-link" href="' . ui_e($url) . '" data-page-modal="' . ui_e($url)
+        . '" data-modal-title="Record actual payment" data-modal-size="narrow">' . ui_icon('check-circle') . 'Record actual payment'
+        . '<span class="visually-hidden"> ' . ui_e(ui_person_name($row)) . ', Ref #' . $id . '</span></a>';
+}
+
 /** Staff side: the Update button (status and remarks). Staff use it where admins have Edit. Only shown to a role
  *  that may decide this program (OPD staff; never Medical & Burial staff, who only encode and view). */
 function ui_staff_update_link(int $typeId, array $row): string
@@ -1362,9 +1374,7 @@ function ui_record_cards(array $a): array
                 ? 'Recorded ' . ui_date($payment['released_on']) . ' · ' . ui_peso($payment['amount']) . ' · Ref ' . $payment['receipt_ref']
                 : 'No payment recorded — verify existing receipts before making a payment');
             if (!$payment && (float)($a['amount'] ?? 0) > 0 && ($_SESSION['user']['role'] ?? '') === 'admin') {
-                $app[] = '<div class="detail-row"><dt>Payment action</dt><dd><a class="btn btn-primary btn-sm" href="../Main_dashboard/release_assistance?id='
-                    . (int)$a['id'] . '" data-page-modal="../Main_dashboard/release_assistance?id=' . (int)$a['id']
-                    . '" data-modal-title="Record actual payment" data-modal-size="narrow">Record actual payment</a></dd></div>';
+                $app[] = '<div class="detail-row"><dt>Payment action</dt><dd>' . ui_record_payment_link($a) . '</dd></div>';
             }
         }
         // date_released is not shown: the forms used to fill it in with the filing date, so it never was the release date

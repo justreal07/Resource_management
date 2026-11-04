@@ -23,6 +23,21 @@ $insert = $pdo->prepare("INSERT INTO applicant(assistance_type_id,status,first_n
     VALUES(?,?,'Budget','Test',?, ?, ?, ?, 'San Jose','General Mariano Alvarez','Cavite')");
 $insert->execute([1,'Approved',5000,"$year-12-01 09:00:00","$year-12-02 09:00:00",date('Y-m-d', strtotime('+7 days'))]);
 $id = (int)$pdo->lastInsertId();
+$unpaid = $pdo->query('SELECT * FROM applicant WHERE id = ' . $id)->fetch(PDO::FETCH_ASSOC);
+check_payment(assistance_release_dates($pdo, [$id]) === [], 'An unpaid approval appeared paid in the list');
+foreach ([1, 2] as $type) {
+    $row = array_replace($unpaid, ['assistance_type_id' => $type]);
+    check_payment(strpos(ui_record_payment_link($row), 'data-page-modal="../Main_dashboard/release_assistance?id=' . $id . '"') !== false,
+        'Approved Medical/Burial payment action does not open the existing modal');
+}
+foreach ([['status' => 'Pending'], ['assistance_type_id' => 3], ['amount' => 0]] as $change) {
+    check_payment(ui_record_payment_link(array_replace($unpaid, $change)) === '', 'An ineligible application has a payment button');
+}
+foreach (['aid_staff', 'staff'] as $role) {
+    $_SESSION['user']['role'] = $role;
+    check_payment(ui_record_payment_link($unpaid) === '', 'Staff can see the payment action');
+}
+$_SESSION['user']['role'] = 'admin';
 $before = budget_status($pdo, $year, 1, true);
 check_payment($before['used'] === 5000.0 && $before['reserved'] === 5000.0 && $before['paid'] === 0.0, 'Approval did not reserve funds without payment');
 check_payment($before['remaining'] === 95000.0, 'Approval did not preserve the existing limit');
@@ -33,6 +48,7 @@ check_payment(!assistance_release_record($pdo,$id,$_SESSION['user'],"$year-12-01
 $limitBefore = budget_check_approval($pdo, $year, 1, 95001);
 check_payment($limitBefore['over'], 'Unpaid commitments stopped counting against new approvals');
 check_payment(assistance_release_record($pdo,$id,$_SESSION['user'],$today,'TEST-TRANSFER')['ok'], 'Actual payment failed');
+check_payment(assistance_release_dates($pdo, [$id, $id + 999]) === [$id => $today], 'Paid-list lookup lost the date or included an unrelated application');
 $after = budget_status($pdo, $year, 1, true);
 check_payment($after['paid'] === 5000.0 && $after['reserved'] === 0.0, 'Payment did not move reserved funds to paid');
 check_payment($after['remaining'] === $before['remaining'] && $after['used'] === $before['used'], 'Payment deducted the budget a second time');
@@ -51,6 +67,7 @@ foreach ([[2,'Pending'],[3,'Approved']] as [$type,$status]) {
 // An unavailable register must show unknown payment figures without changing approval protection.
 $pdo->exec('RENAME TABLE assistance_releases TO test_saved_releases');
 try {
+    check_payment(assistance_release_dates($pdo, [$id]) === null, 'An unreadable payment register appeared unpaid in the list');
     $unavailable = budget_status($pdo,$year,1,true);
     check_payment($unavailable['paid'] === null && $unavailable['reserved'] === null, 'Unavailable payments falsely shown as zero');
     check_payment($unavailable['remaining'] === 95000.0 && budget_check_approval($pdo,$year,1,95001)['over'], 'Payment outage changed approval limits');

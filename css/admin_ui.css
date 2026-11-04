@@ -1026,6 +1026,10 @@ a.row-link { font-weight: 600; text-underline-offset: 3px; }
 .row-actions { display: inline-grid; grid-template-columns: repeat(2, auto); gap: 6px; }
 .row-actions > :only-child { grid-column: 1 / -1; }
 .row-actions .btn { width: 100%; }
+.row-actions > .payment-record-link, .row-actions > .payment-list-status { grid-column: 1 / -1; }
+.row-actions > .payment-list-status { justify-self: end; }
+.program-payment-list .data-table th { white-space: normal; }
+.program-payment-list .payment-record-link { white-space: normal; text-align: center; }
 .cell-clip { max-width: 28ch; }
 .data-table time { white-space: nowrap; }
 
