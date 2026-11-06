@@ -5,21 +5,17 @@ require_once '../config.php';
 require_once '../includes/admin_layout.php';
 require_once '../includes/report_data.php';
 
-$f = report_filters($_GET);
+$f = report_filters($_GET, true);
 $reportTypes = report_types();
+$statusOptions = report_status_options($f['report']);
 $ranges = report_ranges();
 budget_ensure($pdo);   // the budget tables are made the first time (here, never mid-transaction)
 
-// Years for the Year picker: every year with an application, this year, and the one chosen
-$yearList = array_map('intval', $pdo->query("SELECT DISTINCT YEAR(created_at) FROM applicant WHERE created_at IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN));
-foreach ([(int)date('Y'), $f['year']] as $y) {
-    if (!in_array($y, $yearList, true)) $yearList[] = $y;
-}
-rsort($yearList);
+$yearList = report_year_options($pdo, $f['year']);
 [$monthsShort, $monthsLong] = ui_month_labels();
 $quarters = [1 => 'Q1: Jan – Mar', 2 => 'Q2: Apr – Jun', 3 => 'Q3: Jul – Sep', 4 => 'Q4: Oct – Dec'];
 // Approved applications are counted by the date they were approved (no choice); the Disapproved and Feedback tabs do not use it
-$usesBasis = in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true);
+$usesBasis = $statusOptions && $f['status'] !== 'pending';
 // A field of the filter bar is shown for some periods only (js/admin_reports.js keeps this in step when the Period changes)
 $hiddenUnless = function (string $forRanges) use ($f): string {
     return in_array($f['range'], explode(' ', $forRanges), true) ? '' : ' hidden';
@@ -37,6 +33,16 @@ echo ui_page_head('Reports', 'Totals and lists to open in Excel, or an official 
 ?>
 <form class="panel report-filters" method="GET" action="reports" data-busy id="reportFilters">
     <input type="hidden" name="report" value="<?= ui_e($f['report']) ?>">
+    <?php if ($statusOptions): ?>
+        <div class="field">
+            <label for="rStatus">Application status</label>
+            <select id="rStatus" name="status">
+                <?php foreach ($statusOptions as $key => $label): ?>
+                    <option value="<?= ui_e($key) ?>"<?= $f['status'] === $key ? ' selected' : '' ?>><?= ui_e($label) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+    <?php endif; ?>
     <div class="field">
         <label for="rRange">Period</label>
         <select id="rRange" name="range">

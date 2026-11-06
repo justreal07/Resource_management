@@ -109,6 +109,7 @@ function program_columns(int $typeId, string $page): array
     $deceased = ['label' => 'Deceased', 'type' => 'text', 'key' => 'petitioner_name'];   // Burial: petitioner_name is the deceased
     $status = ['label' => 'Status', 'type' => 'html', 'render' => 'ui_status_cell'];   // the badge, plus "Edited" when the applicant changed it while waiting
     $filed = ['label' => 'Date filed', 'type' => 'datetime', 'key' => 'created_at'];
+    $approved = ['label' => 'Date approved', 'type' => 'datetime', 'value' => function ($r) { return $r['approved_at'] ?? $r['created_at']; }];
     $source = ['label' => 'Source', 'type' => 'html', 'render' => 'ui_source_cell'];   // Online, or Walk-in and who encoded it
 
     if ($page === 'all') {
@@ -140,10 +141,10 @@ function program_columns(int $typeId, string $page): array
     }
     // approved: Medical and Burial show approved amounts; OPD (a vehicle schedule) nothing
     return array_values(array_filter($typeId === 3
-        ? [$person, $filed, $address, $contact]
+        ? [$person, $approved, $address, $contact]
         : [$person, $typeId === 2 ? $deceased : null,
            ['label' => 'Approved amount', 'type' => 'amount', 'key' => 'amount', 'trim_zero_decimals' => true],
-           ['label' => 'Date approved', 'type' => 'datetime', 'value' => function ($r) { return $r['approved_at'] ?? $r['created_at']; }],
+           $approved,
            $address, $contact]));
 }
 
@@ -163,11 +164,34 @@ function program_list_controls(int $typeId, string $page, array $result): string
         }
         $html .= '</select></div>';
     }
+    if ($page === 'approved') {
+        $html .= '<div class="field"><label for="programPeriod">Approval date</label><select name="period" id="programPeriod" aria-controls="programDateRange">';
+        foreach (['all' => 'All dates', 'month' => 'This month', 'year' => 'This year', 'custom' => 'Custom range'] as $value => $label) {
+            $html .= '<option value="' . $value . '"' . ($f['period'] === $value ? ' selected' : '') . '>' . $label . '</option>';
+        }
+        $html .= '</select></div><div class="program-date-range" id="programDateRange">';
+        foreach (['from' => 'From', 'to' => 'To'] as $key => $label) {
+            $html .= '<div class="field"><label for="programDate' . $key . '">' . $label . '</label>'
+                . '<input type="date" id="programDate' . $key . '" name="' . $key . '" value="' . ui_e($f[$key]) . '" aria-describedby="programDateHelp"></div>';
+        }
+        $html .= '</div>';
+        if ($typeId === 1 || $typeId === 2) {
+            $html .= '<div class="field"><label for="programPayment">Payment status</label><select name="payment" id="programPayment">';
+            foreach (['all' => 'All payments', 'awaiting' => 'Awaiting payment', 'recorded' => 'Payment recorded'] as $value => $label) {
+                $html .= '<option value="' . $value . '"' . ($f['payment'] === $value ? ' selected' : '') . '>' . $label . '</option>';
+            }
+            $html .= '</select></div>';
+        }
+    }
     $html .= '<div class="field"><label for="programPerPage">Per page</label><select name="per" id="programPerPage">';
     foreach ([10, 25, 50] as $per) $html .= '<option value="' . $per . '"' . ($f['per'] === $per ? ' selected' : '') . '>' . $per . '</option>';
-    $html .= '</select></div><button type="submit" class="btn btn-secondary btn-sm">Search</button>';
-    if ($f['name'] !== '' || $f['q'] !== '' || $f['source'] !== '') {
+    $html .= '</select></div><button type="submit" class="btn btn-secondary btn-sm">' . ($page === 'approved' ? 'Apply filters' : 'Search') . '</button>';
+    if (program_list_has_filters($f)) {
         $html .= '<a class="btn btn-link btn-sm" href="' . ui_e(program_list_url($path, ['per' => $f['per']])) . '">Clear filters</a>';
+    }
+    if ($page === 'approved') {
+        $html .= '<p class="program-filter-help" id="programDateHelp">Filters use the approval date. Older records without one use the date filed. From and To apply to Custom range.</p>';
+        if ($f['error'] !== '') $html .= '<p class="field-error program-filter-help" role="alert">' . ui_e($f['error']) . '</p>';
     }
     return $html . '</form>';
 }
@@ -268,7 +292,7 @@ function program_list_page(int $typeId, string $page): void
 
     $label = $page === 'all' ? $t['all_label'] : $head[0];
     $options = ['empty' => $t[$page . '_empty'], 'search' => false];
-    if (!$rows && ($result['filters']['q'] !== '' || $result['filters']['name'] !== '' || $result['filters']['source'] !== '')) {
+    if (!$rows && program_list_has_filters($result['filters'])) {
         $options['empty'] = ['No applications match these filters', 'Change the search or clear the filters to see other applications.'];
     }
     if ($page === 'pending' || $page === 'approved') {
@@ -306,9 +330,12 @@ function program_list_page(int $typeId, string $page): void
             return $html . ui_record_payment_link($row);
         };
     }
+    $columns = program_columns($typeId, $page);
+    $hideAmounts = (decision_user()['role'] ?? '') === 'aid_staff';
+    if ($hideAmounts) $columns = array_values(array_filter($columns, function ($column) { return ($column['type'] ?? '') !== 'amount'; }));
     echo '<section class="panel' . ($showPaymentActions ? ' program-payment-list' : '') . '" aria-label="' . ui_e($label) . '">' . program_list_controls($typeId, $page, $result)
-        . ui_table($rows, program_columns($typeId, $page), $options);
-    if ($page === 'approved' && $t['gives_money'] && $rows) {
+        . ui_table($rows, $columns, $options);
+    if (!$hideAmounts && $page === 'approved' && $t['gives_money'] && $rows) {
         $totalGiven = round($result['amount_total'], 2);
         echo '<p class="panel-note"><strong>Total approved amount (all matching applications):</strong> ' . ui_e(ui_peso($totalGiven, $totalGiven === floor($totalGiven) ? 0 : 2)) . '</p>';
     }

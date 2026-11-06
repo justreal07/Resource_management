@@ -9,7 +9,7 @@ require_once __DIR__ . '/apply_layout.php';   // e() and other small helpers
 /**
  * Prints the page head and the dashboard frame: sidebar (menu), top bar
  * (notifications + account menu) and the page header.
- * The look follows the Tabler dashboard template (tabler.io, MIT) - styles in css/dashboard.css.
+ * Shares the login page's colors and rounded surfaces - styles in css/dashboard.css.
  *
  * @param string $active  'account' | 'documents' | 'notifications' | 'feedback'
  * @param array  $hero    page header: ['eyebrow', 'title', 'subtitle', 'icon', 'actions' => raw HTML]
@@ -50,7 +50,9 @@ function account_page_start(array $ctx, string $title, string $active, array $he
     <link rel="stylesheet" href="<?= e(portal_asset('../css/dashboard.css')) ?>">
     <?php portal_head(); ?>
 </head>
-<body class="acc-body db-body has-bottom-nav"<?= $tour !== '' ? ' data-tour="' . e($tour) . '"' : '' ?>>
+<body class="acc-body db-body has-bottom-nav" data-account-page="<?= e($active) ?>">
+
+<a class="db-skip" href="#accountMain">Skip to content</a>
 
 <div class="db-shell">
 
@@ -76,14 +78,6 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                     <?php if ($label === 'Notifications'): ?><span class="db-menu-badge" data-unread-badge<?= $unread ? '' : ' hidden' ?>><?= $unread > 9 ? '9+' : $unread ?></span><?php endif; ?>
                 </a>
             <?php endforeach; ?>
-            <?php if ($group === 'Overview'): ?>
-                <span class="db-menu-label">Apply for assistance</span>
-                <?php foreach ($ASSISTANCE_PROGRAMS as $p): ?>
-                    <a href="<?= e(str_replace(' ', '%20', $p['form_page'])) ?>" class="db-menu-link">
-                        <i class="fas <?= e($p['icon']) ?> db-tone-<?= e($p['tone']) ?>" aria-hidden="true"></i><span><?= e($p['name']) ?></span>
-                    </a>
-                <?php endforeach; ?>
-            <?php endif; ?>
         <?php endforeach; ?>
     </nav>
 
@@ -109,6 +103,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
             </span>
         </a>
 
+        <span class="db-topbar-label">Municipal Assistance Portal</span>
         <nav class="acc-nav" aria-label="Account">
 
             <!-- Notifications -->
@@ -155,7 +150,6 @@ function account_page_start(array $ctx, string $title, string $active, array $he
                     <?php /* Only the person's own things here; the other pages are in the side menu (and the bottom bar on a phone) */ ?>
                     <a href="my_account#applications"><i class="fas fa-list"></i> My Applications</a>
                     <a href="my_account#profile"><i class="fas fa-user-gear"></i> Account settings</a>
-                    <a href="#tour" role="button" data-tour-start><i class="fas fa-route"></i> Take a tour of this page</a>
                     <a href="applicant_logout" class="acc-logout"><i class="fas fa-sign-out-alt"></i> Log out</a>
                 </div>
             </div>
@@ -177,7 +171,7 @@ function account_page_start(array $ctx, string $title, string $active, array $he
     </div>
 </div>
 
-<main class="ap-main db-main">
+<main class="ap-main db-main" id="accountMain" tabindex="-1">
     <div class="ap-container">
         <?php foreach (take_flashes() as $f): ?>
             <?php /* data-toast: js/portal-ui.js shows a success message as a toast; errors stay on the page */ ?>

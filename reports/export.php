@@ -34,8 +34,8 @@ admin_tools_ensure($pdo);      // the activity log
 decision_claim_ensure($pdo);   // the approval details columns
 budget_ensure($pdo);
 
-$f = report_filters($_GET);
 $hideAmounts = $user['role'] === 'aid_staff';
+$f = report_filters($_GET, !$hideAmounts);
 if ($hideAmounts && !in_array($f['report'], ['medical', 'burial'], true)) {
     http_response_code(403);
     exit('Medical & Burial staff can only download the Medical and Burial reports.');
@@ -69,7 +69,7 @@ function export_cell($value, bool $numeric, bool $bold = false)
 
 $office = 'LGU General Mariano Alvarez, Cavite';
 $preparedBy = trim((string)($_SESSION['user']['name'] ?? '')) !== '' ? $_SESSION['user']['name'] : (string)($_SESSION['user']['username'] ?? 'Admin');
-$usesBasis = in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true);
+$usesBasis = report_status_options($f['report']) && $f['status'] !== 'pending';
 
 // Summary sheet: what the report is, then the number cards
 $summary = [

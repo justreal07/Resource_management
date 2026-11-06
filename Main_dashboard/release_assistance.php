@@ -6,7 +6,7 @@ require_once '../includes/assistance_release.php';
 $user = decision_user();
 if ($user === null || $user['role'] !== 'admin') { http_response_code(403); exit('Only an administrator can record a payment.'); }
 $id = (int)($_POST['id'] ?? $_GET['id'] ?? 0);
-$stmt = $pdo->prepare('SELECT id, assistance_type_id, status, amount, approved_at, created_at, claim_date, first_name, last_name FROM applicant WHERE id = ?');
+$stmt = $pdo->prepare('SELECT id, assistance_type_id, status, amount, approved_at, created_at, updated_at, claim_date, first_name, last_name FROM applicant WHERE id = ?');
 $stmt->execute([$id]);
 $app = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$app || !in_array((int)$app['assistance_type_id'], [1, 2], true)) { http_response_code(404); exit('Application not found.'); }
@@ -24,7 +24,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $result = ['ok' => false, 'message' => 'Payment can be recorded on or after ' . ui_date($scheduled, 'F j, Y') . ', once the release is confirmed.'];
     } else {
         // The approval already sets the claim date; ignore any separate date posted by the browser.
-        $result = assistance_release_record($pdo, $id, $user, $scheduled, (string)($_POST['receipt_ref'] ?? ''));
+        $result = assistance_release_record($pdo, $id, $user, $scheduled, (string)($_POST['receipt_ref'] ?? ''),
+            is_string($_POST['expected_version'] ?? null) ? $_POST['expected_version'] : '');
     }
     $_SESSION[$result['ok'] ? 'success_message' : 'error_message'] = $result['message'];
     if (!$result['ok']) {
@@ -59,9 +60,11 @@ admin_layout_start(['title'=>'Record payment', 'section'=>ui_types()[(int)$app['
     <?php else: ?>
         <form method="post" action="<?= ui_e($self) ?>" data-busy>
             <?= decision_csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">
+            <input type="hidden" name="expected_version" value="<?= ui_e((string)$app['updated_at']) ?>">
             <div class="payment-content">
                 <div class="payment-schedule"><?= ui_icon('clock') ?><div><strong>Scheduled claim date</strong><p><?= $scheduled !== '' ? ui_e(ui_date($scheduled, 'F j, Y')) : 'No date was scheduled' ?></p></div></div>
                 <p class="field-help">The claim date set during approval is used as the payment date.</p>
+                <?php if ($scheduled === ''): ?><p class="field-help">Use <a target="_top" href="../Main_dashboard/edit_applicant?id=<?= $id ?>">Edit record</a> to enter the missing claim date from the approval record first.</p><?php endif; ?>
                 <div class="field"><label for="receiptRef">Receipt or disbursement reference</label><input type="text" id="receiptRef" name="receipt_ref" value="<?= ui_e($reference) ?>" maxlength="100" placeholder="Enter the transfer or receipt reference" required></div>
                 <p class="field-help">Record only after a confirmed transfer or cash release. Verify older receipts before recording payment.</p>
             </div>

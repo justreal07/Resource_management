@@ -1070,12 +1070,19 @@ td .field-error { margin-top: 4px; }
     display: flex;
     flex-wrap: wrap;
     align-items: end;
+    justify-content: flex-start;
     gap: 12px;
 }
 .program-list-filters .field { margin: 0; }
 .program-list-filters .field-search { flex: 1 1 240px; }
 .program-list-filters .field-search input { width: 100%; }
 .program-list-filters select { width: auto; }
+.program-date-range { display: flex; flex-wrap: wrap; gap: 12px; min-width: 0; }
+.program-date-range[hidden] { display: none; }
+.program-date-range .field { flex: 1 1 140px; min-width: 0; }
+.program-date-range input { width: 100%; min-width: 0; }
+.program-list-filters .program-filter-help { flex-basis: 100%; margin: 0; font-size: var(--fs-sm); color: var(--c-text-muted); }
+.program-list-filters .field-error { color: var(--c-danger-text); }
 .pagination .page-list { align-items: center; }
 .pagination .page-of { padding: 8px; }
 .program-pagination .page-list { display: flex; }

@@ -44,6 +44,7 @@ function auth_page_start(string $title): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= auth_e($title) ?> · LGU Assistance Records</title>
+    <link rel="icon" type="image/png" href="../asset/community-affairs-favicon.png">
     <link rel="stylesheet" href="../css/admin_ui.css?v=<?= (int)@filemtime(__DIR__ . '/../css/admin_ui.css') ?>">
     <link rel="stylesheet" href="../css/admin_login.css?v=<?= (int)@filemtime(__DIR__ . '/../css/admin_login.css') ?>">
 </head>

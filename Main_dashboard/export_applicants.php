@@ -2,7 +2,7 @@
 /**
  * Download one program's list as a CSV file (opens in Excel).
  *   export_applicants.php?type=1|2|3&status=all|Pending|Approved|Disapproved|Withdrawn
- * The "Export CSV" button on every list page (ui_type_tabs) links here.
+ * Kept for existing direct links; assistance pages direct users to Reports for downloads.
  *
  * Who: an admin, any program; OPD staff, OPD only; Medical & Burial staff, Medical/Burial only, with no amount
  * column (same rule as the list pages).
@@ -114,7 +114,12 @@ if ($user['role'] === 'aid_staff') {
 
 try {
     $listPage = ['all' => 'all', 'Pending' => 'pending', 'Approved' => 'approved', 'Disapproved' => 'disapproved', 'Withdrawn' => 'withdrawn'][$status];
-    [$where, $params] = program_list_where($typeId, $listPage, program_list_filters($_GET, $listPage));
+    $filters = program_list_filters($_GET, $listPage, $typeId);
+    if ($filters['payment'] !== 'all') {
+        require_once '../includes/assistance_release.php';
+        if (!assistance_release_ensure($pdo)) throw new PDOException('The payment register is unavailable.');
+    }
+    [$where, $params] = program_list_where($typeId, $listPage, $filters);
     $stmt = $pdo->prepare("SELECT a.* FROM applicant a WHERE $where ORDER BY a.created_at DESC, a.id DESC");
     $stmt->execute($params);
 } catch (PDOException $e) {

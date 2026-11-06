@@ -50,7 +50,7 @@ function assistance_release_dates(PDO $pdo, array $applicationIds): ?array
 }
 
 /** Lock the application so a simultaneous amount correction cannot change the payment being recorded. */
-function assistance_release_record(PDO $pdo, int $applicationId, ?array $user, string $date, string $receipt): array
+function assistance_release_record(PDO $pdo, int $applicationId, ?array $user, string $date, string $receipt, ?string $expectedVersion = null): array
 {
     if ($user === null || $user['role'] !== 'admin') return ['ok' => false, 'message' => 'Only an administrator can record a payment.'];
     $date = trim($date);
@@ -65,9 +65,13 @@ function assistance_release_record(PDO $pdo, int $applicationId, ?array $user, s
     if (!assistance_release_ensure($pdo)) return ['ok' => false, 'message' => 'The payment register is unavailable. Nothing was recorded.'];
     try {
         $pdo->beginTransaction();
-        $stmt = $pdo->prepare('SELECT assistance_type_id, status, amount, approved_at, created_at FROM applicant WHERE id = ? FOR UPDATE');
+        $stmt = $pdo->prepare('SELECT assistance_type_id, status, amount, approved_at, created_at, updated_at FROM applicant WHERE id = ? FOR UPDATE');
         $stmt->execute([$applicationId]);
         $a = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($expectedVersion !== null && (!$a || $expectedVersion === '' || $expectedVersion !== (string)$a['updated_at'])) {
+            $pdo->rollBack();
+            return ['ok' => false, 'message' => 'This application changed since you opened the payment form. Review the updated details before recording payment.'];
+        }
         if (!$a || !in_array((int)$a['assistance_type_id'], [1, 2], true) || $a['status'] !== 'Approved' || (float)$a['amount'] <= 0) {
             $pdo->rollBack();
             return ['ok' => false, 'message' => 'Only an approved Medical or Burial application with an amount can be marked paid.'];

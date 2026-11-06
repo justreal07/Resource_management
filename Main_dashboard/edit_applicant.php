@@ -118,6 +118,13 @@ $sections = [
          'Where and when the check-up is, and what the patient needs for the trip.'],
     ],
 ][$formKey];
+// Older approvals may predate claim scheduling. Repair only a missing date through the existing Edit flow.
+$repairClaimDate = $editRole === 'admin' && $status === 'Approved' && in_array($typeId, [1, 2], true)
+    && empty($applicant['claim_date']) && assistance_release_for($pdo, $id) === null;
+if ($repairClaimDate) {
+    $defs['claim_date'] = ['Claim date from the approval record', 'date', false];
+    $sections[] = ['Missing claim date', 'calendar', ['claim_date'], 'For an older approval, enter the claim date shown on the original approval record. This does not record a payment.'];
+}
 // Birthdate / date of death are columns of database/migrations/migration_person_rules.sql: left out until it is run
 foreach ($sections as $i => $s) {
     $sections[$i][2] = array_values(array_filter($s[2], function ($f) use ($applicant) { return $f === 'applying_for' || array_key_exists($f, $applicant); }));
@@ -226,6 +233,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($repairClaimDate && ($values['claim_date'] ?? '') !== '') {
+        $claimDate = $values['claim_date'];
+        if (!is_ymd($claimDate) || $claimDate < substr((string)($applicant['approved_at'] ?? $applicant['created_at']), 0, 10) || $claimDate > $today) {
+            $errors['claim_date'] = 'Use the date from the approval record, on or after approval and no later than today.';
+        }
+    }
     if ($showAmount) {
         // Corrections use whole pesos. An untouched older amount keeps its exact value.
         $values['amount'] = trim(str_replace([',', '₱', ' '], '', is_string($_POST['amount'] ?? null) ? $_POST['amount'] : ''));
@@ -334,12 +347,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     || ($editRole === 'aid_staff' && $latest['status'] !== 'Pending')) {
                     $pdo->rollBack();
                     $errors['form'] = 'This record changed since you opened the form. Reload it and review the latest details before saving.';
-                } elseif ($budgetCorrection !== null) {
+                } elseif ($budgetCorrection !== null || in_array('claim_date', $changed, true)) {
                     $paid = $pdo->prepare('SELECT id FROM assistance_releases WHERE application_id = ?');
                     $paid->execute([$id]);
                     if ($paid->fetchColumn() !== false) {
                         $pdo->rollBack();
-                        $errors['amount'] = 'Payment was already recorded. The approved amount can no longer be changed.';
+                        $errors['form'] = 'Payment was already recorded. The approved amount and claim date can no longer be changed.';
                     }
                 }
             }

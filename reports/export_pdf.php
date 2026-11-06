@@ -33,8 +33,8 @@ decision_claim_ensure($pdo);   // the approval details columns
 budget_ensure($pdo);
 report_pdf_ensure($pdo);       // the table of made PDFs (DDL: before anything that could open a transaction)
 
-$f = report_filters($_GET);
 $hideAmounts = $user['role'] === 'aid_staff';
+$f = report_filters($_GET, !$hideAmounts);
 if ($hideAmounts && !in_array($f['report'], ['medical', 'burial'], true)) {
     http_response_code(403);
     exit('Medical & Burial staff can only download the Medical and Burial reports.');
@@ -50,7 +50,7 @@ if (!empty($model['error'])) {
 }
 
 $preparedBy = trim((string)($_SESSION['user']['name'] ?? '')) !== '' ? $_SESSION['user']['name'] : (string)($_SESSION['user']['username'] ?? 'Admin');
-$usesBasis = in_array($f['report'], ['overview', 'medical', 'burial', 'opd'], true);
+$usesBasis = report_status_options($f['report']) && $f['status'] !== 'pending';
 
 // The reference number comes from the row's own number, so the row is made first and finished when the file exists
 $pdo->prepare('INSERT INTO report_pdfs (report, title, period_label, generated_by, generated_name, generated_role, generated_at)

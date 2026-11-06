@@ -227,7 +227,6 @@ foreach ($ASSISTANCE_PROGRAMS as $key => $p) {
 
 $profile = $_SESSION['profile_old'] ?? $user;   // show what they typed if saving failed
 unset($_SESSION['profile_old']);
-$completion = profile_completion($user);
 $avatar = avatar_url($user);
 $has_avatar = !empty($user['avatar']);
 
@@ -236,39 +235,16 @@ if ($initial_filter === 'Not_approved') $initial_filter = 'Disapproved';
 if (!in_array($initial_filter, ['All', 'Pending', 'Approved', 'Disapproved', 'Withdrawn'], true)) $initial_filter = 'All';
 
 account_page_start($ctx, 'My Account', 'account', [
-    'title'    => 'Hello, ' . $user['firstname'] . '!',
+    'eyebrow'  => 'Your assistance portal',
+    'title'    => 'Welcome back, ' . $user['firstname'] . '!',
+    'subtitle' => 'Apply for assistance and keep track of your requests.',
     'icon'     => 'fa-user-circle',
-    'actions'  => '<a href="landingpage#programs" class="ap-btn acc-btn-gold"><i class="fas fa-plus"></i> New Application</a>',
-], 'account');
+]);
 ?>
 
-<!-- PROFILE SUMMARY -->
-<div class="ap-card acc-summary">
-    <div class="acc-summary-user">
-        <img src="<?= e($avatar) ?>" alt="Profile photo" class="acc-avatar-lg">
-        <div>
-            <h2><?= e($user['firstname'] . ' ' . $user['lastname']) ?></h2>
-            <p class="ap-muted">
-                @<?= e($user['username']) ?>
-                <?php if ($google): ?><span class="acc-chip"><i class="fab fa-google"></i> Google account</span><?php endif; ?>
-            </p>
-            <p class="ap-muted acc-small"><i class="far fa-calendar"></i> Member since <?= e(date('F Y', strtotime($user['created_at']))) ?></p>
-        </div>
-    </div>
-    <div class="acc-completion">
-        <div class="acc-completion-top"><span>Profile completeness</span><strong><?= $completion ?>%</strong></div>
-        <div class="ap-progress-bar"><span style="width: <?= $completion ?>%"></span></div>
-        <?php if ($completion < 100): ?>
-            <a href="#profile" class="ap-link-btn" data-tab-link="profile"><i class="fas fa-user-edit"></i> Complete your profile</a>
-        <?php else: ?>
-            <p class="acc-small acc-ok"><i class="fas fa-check-circle"></i> Your profile is complete.</p>
-        <?php endif; ?>
-    </div>
-</div>
-
-<!-- TABS -->
-<nav class="acc-tabs" role="tablist" aria-label="Account sections">
-    <a href="#applications" class="acc-tab" role="tab" data-tab="applications"><i class="fas fa-list"></i> Applications <span class="acc-tab-count"><?= $counts['all'] ?></span></a>
+<!-- Settings stay separate from the dashboard; existing section links still work. -->
+<nav class="acc-tabs" role="tablist" aria-label="Account settings" id="accountSettingsTabs" hidden>
+    <a href="#applications" class="acc-tab" role="tab" data-tab="applications" hidden>Applications</a>
     <a href="#profile" class="acc-tab" role="tab" data-tab="profile"><i class="fas fa-user-edit"></i> Profile</a>
     <a href="#security" class="acc-tab" role="tab" data-tab="security"><i class="fas fa-shield-alt"></i> Security</a>
     <a href="#preferences" class="acc-tab" role="tab" data-tab="preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
@@ -277,7 +253,7 @@ account_page_start($ctx, 'My Account', 'account', [
 <!-- ============ APPLICATIONS ============ -->
 <section class="acc-panel" data-panel="applications" role="tabpanel">
     <?php /* The four count tiles are gone: the status chips above the list (All / Pending / Approved / Declined, with the same counts) do the same filtering */ ?>
-    <h3 class="acc-h3">Apply for assistance</h3>
+    <div class="acc-section-heading"><h2>Apply for assistance</h2><p>Choose the service you need.</p></div>
     <div class="acc-programs">
         <?php foreach ($program_status as $p):
             $ok = $p['eligibility']['eligible'];
@@ -286,6 +262,7 @@ account_page_start($ctx, 'My Account', 'account', [
             <span class="acc-program-icon tone-<?= $p['tone'] ?>"><i class="fas <?= $p['icon'] ?>"></i></span>
             <div class="acc-program-body">
                 <h4><?= e($p['name']) ?></h4>
+                <p class="acc-program-description"><?= e([1 => 'Support for medical needs.', 2 => 'Support for funeral expenses.', 3 => 'Transport for your check-up.'][$p['type_id']]) ?></p>
                 <?php /* Only a status that matters: when one can apply again, or that one is waiting. (The long "how often" rule is on the form itself.) */ ?>
                 <?php if (!$ok && $next): ?>
                     <p class="acc-state wait"><i class="fas fa-calendar-alt"></i> Available on <?= e(date('M d, Y', strtotime($next))) ?></p>
@@ -306,17 +283,13 @@ account_page_start($ctx, 'My Account', 'account', [
             <div class="acc-toolbar">
                 <label class="acc-search">
                     <i class="fas fa-search"></i>
-                    <input type="search" id="appSearch" placeholder="Search by name, program or #number" aria-label="Search applications">
+                    <input type="search" id="appSearch" placeholder="Search name or reference" aria-label="Search applications">
                 </label>
                 <select id="appType" aria-label="Filter by program">
                     <option value="">All programs</option>
                     <?php foreach ($ASSISTANCE_PROGRAMS as $p): ?>
                         <option value="<?= $p['type_id'] ?>"><?= e($p['name']) ?></option>
                     <?php endforeach; ?>
-                </select>
-                <select id="appSort" aria-label="Sort">
-                    <option value="newest">Newest first</option>
-                    <option value="oldest">Oldest first</option>
                 </select>
             </div>
         </div>

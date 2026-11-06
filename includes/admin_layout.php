@@ -328,6 +328,7 @@ function admin_layout_start(array $page): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= ui_e($title) ?> · LGU Assistance Records</title>
+    <link rel="icon" type="image/png" href="../asset/community-affairs-favicon.png">
     <?php /* ?v= is the file's last-change time, so the browser loads the new look instead of its old copy */ ?>
     <link rel="stylesheet" href="../css/admin_ui.css?v=<?= (int)@filemtime(__DIR__ . '/../css/admin_ui.css') ?>">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
@@ -520,7 +521,7 @@ function admin_layout_end(array $opts = []): void
         ?>
 </div>
 <script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
-<script src="../js/admin_ui.js"></script>
+<script src="../js/admin_ui.js?v=<?= (int)@filemtime(__DIR__ . '/../js/admin_ui.js') ?>"></script>
 <script src="../js/admin_avatar.js"></script>
 <script src="../js/admin_embed.js"></script>
 <?php foreach ($opts['scripts'] ?? [] as $src): ?>
@@ -627,7 +628,7 @@ function admin_layout_end(array $opts = []): void
 <?php endif; ?>
 
 <script type="application/json" id="adminConfig"><?= json_encode($config, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
-<script src="../js/admin_ui.js"></script>
+<script src="../js/admin_ui.js?v=<?= (int)@filemtime(__DIR__ . '/../js/admin_ui.js') ?>"></script>
 <script src="../js/admin_theme.js"></script>
 <script src="../js/admin_avatar.js"></script>
 <script src="../js/admin_live.js"></script>

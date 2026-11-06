@@ -60,15 +60,18 @@ account_page_start($ctx, 'My Documents', 'documents', [
                 <strong><?= e($p['name'] ?? 'Application') ?> · #<?= (int)$app_id ?></strong>
                 <small class="ap-muted">Submitted <?= e(date('M d, Y', strtotime($i['applied_at']))) ?> · <?= count($g['docs']) ?> file<?= count($g['docs']) === 1 ? '' : 's' ?></small>
             </div>
-            <span class="acc-status s-<?= strtolower($i['status']) ?>"><?= e($i['status']) ?></span>
+            <span class="acc-status s-<?= strtolower($i['status']) ?>"><?= e($i['status'] === 'Disapproved' ? 'Declined' : $i['status']) ?></span>
             <a href="view_application?id=<?= (int)$app_id ?>" class="ap-link-btn">View application <i class="fas fa-chevron-right"></i></a>
         </header>
         <div class="acc-gallery">
             <?php foreach ($g['docs'] as $d):
                 $url = document_url((int)$d['id'], false, '');   // opened through document.php (checks it is yours)
-                $is_img = preg_match('/\.(jpe?g|png|webp|gif)$/i', $d['file_path']); ?>
+                $is_img = preg_match('/\.(jpe?g|png|webp|gif)$/i', $d['file_path']);
+                $available = document_file_path($d) !== null; ?>
             <figure class="acc-doc" data-doc data-name="<?= e(strtolower(document_label($d))) ?>">
-                <?php if ($is_img): ?>
+                <?php if (!$available): ?>
+                    <div class="acc-shot acc-doc-unavailable"><i class="far fa-file-image" aria-hidden="true"></i><span>File unavailable</span></div>
+                <?php elseif ($is_img): ?>
                     <a href="<?= e($url) ?>" class="acc-shot" data-lightbox data-caption="<?= e(document_label($d)) ?>">
                         <img src="<?= e($url) ?>" alt="<?= e(document_label($d)) ?>" loading="lazy">
                     </a>
@@ -78,7 +81,11 @@ account_page_start($ctx, 'My Documents', 'documents', [
                 <figcaption>
                     <strong><?= e(document_label($d)) ?></strong>
                     <small class="ap-muted"><?= e(date('M d, Y', strtotime($d['uploaded_at']))) ?></small>
-                    <a href="<?= e(document_url((int)$d['id'], true, '')) ?>" download class="ap-link-btn acc-small"><i class="fas fa-download"></i> Download</a>
+                    <?php if ($available): ?>
+                        <a href="<?= e(document_url((int)$d['id'], true, '')) ?>" download class="ap-link-btn acc-small"><i class="fas fa-download"></i> Download</a>
+                    <?php else: ?>
+                        <small class="ap-muted">Open the application for details.</small>
+                    <?php endif; ?>
                 </figcaption>
             </figure>
             <?php endforeach; ?>

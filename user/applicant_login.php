@@ -129,6 +129,6 @@ auth_page_start('Log in', 'login', function () { ?>
         <button type="submit" class="btn btn-primary btn-block">Log in</button>
     </form>
 
-    <p class="auth-switch">Don't have an account? <a href="applicant_register">Sign up for free</a></p>
+    <p class="auth-switch">Don't have an account? <a href="applicant_register">Sign up</a></p>
 <?php
 auth_page_end();

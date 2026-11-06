@@ -17,11 +17,7 @@ $f = report_filters($getReport);
 $reportTypes = array_intersect_key(report_types(), ['medical' => true, 'burial' => true]);
 $ranges = report_ranges();
 
-$yearList = array_map('intval', $pdo->query("SELECT DISTINCT YEAR(created_at) FROM applicant WHERE created_at IS NOT NULL")->fetchAll(PDO::FETCH_COLUMN));
-foreach ([(int)date('Y'), $f['year']] as $y) {
-    if (!in_array($y, $yearList, true)) $yearList[] = $y;
-}
-rsort($yearList);
+$yearList = report_year_options($pdo, $f['year'], false);
 [$monthsShort, $monthsLong] = ui_month_labels();
 $quarters = [1 => 'Q1: Jan – Mar', 2 => 'Q2: Apr – Jun', 3 => 'Q3: Jul – Sep', 4 => 'Q4: Oct – Dec'];
 $hiddenUnless = function (string $forRanges) use ($f): string {

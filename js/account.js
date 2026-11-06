@@ -84,6 +84,11 @@
     if (tabs.length) {
         const names = tabs.map(function (t) { return t.dataset.tab; });
         const aliases = { settings: 'profile', password: 'security' };
+        const settingsTabs = $('#accountSettingsTabs');
+        const pageTitle = $('.db-title');
+        const pageSubtitle = $('.db-subtitle');
+        const originalTitle = pageTitle ? pageTitle.textContent : '';
+        const originalSubtitle = pageSubtitle ? pageSubtitle.textContent : '';
 
         function showTab(name, focus) {
             name = aliases[name] || name;
@@ -92,7 +97,11 @@
                 const on = t.dataset.tab === name;
                 t.classList.toggle('is-active', on);
                 t.setAttribute('aria-selected', on);
+                t.tabIndex = on ? 0 : -1;
             });
+            if (settingsTabs) settingsTabs.hidden = name === 'applications';
+            if (pageTitle) pageTitle.textContent = name === 'applications' ? originalTitle : 'Account settings';
+            if (pageSubtitle) pageSubtitle.textContent = name === 'applications' ? originalSubtitle : 'Manage your personal details, password and preferences.';
             $$('[data-panel]').forEach(function (p) { p.hidden = p.dataset.panel !== name; });
             // Sidebar: highlight the menu item of the open section
             $$('[data-side-tab]').forEach(function (a) {
@@ -100,8 +109,22 @@
                 a.classList.toggle('is-active', on);
                 if (on) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
             });
-            if (focus) $('.acc-tabs').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            if (focus) $('.db-page-header').scrollIntoView({ behavior: UI && UI.reduceMotion ? 'auto' : 'smooth', block: 'start' });
         }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('keydown', function (event) {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                const visibleTabs = tabs.filter(function (item) { return !item.hidden; });
+                let index = visibleTabs.indexOf(tab);
+                if (event.key === 'Home') index = 0;
+                else if (event.key === 'End') index = visibleTabs.length - 1;
+                else index = (index + (event.key === 'ArrowRight' ? 1 : -1) + visibleTabs.length) % visibleTabs.length;
+                event.preventDefault();
+                visibleTabs[index].click();
+                visibleTabs[index].focus();
+            });
+        });
 
         function fromHash(focus) { showTab(location.hash.replace('#', ''), focus); }
 
@@ -124,7 +147,6 @@
         const items = $$('.acc-app', appList);
         const search = $('#appSearch');
         const typeSel = $('#appType');
-        const sortSel = $('#appSort');
         const noMatch = $('#appNoMatch');
         let status = card.dataset.initialFilter || 'All';
 
@@ -142,13 +164,8 @@
             noMatch.hidden = shown > 0;
             $$('[data-filter-status]').forEach(function (b) {
                 b.classList.toggle('is-active', b.dataset.filterStatus === status);
+                b.setAttribute('aria-pressed', b.dataset.filterStatus === status ? 'true' : 'false');
             });
-        }
-
-        function sort() {
-            const dir = sortSel.value === 'oldest' ? 1 : -1;
-            items.sort(function (a, b) { return dir * a.dataset.date.localeCompare(b.dataset.date); })
-                 .forEach(function (li) { appList.appendChild(li); });
         }
 
         $$('[data-filter-status]').forEach(function (b) {
@@ -160,7 +177,6 @@
         });
         search.addEventListener('input', apply);
         typeSel.addEventListener('change', apply);
-        sortSel.addEventListener('change', function () { sort(); apply(); });
         $('#appReset').addEventListener('click', function () {
             status = 'All'; search.value = ''; typeSel.value = ''; apply();
         });

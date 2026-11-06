@@ -46,6 +46,33 @@ function report_ranges(): array
     return ['year' => 'Full year', 'quarter' => 'One quarter', 'month' => 'One month', 'week' => 'One week', 'custom' => 'Choose dates'];
 }
 
+/** Include approval and payment years even when no applications were filed in those years. */
+function report_year_options(PDO $pdo, int $selectedYear, bool $includePayments = true): array
+{
+    $years = $pdo->query('SELECT YEAR(created_at) FROM applicant WHERE created_at IS NOT NULL
+        UNION SELECT YEAR(approved_at) FROM applicant WHERE approved_at IS NOT NULL')->fetchAll(PDO::FETCH_COLUMN);
+    if ($includePayments) {
+        try {
+            if (assistance_release_ensure($pdo)) {
+                $years = array_merge($years, $pdo->query('SELECT DISTINCT YEAR(released_on) FROM assistance_releases')->fetchAll(PDO::FETCH_COLUMN));
+            }
+        } catch (PDOException $e) {
+            // Keep application reports accessible; payment reports handle the unavailable register themselves.
+            error_log('report_year_options payments: ' . $e->getMessage());
+        }
+    }
+    $years = array_values(array_unique(array_merge(array_map('intval', $years), [(int)date('Y'), $selectedYear])));
+    rsort($years, SORT_NUMERIC);
+    return $years;
+}
+
+function report_status_options(string $report): array
+{
+    return in_array($report, ['overview', 'medical', 'burial', 'opd'], true)
+        ? ['all' => 'All (summary)', 'pending' => 'Pending only', 'approved' => 'Approved only']
+        : [];
+}
+
 /** Weeks of a year for the Week picker (Monday to Sunday, ISO numbers). A week belongs to its ISO year: week 1 can start in late December. */
 function report_week_options(int $year): array
 {
@@ -64,7 +91,7 @@ function report_week_options(int $year): array
  * The filters from the address, each one checked (only known values reach the queries) and the period worked out.
  * start / end are the first and last day (Y-m-d); from_dt / to_dt are the bounds for "col >= from_dt AND col < to_dt".
  */
-function report_filters(array $get): array
+function report_filters(array $get, bool $allowStatus = false): array
 {
     $text = function (string $key) use ($get): string {
         return isset($get[$key]) && is_string($get[$key]) ? trim($get[$key]) : '';
@@ -73,6 +100,7 @@ function report_filters(array $get): array
     $ranges = report_ranges();
 
     $report = array_key_exists($text('report'), $types) ? $text('report') : 'overview';
+    $status = $allowStatus && isset(report_status_options($report)[$text('status')]) ? $text('status') : 'all';
     $range = array_key_exists($text('range'), $ranges) ? $text('range') : 'year';
     $year = (int)ui_year($text('year'));
     $thisYear = (int)date('Y');
@@ -138,13 +166,13 @@ function report_filters(array $get): array
     $last = (clone $endExcl)->modify('-1 day');
 
     return [
-        'report' => $report, 'range' => $range,
+        'report' => $report, 'range' => $range, 'status' => $status,
         'year' => $year, 'quarter' => $quarter, 'month' => $month, 'week' => $week, 'from' => $from, 'to' => $to,
         'weekOptions' => $weekOptions,
         'start' => $start->format('Y-m-d'), 'end' => $last->format('Y-m-d'), 'end_excl' => $endExcl->format('Y-m-d'),
         'from_dt' => $start->format('Y-m-d') . ' 00:00:00', 'to_dt' => $endExcl->format('Y-m-d') . ' 00:00:00',
         'days' => (int)$start->diff($endExcl)->days,
-        'label' => $label, 'slug' => $slug,
+        'label' => $label, 'slug' => $status === 'all' ? $slug : $status . '-' . $slug,
         'budget_year' => (int)$start->format('Y'),
     ];
 }
@@ -154,6 +182,7 @@ function report_query(array $f, array $override = []): string
 {
     $f = $override + $f;
     $q = ['report' => $f['report'], 'range' => $f['range'], 'year' => $f['year']];
+    if (($f['status'] ?? 'all') !== 'all' && report_status_options($f['report'])) $q['status'] = $f['status'];
     if ($f['range'] === 'quarter') $q['quarter'] = $f['quarter'];
     if ($f['range'] === 'month') $q['month'] = $f['month'];
     if ($f['range'] === 'week') $q['week'] = $f['week'];
@@ -309,31 +338,30 @@ function report_series_table(array $f, array $b, array $counts, array $amounts, 
  *   pending   Pending ones filed in the period
  *   filed     [program id => how many were filed in the period, not Disapproved]
  */
+function report_application_rows(PDO $pdo, array $f, bool $approved, ?int $typeId): array
+{
+    $on = $approved ? report_approved_on_sql() : 'a.created_at';
+    $typeSql = $typeId !== null ? ' AND a.assistance_type_id = ?' : '';
+    $params = [$approved ? 'Approved' : 'Pending', $f['from_dt'], $f['to_dt']];
+    if ($typeId !== null) $params[] = $typeId;
+    $stmt = $pdo->prepare("SELECT a.*, DATE($on) AS _on FROM applicant a
+                           WHERE a.status = ? AND $on >= ? AND $on < ?$typeSql
+                           ORDER BY $on DESC, a.id DESC");
+    $stmt->execute($params);
+    return $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
 function report_load(PDO $pdo, array $f, ?int $typeId = null): array
 {
-    $on = report_approved_on_sql();
+    $approved = report_application_rows($pdo, $f, true, $typeId);
+    $pending = report_application_rows($pdo, $f, false, $typeId);
     $typeSql = $typeId !== null ? ' AND a.assistance_type_id = ?' : '';
-    $bind = function (array $params) use ($typeId): array {
-        if ($typeId !== null) $params[] = $typeId;
-        return $params;
-    };
-
-    $stmt = $pdo->prepare("SELECT a.*, DATE($on) AS _on FROM applicant a
-                           WHERE a.status = 'Approved' AND $on >= ? AND $on < ?$typeSql
-                           ORDER BY $on DESC, a.id DESC");
-    $stmt->execute($bind([$f['from_dt'], $f['to_dt']]));
-    $approved = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $stmt = $pdo->prepare("SELECT a.*, DATE(a.created_at) AS _on FROM applicant a
-                           WHERE a.status = 'Pending' AND a.created_at >= ? AND a.created_at < ?$typeSql
-                           ORDER BY a.created_at DESC, a.id DESC");
-    $stmt->execute($bind([$f['from_dt'], $f['to_dt']]));
-    $pending = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
+    $params = [$f['from_dt'], $f['to_dt']];
+    if ($typeId !== null) $params[] = $typeId;
     $stmt = $pdo->prepare("SELECT a.assistance_type_id, COUNT(*) FROM applicant a
                            WHERE a.status NOT IN ('Disapproved', 'Withdrawn') AND a.created_at >= ? AND a.created_at < ?$typeSql
                            GROUP BY a.assistance_type_id");
-    $stmt->execute($bind([$f['from_dt'], $f['to_dt']]));
+    $stmt->execute($params);
     $filed = array_map('intval', $stmt->fetchAll(PDO::FETCH_KEY_PAIR));
 
     return ['approved' => $approved, 'pending' => $pending, 'filed' => $filed, 'filed_total' => array_sum($filed)];
@@ -359,7 +387,7 @@ function report_sum(array $rows): float
 /** Actual recorded payments in the selected period, counted by payment date. */
 function report_payments(PDO $pdo, array $f, ?int $typeId = null): array
 {
-    if (!assistance_release_ensure($pdo)) return [];
+    if (!assistance_release_ensure($pdo)) throw new PDOException('The payment register is unavailable.');
     $stmt = $pdo->prepare('SELECT application_id, assistance_type_id, amount, released_on, receipt_ref
                            FROM assistance_releases WHERE released_on >= ? AND released_on < ?'
                            . ($typeId !== null ? ' AND assistance_type_id = ?' : '')
@@ -688,6 +716,23 @@ function report_build(PDO $pdo, array $f, bool $hideAmounts = false): array
 {
     $base = report_model(['title' => report_types()[$f['report']], 'notes' => report_notes($f), 'retry' => report_query($f)]);
     try {
+        if (!$hideAmounts && in_array($f['status'] ?? 'all', ['pending', 'approved'], true) && report_status_options($f['report'])) {
+            $typeId = ['medical' => 1, 'burial' => 2, 'opd' => 3][$f['report']] ?? null;
+            $approved = $f['status'] === 'approved';
+            $rows = report_application_rows($pdo, $f, $approved, $typeId);
+            $status = $approved ? 'Approved' : 'Pending';
+            $cards = [['label' => $status, 'value' => number_format(count($rows)), 'status' => $status,
+                'note' => $approved ? 'Approved in this period' : 'Filed in this period, still waiting']];
+            if ($approved && $typeId !== 3) {
+                $cards[] = ['label' => 'Approved amount', 'value' => ui_peso(report_sum($rows)), 'icon' => 'check-circle'];
+            }
+            return [
+                'title' => $status . ' applications' . ($typeId === null ? '' : ' · ' . $base['title']),
+                'cards' => $cards,
+                'tables' => [$typeId === null ? report_people_table($rows, $f, $approved) : report_program_people_table($rows, $f, $typeId, $approved)],
+                'notes' => [],
+            ] + $base;
+        }
         switch ($f['report']) {
             case 'medical':
             case 'burial':
@@ -752,25 +797,70 @@ function report_date_or_none($value): string
  */
 function report_people_tables(array $d, array $f): array
 {
-    $types = ui_types();
-    $approvedRows = $pendingRows = [];
-    foreach ($d['approved'] as $a) {
-        $t = (int)$a['assistance_type_id'];
-        $approvedRows[] = [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), report_text($a['contact_number'] ?? ''),
-            $types[$t]['name'] ?? 'Assistance', $t === 3 && report_amount($a) <= 0 ? '—' : report_peso_or_none($a),   // OPD gives no money
-            ui_date($a['created_at']), report_date_or_none($a['approved_at'] ?? ''), report_listed_as($t)];
-    }
-    foreach ($d['pending'] as $a) {
-        $t = (int)$a['assistance_type_id'];
-        $pendingRows[] = [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), report_text($a['contact_number'] ?? ''),
-            $types[$t]['name'] ?? 'Assistance', ui_date($a['created_at']), report_listed_as($t)];
-    }
-    return [
-        report_table('Approved', 'Approved applications (' . count($approvedRows) . ')', report_sub($f, 'by date approved'),
-            ['Name', 'Age', 'Sex', 'Contact', 'Assistance type', 'Amount', 'Date filed', 'Date approved', 'Listed as'], $approvedRows, [1, 5],
-            null, 'No approved applications in this period.'),
-        report_table('Pending', 'Pending applications (' . count($pendingRows) . ')', report_sub($f, 'filed in this period, still waiting'),
-            ['Name', 'Age', 'Sex', 'Contact', 'Assistance type', 'Date filed', 'Listed as'], $pendingRows, [1],
-            null, 'No pending applications in this period.'),
+    return [report_people_table($d['approved'], $f, true), report_people_table($d['pending'], $f, false)];
+}
+
+/** Status-filtered program lists retain the details needed for that assistance program. */
+function report_program_people_table(array $applications, array $f, int $typeId, bool $approved): array
+{
+    $head = ['Date filed'];
+    if ($approved) $head[] = 'Date approved';
+    $details = [
+        1 => ['Patient', "Patient's age", "Patient's sex", 'Claimant', "Claimant's age", 'Relationship to the patient', 'Contact', 'Address', 'Purpose'],
+        2 => ['Deceased', 'Claimant', "Claimant's age", "Claimant's sex", 'Relationship to the deceased', 'Contact', 'Address'],
+        3 => ['Patient', 'Age', 'Sex', 'Hospital', 'Reason for check-up', 'Check-up date', 'Accompanied by', 'Relationship', 'Contact', 'Address'],
     ];
+    $head = array_merge($head, $details[$typeId]);
+    if ($approved && $typeId !== 3) $head[] = 'Approved amount';
+    $rows = [];
+    foreach ($applications as $a) {
+        $row = [ui_date($a['created_at'])];
+        if ($approved) $row[] = report_date_or_none($a['approved_at'] ?? '');
+        [$claimant, $age, $relationship] = report_claimant($a);
+        $contact = [report_text($a['contact_number'] ?? ''), report_text(ui_address($a, true))];
+        if ($typeId === 1) {
+            $row = array_merge($row, [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), $claimant, $age, $relationship], $contact, [report_text($a['purpose'] ?? '')]);
+        } elseif ($typeId === 2) {
+            $row = array_merge($row, [report_text($a['petitioner_name'] ?? ''), $claimant, $age, report_text($a['sex'] ?? ''), $relationship], $contact);
+        } else {
+            $companion = trim((string)($a['petitioner_name'] ?? ''));
+            $row = array_merge($row, [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), report_text($a['hospital'] ?? ''),
+                report_text($a['checkup_reason'] ?? ''), !empty($a['checkup_date']) ? ui_date($a['checkup_date']) : 'Not scheduled',
+                $companion !== '' ? $companion : 'No companion', $companion !== '' ? report_text($a['relationship'] ?? '') : '—'], $contact);
+        }
+        if ($approved && $typeId !== 3) $row[] = report_peso_or_none($a);
+        $rows[] = $row;
+    }
+    $numeric = [];
+    foreach ($head as $index => $label) {
+        if (in_array($label, ['Age', "Patient's age", "Claimant's age", 'Approved amount'], true)) $numeric[] = $index;
+    }
+    $status = $approved ? 'Approved' : 'Pending';
+    return report_table($status, $status . ' ' . ui_types()[$typeId]['short'] . ' applications (' . count($rows) . ')',
+        report_sub($f, $approved ? 'by date approved' : 'filed in this period, still waiting'), $head, $rows, $numeric,
+        $approved && $typeId !== 3 ? ['Total approved amount', ui_peso(report_sum($applications))] : null,
+        'No ' . strtolower($status) . ' applications in this period.');
+}
+
+function report_people_table(array $applications, array $f, bool $approved): array
+{
+    $types = ui_types();
+    $rows = [];
+    foreach ($applications as $a) {
+        $t = (int)$a['assistance_type_id'];
+        $row = [ui_person_name($a), report_list_age($a), report_text($a['sex'] ?? ''), report_text($a['contact_number'] ?? ''),
+            $types[$t]['name'] ?? 'Assistance'];
+        if ($approved) $row[] = $t === 3 && report_amount($a) <= 0 ? '—' : report_peso_or_none($a);
+        $row[] = ui_date($a['created_at']);
+        if ($approved) $row[] = report_date_or_none($a['approved_at'] ?? '');
+        $row[] = report_listed_as($t);
+        $rows[] = $row;
+    }
+    return $approved
+        ? report_table('Approved', 'Approved applications (' . count($rows) . ')', report_sub($f, 'by date approved'),
+            ['Name', 'Age', 'Sex', 'Contact', 'Assistance type', 'Amount', 'Date filed', 'Date approved', 'Listed as'], $rows, [1, 5],
+            null, 'No approved applications in this period.')
+        : report_table('Pending', 'Pending applications (' . count($rows) . ')', report_sub($f, 'filed in this period, still waiting'),
+            ['Name', 'Age', 'Sex', 'Contact', 'Assistance type', 'Date filed', 'Listed as'], $rows, [1],
+            null, 'No pending applications in this period.');
 }

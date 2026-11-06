@@ -47,7 +47,13 @@ check_payment(!assistance_release_record($pdo,$id,$_SESSION['user'],$today,'')['
 check_payment(!assistance_release_record($pdo,$id,$_SESSION['user'],"$year-12-01",'TEST')['ok'], 'Payment before approval accepted');
 $limitBefore = budget_check_approval($pdo, $year, 1, 95001);
 check_payment($limitBefore['over'], 'Unpaid commitments stopped counting against new approvals');
-check_payment(assistance_release_record($pdo,$id,$_SESSION['user'],$today,'TEST-TRANSFER')['ok'], 'Actual payment failed');
+$shownVersion = (string)$pdo->query('SELECT updated_at FROM applicant WHERE id = ' . $id)->fetchColumn();
+$pdo->exec('UPDATE applicant SET updated_at = DATE_ADD(updated_at, INTERVAL 1 SECOND) WHERE id = ' . $id);
+check_payment(!assistance_release_record($pdo,$id,$_SESSION['user'],$today,'STALE',$shownVersion)['ok'], 'A stale payment form was accepted');
+check_payment(!assistance_release_record($pdo,$id,$_SESSION['user'],$today,'MISSING','')['ok'], 'A payment form without a version was accepted');
+check_payment((int)$pdo->query('SELECT COUNT(*) FROM assistance_releases')->fetchColumn() === 0, 'A rejected payment wrote a release');
+$currentVersion = (string)$pdo->query('SELECT updated_at FROM applicant WHERE id = ' . $id)->fetchColumn();
+check_payment(assistance_release_record($pdo,$id,$_SESSION['user'],$today,'TEST-TRANSFER',$currentVersion)['ok'], 'Actual payment failed');
 check_payment(assistance_release_dates($pdo, [$id, $id + 999]) === [$id => $today], 'Paid-list lookup lost the date or included an unrelated application');
 $after = budget_status($pdo, $year, 1, true);
 check_payment($after['paid'] === 5000.0 && $after['reserved'] === 0.0, 'Payment did not move reserved funds to paid');
@@ -58,6 +64,13 @@ check_payment((int)$pdo->query('SELECT COUNT(*) FROM assistance_releases')->fetc
 check_payment(budget_status($pdo,$year+1,1,true)['paid'] === 0.0, 'Cross-year payment charged to a new budget');
 check_payment(count(report_payments($pdo,['start'=>($year+1).'-01-01','end_excl'=>($year+2).'-01-01'],1)) === 1, 'Payment-period report ignored actual payment date');
 $table = report_budget_table($pdo,['budget_year'=>$year]);
+foreach ([1 => ['Claimant','Address','Purpose'], 2 => ['Deceased','Claimant','Address'], 3 => ['Hospital','Check-up date','Reason for check-up']] as $type => $requiredColumns) {
+    foreach ([false, true] as $approved) {
+        $people = report_program_people_table([], ['label'=>'Test period'], $type, $approved);
+        check_payment(!array_diff($requiredColumns, $people['head']), 'Status-filtered report lost program details');
+        check_payment($approved && $type !== 3 || !in_array('Approved amount', $people['head'], true), 'Pending or OPD report gained an amount column');
+    }
+}
 check_payment(count($table['head']) === 7 && count($table['rows'][0]) === 7 && count($table['total']) === 7, 'Budget report/export columns disagree');
 check_payment(strpos(ui_budget_item($after),'Actually paid') !== false, 'Budget summary omits actual payments');
 foreach ([[2,'Pending'],[3,'Approved']] as [$type,$status]) {
@@ -71,7 +84,25 @@ try {
     $unavailable = budget_status($pdo,$year,1,true);
     check_payment($unavailable['paid'] === null && $unavailable['reserved'] === null, 'Unavailable payments falsely shown as zero');
     check_payment($unavailable['remaining'] === 95000.0 && budget_check_approval($pdo,$year,1,95001)['over'], 'Payment outage changed approval limits');
+    check_payment(in_array($year, report_year_options($pdo, $year + 2), true), 'Payment outage hid application report years');
 } finally {
     $pdo->exec('RENAME TABLE test_saved_releases TO assistance_releases');
 }
+// Filing, approval and payment can each belong to a different year.
+$filedYear = $year - 4;
+$approvalYear = $year - 3;
+$paymentYear = $year - 2;
+$insert->execute([1, 'Approved', 750, "$filedYear-12-31 09:00:00", "$approvalYear-01-02 09:00:00", "$paymentYear-01-03"]);
+$historicalId = (int)$pdo->lastInsertId();
+check_payment(assistance_release_record($pdo, $historicalId, $_SESSION['user'], "$paymentYear-01-03", 'HISTORICAL')['ok'], 'Historical payment fixture failed');
+$years = report_year_options($pdo, $year + 2);
+check_payment(in_array($filedYear, $years, true) && in_array($approvalYear, $years, true), 'Report picker omitted a filing or approval year');
+check_payment(in_array($paymentYear, $years, true), 'Report picker omitted a payment-only year');
+check_payment(in_array((int)date('Y'), $years, true) && in_array($year + 2, $years, true), 'Report picker lost the current or selected year');
+$sortedYears = array_values(array_unique($years));
+rsort($sortedYears, SORT_NUMERIC);
+check_payment($years === $sortedYears, 'Report years are duplicated or not newest first');
+$staffYears = report_year_options($pdo, $year + 2, false);
+check_payment(in_array($approvalYear, $staffYears, true) && !in_array($paymentYear, $staffYears, true), 'Staff report years omit approvals or expose payment-only activity');
+
 echo 'PASS: ' . $checks . ' budget/payment checks' . PHP_EOL;

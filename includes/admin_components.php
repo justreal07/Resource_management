@@ -358,7 +358,6 @@ function ui_withdrawn_count(int $typeId): ?int
 /** Tabs that move between the pages of one program: Overview, All, Pending, Approved, Declined, Withdrawn. */
 function ui_type_tabs(int $typeId, string $current, array $counts = []): string
 {
-    require_once __DIR__ . '/program_list.php';
     $labels = ['overview' => 'Overview', 'all' => 'All applications', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Declined', 'withdrawn' => 'Withdrawn'];
     // How many the applicants withdrew: the count on that tab (the other tabs are not counted here)
     if (!isset($counts['withdrawn'])) {
@@ -377,10 +376,8 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
     $nameBar = ui_name_search($typeId, $current);
     $tabsHtml = $html;
 
-    // Export CSV / Print for the list being shown (Overview exports every application). Not on a page that is not a list.
-    $exportStatus = ['all' => 'all', 'overview' => 'all', 'pending' => 'Pending', 'approved' => 'Approved', 'disapproved' => 'Disapproved', 'withdrawn' => 'Withdrawn'][$current] ?? null;
-    if ($exportStatus === null) return $nameBar . $tabsHtml;
-    $label = $exportStatus === 'all' ? 'all applications' : ($exportStatus === 'Disapproved' ? 'declined' : strtolower($exportStatus)) . ' applications';
+    // Show page actions on the overview and lists only. Downloads belong in Reports.
+    if (!isset($labels[$current])) return $nameBar . $tabsHtml;
     // Admins (every program) and Medical & Burial staff (Medical/Burial only): "Add walk-in" for THIS program. It opens
     // the walk-in window on this very page with the program already chosen (admin_layout_end() adds the window, the
     // form templates and js/admin_dashboard.js when this flag is set).
@@ -391,10 +388,8 @@ function ui_type_tabs(int $typeId, string $current, array $counts = []): string
         $walkIn = '<button type="button" class="btn btn-primary btn-sm" data-open-add data-add-type="' . $typeId . '">' . ui_icon('plus')
             . 'Add walk-in<span class="visually-hidden"> applicant for ' . ui_e(ui_types()[$typeId]['short']) . '</span></button>';
     }
-    $exportFilters = array_intersect_key(program_list_filters($_GET, $current), array_flip(['name', 'q', 'source']));
+    if ($walkIn === '') return $nameBar . $tabsHtml;
     return $nameBar . '<div class="tabs-bar">' . $tabsHtml . '<div class="tabs-tools">' . $walkIn
-        . '<a class="btn btn-secondary btn-sm" href="../Main_dashboard/export_applicants?' . ui_e(http_build_query(['type' => $typeId, 'status' => $exportStatus] + $exportFilters)) . '">'
-        . ui_icon('download') . 'Export CSV<span class="visually-hidden"> of ' . ui_e(ui_types()[$typeId]['short'] . ' ' . $label) . '</span></a>'
         . '</div></div>';
 }
 

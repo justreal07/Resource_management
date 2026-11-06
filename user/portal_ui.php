@@ -69,6 +69,7 @@ function portal_text_base(): string {
 /** Inside <head>, after the page's own stylesheet. */
 function portal_head(): void {
     ?>
+    <link rel="icon" type="image/png" href="../asset/community-affairs-favicon.png">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="<?= htmlspecialchars(portal_asset('../css/portal-ui.css')) ?>">
     <script>

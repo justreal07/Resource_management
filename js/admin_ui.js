@@ -23,6 +23,22 @@
 
     const $ = (id) => document.getElementById(id);
 
+    // Custom approval dates are only needed when that range is selected.
+    const programPeriod = $('programPeriod');
+    const programDateRange = $('programDateRange');
+    if (programPeriod && programDateRange) {
+        const updateDateRange = () => {
+            const custom = programPeriod.value === 'custom';
+            programDateRange.hidden = !custom;
+            programDateRange.querySelectorAll('input').forEach((input) => {
+                input.disabled = !custom;
+                input.required = custom;
+            });
+        };
+        programPeriod.addEventListener('change', updateDateRange);
+        updateDateRange();
+    }
+
     // Browser storage can be blocked (private window, strict settings): then nothing is remembered
     const store = {
         get(key) { try { return window.localStorage.getItem(key); } catch (e) { return null; } },
