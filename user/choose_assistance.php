@@ -46,13 +46,12 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
 
 <a href="#main" class="skip-link">Skip to main content</a>
 
-<!-- TOP UTILITY BAR (same as the home page, with the Text size buttons) -->
+<!-- TOP UTILITY BAR (same as the home page) -->
 <div class="topbar">
     <div class="container">
         <div class="topbar-info">
             <span><i class="fas fa-landmark" aria-hidden="true"></i> Municipality of General Mariano Alvarez, Cavite</span>
         </div>
-        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
@@ -159,6 +158,5 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
     });
 })();
 </script>
-<?php /* Text size buttons: js/portal-ui.js */ ?>
 </body>
 </html>

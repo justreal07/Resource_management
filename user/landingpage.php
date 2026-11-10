@@ -133,7 +133,6 @@ $programs = [
         <div class="topbar-info">
             <span><i class="fas fa-landmark"></i> Municipality of General Mariano Alvarez, Cavite</span>
         </div>
-        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 

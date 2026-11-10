@@ -180,30 +180,6 @@ a { color: var(--navy); }
 .topbar-info span:not(:first-child) { display: none; }
 .topbar-info i { color: var(--gold); }
 
-.text-size {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-}
-.text-size-label { margin-right: 4px; }
-.text-size button {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    border-radius: 6px;
-    min-width: 32px;
-    height: 28px;
-    cursor: pointer;
-    font-weight: 700;
-    font-family: inherit;
-    transition: background 0.2s;
-}
-.text-size button:hover { background: rgba(255, 255, 255, 0.25); }
-.text-size button[aria-pressed="true"] { background: var(--gold); color: var(--ink); border-color: var(--gold); }
-.text-size button:nth-of-type(1) { font-size: 0.75rem; }
-.text-size button:nth-of-type(2) { font-size: 0.9rem; }
-.text-size button:nth-of-type(3) { font-size: 1.05rem; }
-
 /* ============================================
    HEADER / NAVBAR
 ============================================ */
@@ -215,10 +191,7 @@ a { color: var(--navy); }
     backdrop-filter: saturate(160%) blur(12px);
     border-bottom: 1px solid var(--line);
     transition: box-shadow 0.25s;
-    /* The "Text size" buttons (A A A) make the PAGE's text bigger, not this navigation bar: the logo, title and
-       menu stayed one `rem` scale (the root's), so a larger text size made them outgrow the row and wrap onto a
-       second line (logo pushed up, a gap opening below it). Fixed at the normal 112.5%-of-16px size here, with
-       `em` instead of `rem` below, so the header always looks the same no matter what text size is chosen. */
+    /* Keep the navigation at its own stable size while applicant content uses the larger base. */
     font-size: 18px;
 }
 .site-header.scrolled { box-shadow: 0 6px 24px rgba(10, 36, 114, 0.10); }
@@ -1725,9 +1698,7 @@ a { color: var(--navy); }
     .notification-panel { left: 0; right: auto; }
     .user-dropdown-menu { right: auto; left: 0; }
 }
-/* No "wide screen, larger text" fallback is needed above: the header's own font-size is fixed
-   (.site-header, above), so the "Text size" buttons never make the logo, title or menu outgrow
-   this row any more — the menu button at 1459px and down is the only reason it would wrap. */
+/* The header keeps its own scale; use the menu button at 1459px and narrower. */
 
 @media (max-width: 960px) {
     .steps-grid { grid-template-columns: repeat(2, 1fr); row-gap: 40px; }

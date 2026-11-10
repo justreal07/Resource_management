@@ -53,18 +53,8 @@ function portal_asset(string $path): string {
     return is_file($file) ? $path . '?v=' . filemtime($file) : $path;
 }
 
-/**
- * Text size of the applicant pages, in % of the browser's own size. Every size on these pages is in rem,
- * so this one number scales all the text, forms included.
- * The first is the normal size every page opens with: 112.5% (it was 100%, which many applicants found
- * too small; 112.5% was the old "larger" step). The other two are the "Text size" buttons' bigger steps.
- */
-const PORTAL_TEXT_SIZES = ['112.5' => 'Normal text', '125' => 'Larger text', '137.5' => 'Largest text'];
-
-/** The normal text size (the first of PORTAL_TEXT_SIZES). */
-function portal_text_base(): string {
-    return (string)array_key_first(PORTAL_TEXT_SIZES);
-}
+/** Fixed largest applicant text size; rem-based text and forms scale together. */
+const PORTAL_TEXT_BASE = '137.5';
 
 /** Inside <head>, after the page's own stylesheet. */
 function portal_head(): void {
@@ -72,29 +62,13 @@ function portal_head(): void {
     <link rel="icon" type="image/png" href="../asset/community-affairs-favicon.png">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="stylesheet" href="<?= htmlspecialchars(portal_asset('../css/portal-ui.css')) ?>">
-    <script>
-        // Every page opens and refreshes at the normal text size (PORTAL_TEXT_SIZES in user/portal_ui.php), set
-        // here so the page is drawn at that size from the start. The "Text size" buttons only enlarge the page being
-        // viewed (js/portal-ui.js); the choice is not remembered. This also clears a size saved by an old version.
-        document.documentElement.style.fontSize = '<?= portal_text_base() ?>%';
-        try { localStorage.removeItem('portalTextSize'); } catch (e) {}
-    </script>
+    <style>html { font-size: <?= PORTAL_TEXT_BASE ?>%; }</style>
     <?php
-}
-
-/** The "Text size: A A A" buttons of the top bar (js/portal-ui.js makes them work). */
-function portal_text_size_buttons(): void {
-    $base = portal_text_base();
-    echo '<div class="text-size" role="group" aria-label="Text size"><span class="text-size-label">Text size:</span>';
-    foreach (PORTAL_TEXT_SIZES as $size => $label) {
-        echo '<button type="button" data-size="' . $size . '" aria-label="' . $label . '" aria-pressed="' . ($size === $base ? 'true' : 'false') . '">A</button>';
-    }
-    echo '</div>';
 }
 
 /** Before the page's own scripts: the library list and js/portal-ui.js (window.PortalUI). */
 function portal_scripts(): void {
-    $config = ['vendor' => portal_vendor_libs(), 'textBase' => portal_text_base()];
+    $config = ['vendor' => portal_vendor_libs()];
     echo '<script type="application/json" id="portalConfig">'
         . json_encode($config, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP) . "</script>\n";
     echo '<script src="' . htmlspecialchars(portal_asset('../js/portal-ui.js')) . '"></script>' . "\n";
