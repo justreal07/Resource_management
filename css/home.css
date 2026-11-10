@@ -35,8 +35,8 @@
     --shadow: 0 10px 30px rgba(10, 36, 114, 0.10);
     --shadow-lg: 0 24px 60px rgba(10, 36, 114, 0.18);
 
-    --container: 1200px;
-    --header-h: 132px;   /* the 112px logos (same size as the admin menu's seal) + 10px above and below */
+    --container: 1280px;
+    --header-h: 92px;
 }
 
 /* ============================================
@@ -161,13 +161,13 @@ a { color: var(--navy); }
     font-size: 0.85rem;
 }
 .topbar .container,
-.nav-container { max-width: 1480px; }   /* wider than the page body so the big logos, the menu and the buttons stay on one line; the top bar matches so their edges line up */
+.nav-container { max-width: var(--container); }
 .topbar .container {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    min-height: 40px;
+    min-height: 32px;
     flex-wrap: wrap;
 }
 .topbar-info {
@@ -247,10 +247,13 @@ a { color: var(--navy); }
     font-weight: 500;
 }
 /* Header name: bigger, on one line, and centred against the two logos */
-.site-header .brand { align-items: center; }
-.site-header .brand-text { max-width: none; justify-content: center; align-self: center; gap: 4px; }
-.site-header .brand-text strong { font-size: clamp(1.25rem, 0.9vw + 1rem, 1.75rem); line-height: 1.15; }
-.site-header .brand-text small { font-size: clamp(0.9rem, 0.3vw + 0.8rem, 1.05rem); }
+/* Keep the masthead compact and aligned with the content below. */
+.site-header .brand { align-items: center; flex: 0 1 auto; gap: 12px; }
+.site-header .brand-logos img { width: 64px; height: 64px; }
+.site-header .brand-logos img + img { margin-left: -20px; }
+.site-header .brand-text { max-width: 300px; justify-content: center; align-self: center; gap: 4px; }
+.site-header .brand-text strong { font-size: 1.2em; line-height: 1.15; }
+.site-header .brand-text small { font-size: 0.78em; }
 
 .nav-menu {
     display: flex;
@@ -529,15 +532,15 @@ a { color: var(--navy); }
 
 .hero-grid {
     display: grid;
-    grid-template-columns: 1.25fr 0.9fr;
-    gap: 48px;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: clamp(24px, 4vw, 56px);
     align-items: center;
 }
 /* Signed-out home page: a headline and two buttons, no card beside them */
 .hero-grid-single { grid-template-columns: minmax(0, 40rem); }
 /* Signed out: the text on the left, the person large in the right corner, cut out so the background video shows around them */
 .hero-grid-photo { grid-template-columns: minmax(0, 1fr); }
-.hero-grid-photo .hero-text { position: relative; z-index: 1; max-width: min(33%, 30rem); }
+.hero-grid-photo .hero-text { position: relative; z-index: 1; max-width: 48%; }
 .hero-photo {
     position: absolute;
     top: 0;
@@ -559,16 +562,19 @@ a { color: var(--navy); }
 .hero-photo .hero-person { height: 98%; }          /* the person is big, his head near the banner's top corner */
 .hero-photo .hero-person { margin-left: auto; }
 .hero-photo .hero-lettering { position: absolute; left: 49%; top: 50%; height: 60%; transform: translate(-50%, -50%); z-index: 1; }   /* the name in the middle of the banner, in front of the person */
-/* The banner's content lines up with the logo in the header (the page body below stays narrower) */
-.hero-home > .container { max-width: 1900px; }
-/* A taller banner so more of the background video shows: it fills most of the first screen (never shorter than 560px, never taller than 860px), with the text centred in it */
+/* The banner, header and following sections share the same content edges. */
+.hero-home > .container { max-width: var(--container); }
+/* Content can grow at larger zoom levels; the viewport supplies only a minimum. */
 .hero-home {
-    min-height: clamp(560px, calc(100vh - 160px), 860px);
+    min-height: clamp(420px, calc(100svh - var(--header-h) - 80px), 640px);
     display: flex;
     align-items: center;
-    padding: 96px 0 140px;
+    padding: clamp(28px, 5vh, 56px) 0 clamp(64px, 9vh, 88px);
 }
-.hero-home .hero-lead { margin-bottom: 28px; }
+.hero-home .hero-lead { margin-bottom: 0; max-width: 38ch; }
+.hero-home .hero-cta { margin-top: 24px; }
+.hero-grid > * { min-width: 0; }
+.hero-text { overflow-wrap: anywhere; }
 .hero.hero-home h1 { font-size: clamp(2rem, 3.7vw, 3.1rem); }
 .hero-home .hero-cta { margin-bottom: 0; }
 
@@ -634,11 +640,11 @@ a { color: var(--navy); }
     background: rgba(255, 255, 255, 0.97);
     color: var(--body);
     border-radius: var(--radius-lg);
-    padding: 28px;
+    padding: 20px;
     box-shadow: var(--shadow-lg);
     border-top: 5px solid var(--gold);
 }
-.hero-card h3 { font-size: 1.25rem; margin-bottom: 4px; }
+.hero-card h3 { font-size: 1.1rem; margin-bottom: 12px; }
 .hero-card > p { color: var(--muted); font-size: 0.95rem; margin-bottom: 18px; }
 
 .mini-steps { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 12px; }
@@ -661,7 +667,8 @@ a { color: var(--navy); }
 
 .hero-card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-.quick-apply-list { display: grid; gap: 10px; margin-bottom: 18px; }
+.quick-apply-list { display: grid; gap: 8px; margin-bottom: 12px; }
+.quick-apply > span:not(.qa-icon) { min-width: 0; overflow-wrap: anywhere; }
 .quick-apply {
     display: flex;
     align-items: center;
@@ -1648,27 +1655,16 @@ a { color: var(--navy); }
    RESPONSIVE
 ============================================ */
 @media (max-width: 1100px) {
-    .hero-grid { grid-template-columns: 1fr; }
     .hero-photo { opacity: 0.4; }
     .hero-photo .hero-lettering { display: none; }
     .hero-grid-photo .hero-text { max-width: none; }
-    .hero-card { max-width: 560px; }
     .stats-grid, .stats-grid.has-withdrawn { grid-template-columns: repeat(2, 1fr); }
     .program-grid { grid-template-columns: repeat(2, 1fr); }
     .footer-grid { grid-template-columns: 1fr 1fr; }
 }
 
-/* Collapse to the menu button (☰) before the header items get squeezed: the 112px logos, the title,
-   the menu links and Log in / Sign up need about 1450px at the normal text size (112.5%: the applicant pages
-   open larger than the browser's default), so below 1460px wide the menu would drop to a second row.
-   The menu button keeps everything on one row instead. */
-@media (max-width: 1180px) {
-    /* Tablets: smaller logos too */
-    :root { --header-h: 100px; }
-    .brand-logos img { width: 80px; height: 80px; }
-    .brand-logos img + img { margin-left: -24px; }
-}
-@media (max-width: 1459px) {
+/* Collapse navigation before it crowds the masthead; keep every link accessible by scrolling. */
+@media (max-width: 1279px) {
     .nav-toggle { display: inline-flex; align-items: center; justify-content: center; }
     .nav-menu {
         position: absolute;
@@ -1683,6 +1679,8 @@ a { color: var(--navy); }
         border-bottom: 1px solid var(--line);
         box-shadow: 0 16px 30px rgba(10, 36, 114, 0.12);
         display: none;
+        max-height: calc(100svh - var(--header-h) - 8px);
+        overflow-y: auto;
     }
     .nav-menu.open { display: flex; }
     .nav-link { padding: 14px 16px; font-size: 1.05em; white-space: normal; }
@@ -1698,7 +1696,7 @@ a { color: var(--navy); }
     .notification-panel { left: 0; right: auto; }
     .user-dropdown-menu { right: auto; left: 0; }
 }
-/* The header keeps its own scale; use the menu button at 1459px and narrower. */
+/* The header keeps its own scale independently of applicant content. */
 
 @media (max-width: 960px) {
     .steps-grid { grid-template-columns: repeat(2, 1fr); row-gap: 40px; }
@@ -1706,6 +1704,13 @@ a { color: var(--navy); }
     .faq-layout { grid-template-columns: minmax(0, 1fr); }
     .help-card { position: static; }
     .contact-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 800px) {
+    .hero-grid { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+    .hero-home { min-height: 0; padding: 32px 0 72px; }
+    .hero-grid-photo .hero-text { max-width: none; }
+    .hero-card { width: 100%; max-width: 560px; justify-self: center; }
 }
 
 @media (max-width: 640px) {
@@ -1721,8 +1726,15 @@ a { color: var(--navy); }
 
     .hero { padding: 64px 0 130px; }
     .hero-cta .btn { flex: 1 1 100%; }
-    .hero-home { padding: 56px 0 110px; min-height: 480px; }
-    .hero-card { padding: 22px; }
+    .hero-home { padding: 28px 0 64px; min-height: 0; }
+    .hero-card { padding: 16px; }
+    .site-header .brand-logos img { width: 44px; height: 44px; }
+    .site-header .brand-logos img + img { margin-left: -14px; }
+    .site-header .brand { gap: 8px; }
+    .site-header .brand-text strong { font-size: 0.95em; }
+    .nav-toggle { flex: none; }
+    .hero.hero-home h1 { font-size: clamp(1.4rem, 7vw, 2rem); }
+    .hero-home .hero-lead { font-size: 0.9rem; }
 
     .section { padding: 56px 0; }
     .dashboard-card { padding: 24px 20px; }
