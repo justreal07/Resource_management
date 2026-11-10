@@ -467,6 +467,9 @@ function edit_field(string $f, array $def, string $value, ?string $error, string
             $control .= '</select>';
             break;
         case 'barangay':
+            foreach (BARANGAYS as $official) {
+                if (strcasecmp($value, $official) === 0) { $value = $official; break; }
+            }
             $control = '<select ' . $common . '><option value="">Choose…</option>';
             // An older record may have a barangay that is not on today's list: keep it choosable as it was
             if ($value !== '' && !in_array($value, BARANGAYS, true)) {

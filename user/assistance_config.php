@@ -511,15 +511,15 @@ function medical_self_claimant(array $values, string $on = ''): array {
 }
 
 // The barangays of General Mariano Alvarez - the applicant picks one on the forms
-// The 27 barangays of General Mariano Alvarez as the PSA lists them: 5 Poblacion, then 22 regular ones A to Z.
-// (Spellings are kept as already saved on applications and accounts, e.g. "de las Alas", so existing records still match.)
+// The municipality's 27 choices, shared by applicant forms, office forms and the dashboard map.
 const BARANGAYS = [
+    'Aldiano Olaes',
     'Barangay 1 Poblacion', 'Barangay 2 Poblacion', 'Barangay 3 Poblacion', 'Barangay 4 Poblacion', 'Barangay 5 Poblacion',
-    'Aldiano Olaes', 'Benjamin Tirona', 'Bernardo Pulido', 'Epifanio Malia', 'Francisco De Castro',
+    'Benjamin Tirona', 'Bernardo Pulido', 'Epifanio Malia', 'Fiorello Calimag', 'Francisco de Castro',
     'Francisco Reyes', 'Gavino Maderan', 'Gregoria de Jesus', 'Inocencio Salud', 'Jacinto Lumbreras',
     'Kapitan Kua', 'Koronel Jose P. Elises', 'Macario Dacon', 'Marcelino Memije', 'Nicolasa Virata',
-    'Pantaleon Granados', 'Ramon Cruz', 'San Gabriel', 'San Jose', 'Severino de las Alas',
-    'Teodoro Virata', 'Vicente Belarmino',
+    'Pantaleon Granados', 'Ramon Cruz', 'San Gabriel', 'San Jose', 'Severino de Las Alas',
+    'Tiniente Tiago',
 ];
 
 // Choices for the "reason" fields. The last choice, "Others", lets the applicant type their own.

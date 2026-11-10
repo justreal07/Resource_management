@@ -653,8 +653,9 @@ function report_budget_table(PDO $pdo, array $f): ?array
 
     $rows = [];
     $sumBudget = $sumUsedBudgeted = $sumUsed = 0.0;
-    $sumPaid = $sumReserved = 0.0;
+    $sumPaid = $sumReserved = $sumRemaining = 0.0;
     $paymentsReady = true;
+    $balanceReady = true;
     $anyBudget = false;
     foreach (budget_types() as $id) {
         $s = $statuses[$id];
@@ -666,21 +667,25 @@ function report_budget_table(PDO $pdo, array $f): ?array
             $anyBudget = true;
             $sumBudget += $s['budget'];
             $sumUsedBudgeted += $s['used'];
+            $balanceReady = $balanceReady && $s['remaining'] !== null;
+            $sumRemaining += $s['remaining'] ?? 0;
         }
         $rows[] = [$types[$id]['name'], $s['budget'] !== null ? ui_peso($s['budget']) : 'Not set', ui_peso($s['used']),
             isset($s['reserved']) ? ui_peso($s['reserved']) : 'Unavailable', isset($s['paid']) ? ui_peso($s['paid']) : 'Unavailable',
-            $s['budget'] !== null ? report_signed_peso($s['remaining']) : '—', $s['budget'] !== null ? $s['percent'] . '%' : '—'];
+            $s['budget'] !== null ? ($s['remaining'] !== null ? report_signed_peso($s['remaining']) : 'Unavailable') : '—',
+            $s['budget'] !== null ? report_signed_peso($s['available']) : '—', $s['budget'] !== null ? $s['percent'] . '%' : '—'];
     }
     $total = ['Total', $anyBudget ? ui_peso($sumBudget) : 'Not set', ui_peso($sumUsed),
         $paymentsReady ? ui_peso($sumReserved) : 'Unavailable', $paymentsReady ? ui_peso($sumPaid) : 'Unavailable',
+        $anyBudget ? ($balanceReady ? report_signed_peso($sumRemaining) : 'Unavailable') : '—',
         $anyBudget ? report_signed_peso($sumBudget - $sumUsedBudgeted) : '—',
         $anyBudget && $sumBudget > 0 ? round($sumUsedBudgeted / $sumBudget * 100, 1) . '%' : '—'];
 
     $link = '<p class="panel-note no-print"><a href="../Main_dashboard/budget?year=' . $year . '">' . ui_icon('wallet') . 'Open the Budget page</a> to set the ' . $year
         . ' budget, add to it or reduce it, and see its history.</p>';
     return report_table('Budget use', 'Budget use · ' . $year,
-        'Commitments from approvals in ' . $year . ', split into reserved (no payment recorded) and actually paid. Payments stay with the approval year here; payment-period reports use the actual payment date. Verify older receipts before treating an unrecorded payment as unpaid. The period above does not change this table.',
-        ['Program', 'Budget', 'Committed', 'Reserved / no payment recorded', 'Actually paid', 'Available for new approvals', 'Committed %'], $rows, [1, 2, 3, 4, 5, 6], $total, '', true, $link);
+        'Remaining budget = budget minus recorded payments. Available for new approvals also excludes reserved commitments. Commitments from approvals in ' . $year . ' are split into reserved (no payment recorded) and actually paid. Payments stay with the approval year here; payment-period reports use the actual payment date. Verify older receipts before treating an unrecorded payment as unpaid. The period above does not change this table.',
+        ['Program', 'Budget', 'Committed', 'Reserved / no payment recorded', 'Actually paid', 'Remaining budget', 'Available for new approvals', 'Committed %'], $rows, [1, 2, 3, 4, 5, 6, 7], $total, '', true, $link);
 }
 
 /* ============================================================

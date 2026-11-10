@@ -251,7 +251,7 @@
 .acc-section-heading h2 { margin: 0; font-size: 1rem; }
 .acc-section-heading p { margin: 0; color: var(--db-muted); font-size: .8rem; }
 .db-body .acc-programs { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 16px; margin-bottom: 28px; }
-.db-body .acc-program { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: start; gap: 12px; padding: 20px; transition: border-color 0.15s; }
+.db-body .acc-program { display: grid; grid-template-columns: auto minmax(0,1fr); grid-template-rows: 1fr auto; align-items: start; gap: 12px; padding: 20px; transition: border-color 0.15s; }
 .db-body .acc-program:hover { border-color: #bac9e8; }
 .db-body .acc-program > .ap-btn { grid-column: 1 / -1; justify-self: start; min-height: 36px; background: transparent; border: 0; color: var(--navy); padding: 2px 0; }
 .db-body .acc-program > .ap-btn:hover { text-decoration: underline; }
@@ -382,7 +382,7 @@
     .db-body .acc-app { padding: 12px 14px; }
     .db-body .acc-stat { padding: 14px; }
     .db-body .acc-programs { grid-template-columns: minmax(0,1fr); gap: 10px; margin-bottom: 20px; }
-    .db-body .acc-program { grid-template-columns: auto minmax(0,1fr) auto; padding: 16px; align-items: center; }
+    .db-body .acc-program { grid-template-columns: auto minmax(0,1fr) auto; grid-template-rows: auto; padding: 16px; align-items: center; }
     .db-body .acc-program > .ap-btn { grid-column: auto; padding-left: 6px; }
     .db-body .acc-list-head { align-items: stretch; gap: 14px; }
     .db-body .acc-toolbar { flex-basis: 100%; flex-wrap: wrap; }
@@ -393,6 +393,10 @@
     .db-body .acc-doc-group-head > div { min-width: 0; flex-basis: 65%; }
     .db-body .acc-notif-panel { width: min(370px, calc(100vw - 32px)); right: -70px; }
     .db-body .acc-tab { padding: 12px 10px; font-size: .8rem; }
+    .db-body .acc-avatar-edit { display: grid; grid-template-columns: 88px minmax(0,1fr); align-items: center; gap: 10px 16px; text-align: left; }
+    .db-body .acc-avatar-edit .acc-avatar-xl { width: 88px; height: 88px; grid-row: 1 / span 3; margin: 0; }
+    .db-body .acc-avatar-edit form { margin: 0; }
+    .db-body .acc-avatar-edit p { margin: 0; font-size: .72rem; }
 }
 @media (prefers-reduced-motion: reduce) {
     .db-sidebar { transition: none; }
@@ -400,4 +404,7 @@
 @media print {
     .db-sidebar, .db-topbar, .db-backdrop, .db-footer { display: none !important; }
     .db-body { background: #fff; }
+    .db-body .db-page-header-inner { background: #fff; padding: 0; }
+    .db-body .db-title, .db-subtitle, .db-pretitle { color: var(--ink); }
+    .db-page-header-inner::after { display: none; }
 }

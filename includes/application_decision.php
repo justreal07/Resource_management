@@ -496,7 +496,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
                     $reason = trim(preg_replace('/\s+/u', ' ', (string)($opts['budget_reason'] ?? '')) ?? '');
                     if ($reason === '') {
                         return decision_result(false, 'budget', 'This approval of ' . ui_peso($amount) . ' is ' . ui_peso($budgetCheck['over_by']) . ' over the '
-                            . $before['year'] . ' ' . ui_types()[$typeId]['short'] . ' budget (' . ui_peso(max(0, $before['remaining'])) . ' left of ' . ui_peso($before['budget'])
+                            . $before['year'] . ' ' . ui_types()[$typeId]['short'] . ' budget (' . ui_peso(max(0, $before['available'])) . ' available for new approvals of ' . ui_peso($before['budget'])
                             . '). Give the reason for going over the budget to approve it anyway.', $app);
                     }
                     if (mb_strlen($reason) > BUDGET_REASON_MAX) {
@@ -609,7 +609,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
     if ($decision === 'approve') {
         $result = decision_result(true, 'approved', $label . ' was approved' . ($amount !== null ? ' with ₱' . number_format($amount, 0) : '') . '.'
             . ($backdatedAt !== null ? ' Saved with ' . ui_date($backdatedAt, 'M j, Y') . ' as the approval date; no email was sent (a past paper record).' : ''), $app);
-        // What the approval did to the budget: told once, so the admin knows how much is left (or that it went over)
+        // Approval reserves funds; this message describes commitments, never an actual payment.
         if ($budgetCheck !== null && $budgetCheck['before']['budget'] !== null) {
             $b = $budgetCheck['before'];
             $name = $b['year'] . ' ' . ui_types()[$typeId]['short'] . ' budget';
@@ -619,7 +619,7 @@ function decide_application(PDO $pdo, $applicantId, string $decision, array $opt
                 $result['message'] .= ' It is ' . ui_peso($override['over_by']) . ' over the ' . $name . '; the reason was recorded on the Budget page.';
                 activity_log('budget_override', $label . ' approved ' . ui_peso($amount) . ', ' . ui_peso($override['over_by']) . ' over the ' . $name . ': ' . $override['reason']);
             } elseif ($percent >= BUDGET_WARN_PERCENT) {
-                $result['message'] .= ' The ' . $name . ' is now ' . $percent . '% used (' . ui_peso($b['budget'] - $after) . ' left).';
+                $result['message'] .= ' The ' . $name . ' is now ' . $percent . '% committed (' . ui_peso($b['budget'] - $after) . ' available for new approvals). Remaining budget decreases only after payment is recorded.';
             }
         }
         // Only after the approval is saved: an email that fails must not undo it. A backdated paper record gets none.

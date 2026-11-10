@@ -245,13 +245,13 @@ account_page_start($ctx, 'My Account', 'account', [
 <!-- Settings stay separate from the dashboard; existing section links still work. -->
 <nav class="acc-tabs" role="tablist" aria-label="Account settings" id="accountSettingsTabs" hidden>
     <a href="#applications" class="acc-tab" role="tab" data-tab="applications" hidden>Applications</a>
-    <a href="#profile" class="acc-tab" role="tab" data-tab="profile"><i class="fas fa-user-edit"></i> Profile</a>
-    <a href="#security" class="acc-tab" role="tab" data-tab="security"><i class="fas fa-shield-alt"></i> Security</a>
-    <a href="#preferences" class="acc-tab" role="tab" data-tab="preferences"><i class="fas fa-sliders-h"></i> Preferences</a>
+    <a href="#profile" class="acc-tab" id="profileTab" role="tab" aria-controls="profilePanel" data-tab="profile"><i class="fas fa-user-edit" aria-hidden="true"></i> Profile</a>
+    <a href="#security" class="acc-tab" id="securityTab" role="tab" aria-controls="securityPanel" data-tab="security"><i class="fas fa-shield-alt" aria-hidden="true"></i> Security</a>
+    <a href="#preferences" class="acc-tab" id="preferencesTab" role="tab" aria-controls="preferencesPanel" data-tab="preferences"><i class="fas fa-sliders-h" aria-hidden="true"></i> Preferences</a>
 </nav>
 
 <!-- ============ APPLICATIONS ============ -->
-<section class="acc-panel" data-panel="applications" role="tabpanel">
+<section class="acc-panel" data-panel="applications" aria-label="Applications">
     <?php /* The four count tiles are gone: the status chips above the list (All / Pending / Approved / Declined, with the same counts) do the same filtering */ ?>
     <div class="acc-section-heading"><h2>Apply for assistance</h2><p>Choose the service you need.</p></div>
     <div class="acc-programs">
@@ -350,7 +350,7 @@ account_page_start($ctx, 'My Account', 'account', [
 </section>
 
 <!-- ============ PROFILE ============ -->
-<section class="acc-panel" data-panel="profile" role="tabpanel" hidden>
+<section class="acc-panel" id="profilePanel" data-panel="profile" role="tabpanel" aria-labelledby="profileTab" hidden>
     <div class="acc-two">
         <div class="ap-card acc-card">
             <h3 class="acc-h3"><i class="fas fa-camera"></i> Profile photo</h3>
@@ -443,7 +443,7 @@ account_page_start($ctx, 'My Account', 'account', [
                     <select id="barangay" name="barangay" autocomplete="address-level3">
                         <option value="">Choose your barangay</option>
                         <?php foreach (BARANGAYS as $b): ?>
-                            <option value="<?= e($b) ?>"<?= ($profile['barangay'] ?? '') === $b ? ' selected' : '' ?>><?= e($b) ?></option>
+                            <option value="<?= e($b) ?>"<?= strcasecmp((string)($profile['barangay'] ?? ''), $b) === 0 ? ' selected' : '' ?>><?= e($b) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -471,7 +471,7 @@ account_page_start($ctx, 'My Account', 'account', [
 </section>
 
 <!-- ============ SECURITY ============ -->
-<section class="acc-panel" data-panel="security" role="tabpanel" hidden>
+<section class="acc-panel" id="securityPanel" data-panel="security" role="tabpanel" aria-labelledby="securityTab" hidden>
     <div class="acc-two">
         <?php if ($google): ?>
         <div class="ap-card acc-card acc-wide">
@@ -521,7 +521,7 @@ account_page_start($ctx, 'My Account', 'account', [
 </section>
 
 <!-- ============ PREFERENCES ============ -->
-<section class="acc-panel" data-panel="preferences" role="tabpanel" hidden>
+<section class="acc-panel" id="preferencesPanel" data-panel="preferences" role="tabpanel" aria-labelledby="preferencesTab" hidden>
     <div class="acc-two">
         <form method="post" class="ap-card acc-card acc-wide">
             <?= csrf_field() ?>

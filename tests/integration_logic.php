@@ -43,6 +43,8 @@ $opts = function (int $id) use ($version): array {
 };
 $first = $newApp('First');
 check(decide_application($pdo, $first, 'approve', $opts($first))['ok'], 'First historical approval failed');
+$firstBudget = budget_status($pdo, 2025, 1, true);
+check($firstBudget['remaining'] === 500.0 && $firstBudget['reserved'] === 400.0 && $firstBudget['available'] === 100.0, 'An approval reduced cash balance instead of reserving funds');
 $second = $newApp('Second');
 $noReason = decide_application($pdo, $second, 'approve', $opts($second));
 check($noReason['code'] === 'budget', 'Prior-year budget was not enforced');
@@ -50,6 +52,9 @@ $withReason = $opts($second);
 $withReason['budget_reason'] = 'Historical exceptional aid';
 check(decide_application($pdo, $second, 'approve', $withReason)['ok'], 'Budget override failed');
 check((int)$pdo->query('SELECT budget_year FROM budget_overrides LIMIT 1')->fetchColumn() === 2025, 'Override used wrong year');
+$overBudget = budget_status($pdo, 2025, 1, true);
+check($overBudget['remaining'] === 500.0 && $overBudget['available'] === -300.0 && $overBudget['state'] === 'over', 'An override changed the cash balance or lost the commitment warning');
+check(strpos(budget_state_text($overBudget), ui_peso(300)) !== false, 'Over-budget warning used cash balance instead of commitments');
 
 $third = $newApp('Third');
 $invalid = $opts($third);
@@ -62,6 +67,8 @@ check(decide_application($pdo, $third, 'approve', $stale)['code'] === 'changed',
 $admin = ['id' => 1, 'role' => 'admin'];
 check(assistance_release_record($pdo, $first, $admin, '2025-06-12', 'TEST-RECEIPT-1')['ok'], 'Payment record failed');
 check(!assistance_release_record($pdo, $first, $admin, '2025-06-12', 'TEST-RECEIPT-2')['ok'], 'Duplicate payment was accepted');
+$paidBudget = budget_status($pdo, 2025, 1, true);
+check($paidBudget['remaining'] === 100.0 && $paidBudget['reserved'] === 400.0 && $paidBudget['available'] === -300.0, 'Payment did not deduct once while preserving unpaid reservations');
 $payments = report_payments($pdo, ['start' => '2025-01-01', 'end_excl' => '2026-01-01'], 1);
 check(count($payments) === 1 && (float)$payments[0]['amount'] === 400.0, 'Payment report did not use actual payment records');
 check(person_lock_names('burial', ['beneficiary_birthdate' => '1980-01-01']) ===

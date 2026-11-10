@@ -669,7 +669,7 @@ admin_layout_start([
             <details class="panel panel-fold" id="barangays"<?= !empty($loadFailed['barangaymap']) ? ' open' : '' ?>>
                 <summary>
                     <h2 id="barangaysTitle">Applications by barangay</h2>
-                    <span class="fold-hint fold-show">Show map</span><span class="fold-hint fold-hide">Hide map</span>
+                    <span class="fold-hint fold-show">List of Baranggay</span><span class="fold-hint fold-hide">Hide list</span>
                 </summary>
                 <div class="fold-body">
                 <?php if (empty($loadFailed['barangaymap']) && $brgyMap && $brgyMap['total'] > 0): ?>

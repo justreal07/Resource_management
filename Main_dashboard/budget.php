@@ -1,7 +1,7 @@
 <?php
 /**
  * Budget (admin): the yearly budget of Medical and Burial assistance. See includes/budget.php for the rules.
- *   - how much of each budget is used (approved amounts, by the day they were approved) and what is left
+ *   - recorded payments and remaining budget, with approved reservations shown separately, attributed to the approval year
  *   - the form to set the starting budget, add to it, reduce it, CORRECT it (type the right total) or REMOVE it (every change needs a reason)
  *     Nothing is erased: a correction or a removal is a new line in the history (includes/budget.php)
  *   - the history of the year, and the approvals that went over the budget with the reason given
@@ -57,13 +57,13 @@ $kindNames = ['start' => 'Starting budget', 'add' => 'Added', 'reduce' => 'Reduc
 $canChange = $year >= $thisYear;   // this year and next can be changed; an earlier year is history
 
 admin_layout_start(['title' => 'Budget', 'section' => 'budget']);
-echo ui_page_head('Budget', 'The yearly budget for Medical and Burial assistance, and how much of it has been approved.');
+echo ui_page_head('Budget', 'The yearly budget for Medical and Burial assistance, recorded payments and remaining funds.');
 ?>
 <section class="panel" id="budget" aria-labelledby="budgetTitle">
     <div class="panel-head panel-head-row">
         <div>
             <h2 id="budgetTitle">Budget <?= $year ?></h2>
-            <p class="panel-sub">Approval reserves funds; only a recorded payment counts as paid. Available for new approvals = budget minus all approved commitments. OPD gives no money, so it has no budget.</p>
+            <p class="panel-sub">Remaining budget = total budget minus recorded payments. Approval only reserves funds; the balance decreases after the admin records actual payment. Available for new approvals also excludes reserved funds. OPD gives no money, so it has no budget.</p>
         </div>
         <?= ui_year_form((string)$year, 'budget') ?>
     </div>

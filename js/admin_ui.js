@@ -398,8 +398,8 @@
         if (time && time.value) store.set(claimKey(scope, 'Time'), time.value);
     }
 
-    /* The budget note under the amount (Medical / Burial; ui_budget_note() in includes/budget.php): what is left of this year's
-       budget, and what this approval would leave. When the amount would pass the budget the reason box appears (and is sent);
+    /* The budget note under the amount (Medical / Burial; ui_budget_note() in includes/budget.php): funds available for new
+       approvals after reservations. When the amount would pass the budget the reason box appears (and is sent);
        otherwise it stays hidden and disabled. decide_application() checks the budget again on the server. */
     const budgetMoney = (n) => '₱' + Number(n).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     function updateBudgetNote(scope) {
@@ -439,11 +439,11 @@
             const shown = Math.round(pct * 10) / 10;
             if (amount > 0) {
                 text.textContent = over
-                    ? 'This approval is ' + budgetMoney(after - total) + ' over the ' + label + ' (' + budgetMoney(Math.max(0, total - used)) + ' left). Give a reason to approve it anyway.'
-                    : 'After this approval: ' + budgetMoney(total - after) + ' left of ' + budgetMoney(total) + ' (' + shown + '% committed).';
+                    ? 'This approval is ' + budgetMoney(after - total) + ' over the ' + label + ' (' + budgetMoney(Math.max(0, total - used)) + ' available for new approvals). Give a reason to approve it anyway.'
+                    : 'After reserving this amount: ' + budgetMoney(total - after) + ' available for new approvals of ' + budgetMoney(total) + ' (' + shown + '% committed). Remaining budget decreases only after payment is recorded.';
             } else {
                 text.textContent = label.charAt(0).toUpperCase() + label.slice(1) + ': '
-                    + (used > total ? budgetMoney(used - total) + ' over ' : budgetMoney(total - used) + ' left of ') + budgetMoney(total)
+                    + (used > total ? budgetMoney(used - total) + ' committed over ' : budgetMoney(total - used) + ' available for new approvals of ') + budgetMoney(total)
                     + ' (' + (Math.round((total > 0 ? used / total * 100 : 0) * 10) / 10) + '% committed).';
             }
         }

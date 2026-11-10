@@ -22,6 +22,8 @@ function val(string $name): string {
 /** ' selected' when the field currently has this value. */
 function selected(string $name, string $option): string {
     global $values;
+    // Keep previously saved capitalization selected when the barangay list is updated.
+    if ($name === 'barangay') return strcasecmp((string)($values[$name] ?? ''), $option) === 0 ? ' selected' : '';
     return (($values[$name] ?? '') === $option) ? ' selected' : '';
 }
 
