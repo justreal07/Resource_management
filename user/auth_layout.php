@@ -28,7 +28,6 @@ function auth_page_start(string $title, string $active, callable $heroText): voi
         <div class="topbar-info">
             <span><i class="fas fa-landmark"></i> Municipality of General Mariano Alvarez, Cavite</span>
         </div>
-        <?php portal_text_size_buttons(); ?>
     </div>
 </div>
 
@@ -112,7 +111,6 @@ function auth_page_end(): void {
 
 <?php portal_scripts(); ?>
 <script>
-// (Text size buttons: js/portal-ui.js)
 
 // Header shadow + mobile menu
 const siteHeader = document.getElementById('siteHeader');

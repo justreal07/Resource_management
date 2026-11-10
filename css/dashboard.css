@@ -309,7 +309,7 @@
 .db-body .field input, .db-body .field select { min-width: 0; width: 100%; }
 .db-body .acc-pw input { padding-right: 48px; }
 .db-body .acc-pw-toggle { min-width: 42px; min-height: 42px; }
-.db-body .acc-switch-row, .db-body .acc-size-picker button { border-radius: var(--db-radius); border-width: 1px; }
+.db-body .acc-switch-row { border-radius: var(--db-radius); border-width: 1px; }
 
 /* ---------- Notifications page ---------- */
 .db-body .acc-notif { border-radius: var(--db-radius); border-color: var(--db-border); }

@@ -306,15 +306,6 @@
 .acc-switch input:checked + span::after { transform: translateX(24px); }
 .acc-switch input:focus-visible + span { outline: 3px solid var(--gold); outline-offset: 2px; }
 
-.acc-size-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.acc-size-picker button {
-    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 8px;
-    border: 1.5px solid var(--line); border-radius: 14px; background: var(--field); cursor: pointer;
-    font-family: inherit; font-weight: 600; color: var(--body); font-size: 0.85rem;
-}
-.acc-size-picker button span { font-family: 'Poppins', sans-serif; font-weight: 700; color: var(--ink); line-height: 1; }
-.acc-size-picker button[aria-pressed="true"] { border-color: var(--navy); background: var(--info-soft); color: var(--navy); }
-
 /* ---------- Notifications page ---------- */
 .acc-notif-group + .acc-notif-group { margin-top: 18px; }
 .acc-notif-group[hidden] { display: none; }

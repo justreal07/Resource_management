@@ -540,17 +540,6 @@ account_page_start($ctx, 'My Account', 'account', [
             </div>
         </form>
 
-        <div class="ap-card acc-card">
-            <h3 class="acc-h3"><i class="fas fa-text-height"></i> Text size</h3>
-            <p class="acc-small ap-muted">Make the text bigger and easier to read on this page. Pages always open at the normal size.</p>
-            <div class="acc-size-picker" role="group" aria-label="Text size">
-                <?php /* Same sizes as the top bar's buttons (PORTAL_TEXT_SIZES); run by js/portal-ui.js */ ?>
-                <?php $pickerLabels = ['Normal', 'Large', 'Largest']; $pickerA = ['.9rem', '1.15rem', '1.4rem']; $i = 0; ?>
-                <?php foreach (PORTAL_TEXT_SIZES as $size => $_): ?>
-                    <button type="button" data-size="<?= e((string)$size) ?>"><span style="font-size:<?= $pickerA[$i] ?>">A</span><?= $pickerLabels[$i++] ?></button>
-                <?php endforeach; ?>
-            </div>
-        </div>
     </div>
 </section>
 

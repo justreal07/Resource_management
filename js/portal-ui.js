@@ -11,7 +11,6 @@
    - Guided tours: <body data-tour="..."> and [data-tour-start] buttons
    - Copy buttons, Caps Lock hint, password strength and "passwords match",
      mobile number boxes (data-phone: digits only, 11 at most)
-   - Text size buttons (pages open at 112.5%; the buttons enlarge further)
    Exposed as window.PortalUI for js/account.js, js/apply-form.js and js/apply-upload.js.
    ========================================================================== */
 (function () {
@@ -439,19 +438,6 @@
         showFlashToasts();
         offerTour();
     }).catch(keepBuiltIn);
-
-    /* ---------- Text size: the "A A A" buttons of the top bar and My Account > Preferences ----------
-       Every page opens at the normal size (cfg.textBase, 112.5%: PORTAL_TEXT_SIZES in user/portal_ui.php,
-       already applied in <head> so the page is drawn at that size). A button enlarges this page only;
-       the choice is not remembered. All sizes on these pages are in rem, so the forms grow too. */
-    const textBase = String(cfg.textBase || '112.5');
-    const textButtons = document.querySelectorAll('.text-size button[data-size], .acc-size-picker button[data-size]');
-    function applyTextSize(size) {
-        document.documentElement.style.fontSize = size + '%';
-        textButtons.forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.size === String(size))));
-    }
-    applyTextSize(textBase);
-    textButtons.forEach((b) => b.addEventListener('click', () => applyTextSize(b.dataset.size)));
 
     window.PortalUI = { store, reduceMotion, loadLib, confirm, alert, toast, startTour };
 })();
