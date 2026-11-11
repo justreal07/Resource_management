@@ -51,8 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($contact_errors as $field => $message) {
             if ($message !== 'This field is required.') $errors[] = $labels[$field] . ': ' . $message;
         }
-        if ($old['username'] !== '' && !preg_match('/^[A-Za-z0-9._]{4,50}$/', $old['username'])) {
-            $errors[] = 'Username must be 4–50 characters: letters, numbers, dots or underscores only.';
+        if ($old['username'] !== '' && ($usernameProblem = applicant_username_problem($old['username'])) !== null) {
+            $errors[] = $usernameProblem;
             $stepOneError = true;
         }
         if ($old['email'] !== '' && !filter_var($old['email'], FILTER_VALIDATE_EMAIL)) {
@@ -209,10 +209,9 @@ auth_page_start('Sign up', 'register', function () { ?>
         <div class="field">
             <label for="username">Username</label>
             <div class="input-wrap">
-                <input type="text" id="username" name="username" required minlength="4" maxlength="50" pattern="[A-Za-z0-9._]{4,50}" autocomplete="username" value="<?php echo $value('username'); ?>" placeholder="e.g. juan.delacruz">
+                <input type="text" id="username" name="username" required minlength="4" maxlength="50" autocomplete="username" value="<?php echo $value('username'); ?>" placeholder="Choose your username">
                 <i class="fas fa-at"></i>
             </div>
-            <span class="field-hint">At least 4 characters: letters, numbers, dots or underscores.</span>
         </div>
 
         <div class="field">

@@ -6,6 +6,17 @@
 require_once __DIR__ . '/assistance_config.php';
 require_once __DIR__ . '/../includes/schema.php';
 
+/** Applicant usernames may use any visible characters; @ remains reserved for email sign-in. */
+function applicant_username_problem(string $username): ?string {
+    if (!mb_check_encoding($username, 'UTF-8') || preg_match('/\p{C}/u', $username)) {
+        return 'Please use visible characters in your username.';
+    }
+    $length = mb_strlen(trim($username), 'UTF-8');
+    if ($length < 4 || $length > 50) return 'Choose a username with 4–50 characters.';
+    if (strpos($username, '@') !== false) return 'Please leave out @; it is reserved for email sign-in.';
+    return null;
+}
+
 /**
  * Adds the profile/settings columns to applicant_accounts if they are missing (an older database).
  * A database installed from database/lgu_assistance_system.sql has them all, so this only reads and changes nothing.

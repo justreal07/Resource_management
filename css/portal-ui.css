@@ -541,3 +541,33 @@ section + section .pui-fb-section-title { margin-top: 30px; }
     .pui-btn:hover { transform: none; }
     .pui-fb-face:hover span { transform: none; }
 }
+/* Shared applicant-side service icons: consistent dark navy across page layouts.
+   Admin styles do not load this stylesheet. Status indicators retain their own colors. */
+body :is(.fa-briefcase-medical, .fa-hand-holding-heart, .fa-stethoscope) {
+    color: #0a2472 !important;
+}
+body :is(.fa-hourglass, .fa-hourglass-half, .fa-hourglass-start, .fa-hourglass-end) {
+    color: #000 !important;
+}
+body :is(.acc-program-icon, .acc-app-icon, .qa-icon, .ap-hero-icon, .ap-tl-icon, .acc-n-icon, .mu-icon, .notif-icon):has(> :is(.fa-briefcase-medical, .fa-hand-holding-heart, .fa-stethoscope)) {
+    background: #f2f2f2 !important;
+    color: #0a2472 !important;
+}
+/* User footer branding, shared by the public, account and application layouts. */
+.pui-footer-band { background: #061650; color: #fff; padding: 28px 24px; text-align: left; }
+.pui-footer-inner { max-width: 1232px; margin: auto; }
+.pui-footer-brand { max-width: 320px; text-align: left; font-size: 14px; line-height: 1.6; }
+.pui-footer-brand .brand { display: flex; align-items: center; gap: 12px; color: #fff; text-decoration: none; }
+.pui-footer-brand .brand-logos { display: flex; align-items: center; flex: none; }
+.pui-footer-brand .brand-logos img { width: 48px; height: 48px; border-radius: 50%; object-fit: cover; border: 2px solid #fff; }
+.pui-footer-brand .brand-logos img + img { margin-left: -14px; }
+.pui-footer-brand .brand-text { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
+.pui-footer-brand .brand-text strong { color: #fff; font-size: 16px; line-height: 1.2; white-space: normal; }
+.pui-footer-brand .brand-text small { display: block; color: #c5cce2; font-size: 12px; line-height: 1.4; }
+.pui-footer-brand p { color: #c5cce2; margin: 18px 0 14px; }
+.pui-footer-brand .footer-social { display: flex; gap: 10px; }
+.pui-footer-brand .footer-social a { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; color: #fff; text-decoration: none; font-size: 18px; }
+.pui-footer-brand .social-fb { background: #1877f2; }
+.pui-footer-brand .social-ig { background: linear-gradient(135deg, #833ab4, #e1306c, #fcb045); }
+.pui-footer-brand .footer-social .social-gm { background: #fff; }
+@media print { .pui-footer-band, .pui-footer-brand { display: none; } }

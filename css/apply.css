@@ -373,6 +373,15 @@ img { max-width: 100%; display: block; }
 .span-3 { grid-column: span 6; }    /* half */
 .span-4 { grid-column: span 8; }    /* two thirds */
 .span-6 { grid-column: span 12; }   /* the whole row */
+/* Share label/input/error rows so the longer birthdate label does not offset the companion input. */
+.opd-companion-grid > .field {
+    display: grid;
+    grid-template-rows: subgrid;
+    grid-row: span 3;
+    row-gap: 6px;
+}
+.opd-companion-grid > .field > label { align-self: end; margin-bottom: 0; }
+.opd-companion-grid > .field > input { align-self: start; }
 /* Barangay, Municipality and Province share a row. At the larger text size a third of the row each is too
    narrow for "Barangay 1 Poblacion" or "General Mariano Alvarez" (both would be cut off), while "Cavite" is short. */
 .field:has(> select#barangay), .field:has(> #municipality) { grid-column: span 5; }

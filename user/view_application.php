@@ -243,10 +243,10 @@ account_page_start($ctx, "Application #$app_id", 'account', [
 </div>
 <?php endif; ?>
 
-<div class="acc-two acc-details">
+<div class="acc-two acc-details acc-information">
     <div class="ap-card acc-card">
         <h3 class="acc-h3"><i class="fas fa-user"></i> <?= $person_label ?> details</h3>
-        <dl class="acc-dl">
+        <dl class="acc-dl acc-person-details">
             <?php
             detail_row('Full name', trim(preg_replace('/\s+/', ' ', $app['first_name'] . ' ' . $app['middle_name'] . ' ' . $app['last_name'])));
             if ($type === 1 && !empty($app['beneficiary_birthdate'])) detail_row('Birthdate', date('F d, Y', strtotime($app['beneficiary_birthdate'])));

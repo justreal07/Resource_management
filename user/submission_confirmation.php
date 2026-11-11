@@ -74,7 +74,7 @@ apply_page_start('Application Submitted', $program, 3);
             </li>
             <li>
                 <span class="ap-tl-icon"><i class="fas fa-bell"></i></span>
-                <div><strong>Decision</strong><p>You'll see <em>Approved</em> or <em>Declined</em> (you may then apply again) in your notifications and on <a href="my_account">My Account</a>.</p></div>
+                <div><strong>Decision</strong><p>When your application is approved, the office sends approval details to the email address on your account, if provided. You can also check your <em>Approved</em> or <em>Declined</em> status on your <a href="my_account">dashboard</a> and in <a href="user_notifications">Notifications</a>, even if you haven't received an email. If declined, you may apply again.</p></div>
             </li>
             <?php if ((int)$app['assistance_type_id'] === 3 && $app['checkup_date']): ?>
             <li>

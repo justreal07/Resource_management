@@ -36,7 +36,7 @@
         linear-gradient(135deg, rgba(8, 25, 85, 0.9) 0%, rgba(48, 35, 84, 0.85) 52%, rgba(120, 12, 30, 0.82) 100%);
 }
 .auth-page-login .auth-hero::after { display: none; }
-.auth-page-login .hero-text .accent { color: #eadcf9; }
+.auth-page-login .hero-text .accent { color: var(--gold, #F4B400); }
 .auth-page-login .auth-card {
     position: relative;
     overflow: hidden;

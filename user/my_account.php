@@ -34,12 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $errors = [];
         if ($p['firstname'] === '' || $p['lastname'] === '') $errors[] = 'First name and last name are required.';
-        if (!preg_match('/^[A-Za-z0-9._@-]{3,100}$/', $p['username'])) {
-            $errors[] = 'Username must be 3 or more characters (letters, numbers, . _ - only).';
-        } elseif (strpos($p['username'], '@') !== false && $p['username'] !== $user['username']) {
-            // A username that is an email address is how a Google account is named. Letting anyone pick one would let a
-            // stranger take the name of someone else's Gmail before that person ever signs in with Google.
-            $errors[] = 'A username cannot contain @. Use letters, numbers, dots, dashes or underscores.';
+        // Preserve existing usernames (including Google email names); new choices follow signup rules.
+        if ($p['username'] !== $user['username'] && ($usernameProblem = applicant_username_problem($p['username'])) !== null) {
+            $errors[] = $usernameProblem;
         }
         if ($p['email'] !== '' && !filter_var($p['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Please enter a valid email address.';
         // An email already on the account can be changed but not removed: it is how a forgotten password is reset

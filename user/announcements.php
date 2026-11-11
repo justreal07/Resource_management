@@ -287,6 +287,7 @@ $h = 'ann_e';
 </dialog>
 
 <footer class="site-footer ann-footer">
+    <?php portal_footer_brand(); ?>
     <div class="footer-bottom">
         <div class="container">
             <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>

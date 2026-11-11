@@ -317,6 +317,21 @@
 .db-body .acc-n-icon { border-radius: var(--db-radius-sm); }
 
 /* ---------- Application details ---------- */
+/* Wide information cards keep addresses and phone numbers out of the narrow profile column. */
+.db-body .acc-two.acc-information { grid-template-columns: minmax(0, 1fr); }
+.acc-information .acc-dl {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+    gap: 18px 28px;
+    margin-bottom: 0;
+}
+.acc-information .acc-dl > div {
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    gap: 4px;
+}
+.acc-information .acc-person-details > div:last-child { grid-column: 1 / -1; }
+.acc-information .acc-dl dd { overflow-wrap: anywhere; word-break: normal; }
 .db-body .acc-status-card { border-top-width: 3px; }
 .db-body .acc-status-head h2 { font-size: 1.35rem; font-weight: 700; }
 .db-body .acc-status-icon { width: 56px; height: 56px; border-radius: var(--db-radius); font-size: 1.4rem; background: var(--tint-amber); color: #a86a00; }

@@ -234,7 +234,7 @@ apply_page_start($edit !== null ? 'Edit ' . $program['name'] . ' application' : 
             <fieldset class="ap-section" data-all-or-none>
                 <legend><span class="ap-section-num">4</span> Adult guardian or companion</legend>
                 <p class="ap-section-hint">Required for patients under 18. Adult patients may leave all companion fields empty. A named companion must be at least 18.</p>
-                <div class="ap-grid">
+                <div class="ap-grid opd-companion-grid">
                     <div class="field span-2">
                         <label for="claimant_birthdate">Guardian or companion birthdate</label>
                         <input type="date" id="claimant_birthdate" name="claimant_birthdate" value="<?= val('claimant_birthdate') ?>" max="<?= date('Y-m-d') ?>"<?= invalid('claimant_birthdate') ?>>

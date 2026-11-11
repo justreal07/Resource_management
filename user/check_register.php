@@ -21,7 +21,9 @@ $problems = [];
 try {
     ensure_user_schema($pdo);
 
-    if ($username !== '') {
+    if (($usernameProblem = applicant_username_problem($username)) !== null) {
+        $problems['username'] = $usernameProblem;
+    } else {
         $stmt = $pdo->prepare('SELECT 1 FROM applicant_accounts WHERE username = ?');
         $stmt->execute([$username]);
         if ($stmt->fetch()) {

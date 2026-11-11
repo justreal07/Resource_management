@@ -131,6 +131,7 @@ $h = function ($value): string { return htmlspecialchars((string)$value, ENT_QUO
 </main>
 
 <footer class="site-footer ch-footer">
+    <?php portal_footer_brand(); ?>
     <div class="footer-bottom">
         <div class="container">
             <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez. All rights reserved.</span>

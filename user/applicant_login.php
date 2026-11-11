@@ -85,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 auth_page_start('Log in', 'login', function () { ?>
-    <h1>Welcome back, <span class="accent" style="white-space: nowrap">ka-GMA!</span></h1>
+    <h1>WELCOME, <span class="accent">KA GMANIANS!</span></h1>
     <p class="hero-lead">Log in to apply for assistance and follow your applications.</p>
     <ul class="hero-trust">
         <li><i class="fas fa-check-circle"></i> For GMA, Cavite residents</li>

@@ -198,6 +198,7 @@ function apply_page_end(array $scripts = []): void {
 </main>
 
 <footer class="ap-footer">
+    <?php portal_footer_brand(); ?>
     <div class="ap-container">
         <span>&copy; <?= date('Y') ?> Local Government Unit of General Mariano Alvarez</span>
         <span><i class="fas fa-phone"></i> Need help? Call (046) 123-4567 · Mon–Fri, 8 AM–5 PM</span>

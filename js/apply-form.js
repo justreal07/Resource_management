@@ -304,13 +304,18 @@
         clearBtn.addEventListener('click', function () {
             ask({
                 title: 'Clear the form?',
-                text: 'All the fields on this form will be emptied so you can start over.',
+                text: 'Your answers will be cleared so you can start over. Municipality and province will stay the same.',
                 confirmText: 'Clear form',
                 cancelText: 'Keep my answers',
                 danger: true
             }).then(function (ok) {
                 if (!ok) return;
                 textFields.forEach(function (el) {
+                    // These service-area fields are fixed on all three assistance forms.
+                    if (el.readOnly && (el.name === 'municipality' || el.name === 'province')) {
+                        el.value = el.defaultValue;
+                        return;
+                    }
                     el.value = '';
                     el.classList.remove('is-prefilled');
                 });
